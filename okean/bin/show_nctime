@@ -1,0 +1,62 @@
+#!/usr/bin/python
+from okean import netcdf
+from sys import argv
+import numpy as np
+
+def find_tvar(fname):
+  tvar=''
+  vars=netcdf.varnames(fname)
+  for v in vars:
+    if v.endswith('time'):
+      return v
+
+  return tvar
+
+
+def show(fname,tvar=False,tind=False):
+  if not tvar:
+    tvar=find_tvar(fname)
+
+  if not tvar:
+    print 'provide time varname'
+    return
+
+  if tind=='all':
+    T=netcdf.nctime(fname,tvar)
+    for t in T: print t
+  elif tind is False:
+    T0=netcdf.nctime(fname,tvar,**{'0':0})
+    T1=netcdf.nctime(fname,tvar,**{'0':-1})
+    nrec=netcdf.vdim(fname,tvar).values()[0]
+    print '%d reccords, from %s to %s' % (nrec,T0.isoformat(' '),T1.isoformat(' '))
+  else:
+    T=netcdf.nctime(fname,tvar,**{'0':tind})
+    print T,'('+tvar+')'
+
+if __name__=='__main__':
+  import sys
+  import getopt
+
+  if len(argv)==1:
+    print 'show_nctime [-v tvarname] [-t <tind,"all">] filename'
+    print 'by default show first and last date in the first time var of file'
+    sys.exit()
+
+  try:
+    opts, args = getopt.getopt(sys.argv[1:], 'v:t:')
+  except getopt.GetoptError, msg:
+    print msg
+    sys.exit(2)
+
+
+  filename=args[0]
+  varname=False
+  tind=False
+  for o, a in opts:
+    if   o =='-v': varname=a
+    elif o =='-t': tind=a
+
+  if tind!='all' and not tind is False: tind=int(tind)
+
+  show(filename,varname,tind)
+

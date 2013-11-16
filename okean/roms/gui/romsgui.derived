@@ -1,0 +1,15 @@
+[speed]
+lon_name: currents spped, sqrt(u2+v2)
+units: metre second-1
+req=u,v
+
+[ke]
+lon_name: kinetic energy, 1/2(u2+v2)
+units: metre second-1
+req=u,v
+
+[okubo]
+lon_name: Okubo-Weiss parameter
+units: second-2
+req=u,v
+

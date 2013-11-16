@@ -1,0 +1,7 @@
+*.pyc
+*OLD
+*notINCLUDE*
+*REMOVE*
+*.so
+MANIFEST
+dist/

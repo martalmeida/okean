@@ -1,0 +1,73 @@
+#!/usr/local/bin/python2.7
+
+from okean import cookbook as cb
+import numpy as np
+
+def stat():
+  a=cb.run('qstat')
+  s={}
+  for i in a[2:]:
+    num=int(i.split('.')[0])
+    name=i.split()[1]
+    user=i.split()[2]
+    s[num]=name,user
+
+  return s
+
+
+def qnodes():
+  a=cb.run('qnodes')
+
+  q=cb.odict()
+  for l in a:
+    if not l: continue
+    if l[0]!=' ':
+      name=l
+      #n=int(name.split('-')[-1])
+      n=int(name.split('.')[0][-2:])
+      q[n]={}
+      q[n]['name']=name
+    else:
+      prop=l.split()[0]
+      val=l.split('=')[-1].strip()
+      q[n][prop]=val
+
+  S=stat()
+  # job names:
+  for k in q.keys():
+    if not 'jobs' in q[k].keys(): continue
+    jobs=q[k]['jobs']
+    tmp=jobs.split('/')[1:]
+    ids=[]
+    for i in tmp:
+      id=int(i.split('.')[0])
+      ids+=[id]
+
+
+    ids  = np.array(ids)
+    uids = np.unique(ids)
+    q[k]['JobIds']=ids
+    s=''
+    for i in uids:
+      nid=len(ids[ids==i])
+      s+=S[i][0]+' x%d (' % (nid) +S[i][1]+')#'
+
+    q[k]['Jobs']=s[:-1]
+
+
+
+  K=q.keys()
+  for k in range(K[0],K[-1]+1):
+    if k in K:
+      state=q[k]['state']
+      if state=='down': s='X'
+      elif q[k].has_key('Jobs'): s='   '+q[k]['Jobs']
+      else: s='A'
+      print '%02d --> %s : %s %s' % (k,q[k]['name'].ljust(15),state.ljust(16),s)
+    else:
+      print '%02d --> ???? %s ???? %s %s' % (k,' '*12,' '*11,'X')
+
+
+  return q
+
+if __name__=='__main__': qnodes();

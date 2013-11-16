@@ -1,0 +1,23 @@
+#!/usr/bin/python
+
+# next 2 lines may be needed to open new figs!
+# for vertical slices, separate
+import matplotlib
+matplotlib.use('tkagg')
+
+
+from okean.roms.gui import romsgui
+import sys
+
+class NullStream:
+  def write(self, text): pass
+
+
+if __name__=='__main__':
+  sys.stdout = NullStream()
+  r=romsgui.rgui()
+  for i in sys.argv[1:]:
+    r.select_file(i)
+
+
+  r.root.mainloop()

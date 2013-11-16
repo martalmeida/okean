@@ -1,0 +1,5 @@
+#CITIES#
+College Station, U.S.A.  30 37.67 N 96 20.05 W
+Couto de Esteves, Portugal 40 45.46 N  8 18.44 W
+Brasília, Brazil 15 48 S 47 54 W
+Viavelez, Spain 43 30 N 7 0.9 W

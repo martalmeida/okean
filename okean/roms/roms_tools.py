@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import datetime
 import numpy as np
 from okean import netcdf, calc, dateu
 
@@ -317,7 +318,7 @@ def s_params(nc,show=0):
   return theta_s, theta_b, hc, N,vt,vs
 
 
-def roms_read_out(f,romsagrif=False):
+def roms_read_out(f):
   '''Parse ROMS output text file
      Returns Time, Ek,Ep,Etotal,Volume
 
@@ -326,12 +327,8 @@ def roms_read_out(f,romsagrif=False):
      Martinho MA, 2012
   '''
 
-  if romsagrif:
-    tag=' MAIN: started time-steping.'
-    nskip=2
-  else:
-    tag='   STEP   Day'
-    nskip=2
+  tag='   STEP   Day'
+  nskip=2
 
   badFormatStr='******'
 

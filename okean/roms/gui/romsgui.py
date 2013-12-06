@@ -271,7 +271,7 @@ class rgui:
 
 #    print TODO
 
-    self.url='pong.tamu.edu/~mma'
+    self.url='http://pong.tamu.edu/~mma'
 
     self.bg='#dddddd'
     self.fg='#333333'

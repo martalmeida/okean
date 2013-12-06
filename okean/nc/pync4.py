@@ -642,7 +642,7 @@ class Pync(Pyncgroup):
 
 
   def sync(self):
-    if self.interface=='netcdf4': self._nc.sync()
+    if self._interface=='netcdf4': self._nc.sync()
     else: print 'sync only in netcdf4'
 
   def close(self):

@@ -178,18 +178,22 @@ def show(filename,**kargs):
   print "\n# Contents of the NetCDF file"
   print '   '+realpath(filename)
 
-  print "\n:: Global Attibutes:"
+  print "\n:: Global Attributes:"
   at=nc.atts
   if at:
     l1=reduce(max,[len(x) for x in at.keys()])
-    l2=reduce(max,[len(str(x)) for x in [y.value for y in at.values()]])
+    try:
+      l2=reduce(max,[len(str(x)) for x in [y.value for y in at.values()]])
+    except:
+      l2=reduce(max,[len(unicode(x)) for x in [y.value for y in at.values()]])
 
     if lmax: l1=min(lmax,l1)
     if Lmax: l2=min(Lmax,l2)
 
     format='   %-'+str(l1) + 's   %-'+str(l2)+'s'
     for k in at.keys():
-       v=str(at[k].value)
+       try: v=str(at[k].value)
+       except: v=unicode(at[k].value)
        if len(k)>l1: k=k[:l1-1]+'+'
        if len(v)>l2: v=v[:l2-1]+'+'
        print format % (k,v)
@@ -250,17 +254,21 @@ def showvar(filename,varname,**kargs):
     for k in di.keys():
        print format % (k,di[k])
 
-  print "\n:: Attibutes:"
+  print "\n:: Attributes:"
   if at:
     l1=reduce(max,[len(x) for x in at.keys()])
-    l2=reduce(max,[len(str(x)) for x in [y['value'] for y in at.values()]])
+    try:
+      l2=reduce(max,[len(str(x)) for x in [y.value for y in at.values()]])
+    except:
+      l2=reduce(max,[len(unicode(x)) for x in [y.value for y in at.values()]])
 
     if lmax: l1=min(lmax,l1)
     if Lmax: l2=min(Lmax,l2)
 
     format='   %-'+str(l1) + 's   %-'+str(l2)+'s'
     for k in at.keys():
-       v=str(at[k]['value'])
+       try: v=str(at[k].value)
+       except: v=unicode(at[k].value)
        if len(k)>l1: k=k[:l1-1]+'+'
        if len(v)>l2: v=v[:l2-1]+'+'
        print format % (k,v)

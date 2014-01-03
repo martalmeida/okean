@@ -198,7 +198,9 @@ class Pyncatt:
     s=''
     s+='nctype: '+str(self.nctype)
     s+='\ndtype:  '+str(self.dtype)
-    s+='\nvalue:  '+str(self.value)
+    try:
+      s+='\nvalue:  '+str(self.value)
+    except: s+='\nvalue:  '+unicode(self.value)
 
     s='%s   %s  %s' % (self.name,str(self.dtype),str(self.value))
     return s

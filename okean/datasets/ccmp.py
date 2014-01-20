@@ -99,7 +99,7 @@ def gen_frc(fname,grd,tag='_ccmp'):
 
   # Global Attributes:
   nc.add_att('type','Wind forcing file')
-  nc.add_att('title','WEST CCMP wind')
+  nc.add_att('title','CCMP wind')
   nc.add_att('grd_file',os.path.realpath(grd))
   from time import ctime
   nc.add_att('history','ROMS  wind  file, '+ctime())
@@ -130,7 +130,7 @@ def make_frc(frcname,grd,date0,date1):
     gen_frc(frcname,grd)
   else:
     last=netcdf.nctime(frcname,'wind_time',wind_time=-1)
-    print '-->founf file %s with last time %s'%(frcname,last.isoformat())
+    print '-->found file %s with last time %s'%(frcname,last.isoformat())
     date0=last+datetime.timedelta(1/4.)
 
   dates=[date0]
@@ -161,7 +161,7 @@ if __name__=='__main__':
   if len(sys.argv)<5:
     print 'USAGE: python ccmp.py roms_grd.nc  wind_frc.nc 20100101 20110101'
   else:
-    grd=ys.argv[1]
+    grd=sys.argv[1]
     fname=sys.argv[2]
     date0=dateu.parse_date(sys.argv[3])
     date1=dateu.parse_date(sys.argv[4])

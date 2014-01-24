@@ -246,14 +246,14 @@ def griddata(x,y,v,xi,yi,**kargs):
     y=y*rxy
     yi=yi*rxy
 
-
   # interp/extrap:
   try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap)
   except: res=xi*np.nan
 
   # final extrap:
   if finalextrap:
-    try: res=mask_extrap(xi,yi,np.ma.masked_where(np.isnan(res),res))
+    try: mask_extrap(xi,yi,np.ma.masked_where(np.isnan(res),res),
+           inplace=True,norm_xy=norm_xy)
     except: pass
 
   maskCond=np.isnan(res)
@@ -289,6 +289,13 @@ def _griddataz(x,y,v,xi,yi,mask2d,extrap):
   '''
   Use griddata instead
   '''
+
+  # nn_extrapolator/nn_interpolator may have problems dealing with
+  # regular grids, nans may be obtained. One simple solution is to
+  # rotate the domains!
+  x,y=rot2d(x,y,np.pi/3.)
+  xi,yi=rot2d(xi,yi,np.pi/3.)
+
   if v.ndim==x.ndim+1:
     tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d)
     res=np.zeros([v.shape[0]]+list(tmp.shape),dtype=v.dtype)
@@ -329,7 +336,7 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False):
   return u, tri
 
 
-def mask_extrap(x,y,v):
+def mask_extrap(x,y,v,inplace=False,norm_xy=False):
   '''
   Extrapolate numpy array at masked points.
   Based on delaunay triangulation provided by matplotlib.
@@ -338,23 +345,34 @@ def mask_extrap(x,y,v):
   if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
   else: return v
 
+  if inplace: u=v
+  else: u=v.copy()
+
+  if norm_xy:
+    rxy=(x.max()-x.min())/(y.max()-y.min())
+    y=y*rxy
+
+  # nn_extrapolator may have problems dealing with regular grids,
+  # nans may be obtained. One simple solution is to rotate the domain!
+  x,y=rot2d(x,y,np.pi/3.)
+
   if 0:
     tri=delaunay.Triangulation(x[~mask],y[~mask])
-    v[mask]=tri.nn_extrapolator(v[~mask])(x[mask],y[mask])
+    u[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
   else:
     # deal with repeated pairs (problem for nn_extrapolator)
     xy=x[~mask]+1j*y[~mask]
     xy,ii=np.unique(xy,1)
 
     tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
-    v[mask]=tri.nn_extrapolator(v[~mask][ii])(x[mask],y[mask])
+    u[mask]=tri.nn_extrapolator(u[~mask][ii])(x[mask],y[mask])
 
-  if np.any(np.isnan(v)):
-    mask=np.isnan(v)
+  if np.any(np.isnan(u)):
+    mask=np.isnan(u)
     tri=delaunay.Triangulation(x[~mask],y[~mask])
-    v[mask]=tri.nn_extrapolator(v[~mask])(x[mask],y[mask])
+    v[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
 
-  return v
+  if not inplace: return u
 
 
 def cyclic_index(time,t,cycle):
@@ -601,13 +619,12 @@ def meetpoint(x1,y1,x2,y2):
   '''
 
   from alg import meetpoint as meetp
-  mask=999.
   xy=[]
   xyi,N=meetp(x1,y1,x2,y2,len(x1),len(x2))
   xi=xyi[0]
   yi=xyi[1]
   for i in range(N):
-    if  (xi[i],yi[i]) not in xy and xi[i]!=mask:
+    if  (xi[i],yi[i]) not in xy:
        xy+=  [(xi[i],yi[i])]
 
   ty=x1.dtype
@@ -774,3 +791,124 @@ def angle_point_line(x,y,xp,yp,n=1):
   elif n==0:
     return np.squeeze([calc_ang(i) for i in range(len(x)-1)])
 
+
+def _bilin_aux(xi,yi,vi,maski,**kargs):
+  '''Used by bilin and bilin_aux.
+  (processes extrapolation options)
+  '''
+
+  extrap=kargs.get('extrap',False)
+  extrap_method=kargs.get('extrap_method','easy') # easy or tri
+
+  condIn=maski==-1
+  condOut=maski==0
+
+  if extrap_method=='easy':
+    extrp=easy_extrap
+    args=dict(inplace=True)
+  elif extrap_method=='tri':
+    extrp=mask_extrap
+    args=dict(inplace=True,norm_xy=True)
+
+  if extrap=='in':
+    vi=np.ma.masked_where(condIn,vi)
+    extrp(xi,yi,vi,**args)
+    return np.ma.masked_where(condOut,vi)
+  elif extrap=='out':
+    vi=np.ma.masked_where(condOut,vi)
+    extrp(xi,yi,vi,**args)
+    return np.ma.masked_where(condIn,vi)
+  elif extrap in (0,1):
+    vi=np.ma.masked_where(condIn|condOut,vi)
+    if extrap==1: extrp(xi,yi,vi,**args)
+
+  return vi
+
+
+def bilin(x,y,v,xi,yi,**kargs):
+  '''Bilinear interpolation.
+  Domains x,y and xi,yi do not need to be fully regular!
+
+  Options
+    extrap: True, False, 'in','out' (extrap everywhere, do not extrap,
+      extrap in masked points inside original domain, extrap in
+      points outside original domain
+
+    extrap_method: 'easy','tri' (extrap with a fast/simple/ugly method
+      or with triangulation)
+  '''
+
+  from alg import bilin as alg_bilin
+  if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
+  else: mask=np.zeros_like(v,'bool')
+  vi,maski=alg_bilin(x,y,v,xi,yi,mask)
+  return _bilin_aux(xi,yi,vi,maski,**kargs)
+
+
+def bilin_coefs(x,y,xi,yi,mask=False):
+  '''Bilinear interpolation coefficients.
+  Returns coefs to be used as bilin_fast(v,coefs,...).
+  Use Bilin instead.
+  '''
+  from alg import bilin_coefs as alg_bc
+  if mask is False: mask=np.zeros_like(x,'bool')
+  coefs,inds=alg_bc(x,y,xi,yi,mask)
+  return xi,yi,coefs,inds
+
+
+def  bilin_fast(v,coefs,**kargs):
+  '''Fast bilinear interpolation.
+  Uses coefficients returned by bilin_coefs, making
+  interpolations of diferent variables, but same domains,
+  very fast.
+  Use Bilin instead.
+  '''
+
+  from alg import bilin_fast as alg_bf
+  xi,yi,inds,coefs=coefs
+  vi,maski=alg_bf(v,coefs,inds)
+  return _bilin_aux(xi,yi,vi,maski,**kargs)
+
+
+def easy_extrap(x,y,v,inplace=False):
+  '''Simple, fast and ugly extrapolations method.
+  Masked point value is calculated based on distance
+  to nearest cells in each direction only!
+  Use only when mask_extrap is too slow or extrapolation is not ok.
+  '''
+
+  from alg import extrap2 as alg_extrap2
+  if np.ma.isMA(v) and v.size!=v.count():
+    directions=[1,1,1,1] # use all (E-W,W-E,N-S,S-N)
+    if inplace: v[:]=alg_extrap2(x,y,v,v.mask,dir=directions)
+    else:return alg_extrap2(x,y,v,v.mask,dir=directions)
+  else: return v
+
+
+class Bilin():
+  '''Fast bilinear interpolation.
+  Usage:
+    a=Bilin(x,y,xi,yi,mask=False)
+    vi=a(v)
+    wi=a(w)
+    zi=z(z,**kargs)
+
+    # is faster but the same as:
+    zi=bilin(x,y,z,xi,yi,**kargs)
+    ...
+    # and:
+    C=bilin_coefs(x,y,xi,yi,mask=False)
+    zi=bilin_fast(z,C,**kargs)
+    ...
+
+  kargs:
+    extrap: 0,1,'in','out'
+    extrap_method='easy','tri'
+
+  See bilin from additional help
+  '''
+
+  def __init__(self,x,y,xi,yi,mask=False):
+    self.coefs=bilin_coefs(x,y,xi,yi,mask)
+  def __call__(self,v,**kargs):
+    return bilin_fast(v,self.coefs,**kargs)

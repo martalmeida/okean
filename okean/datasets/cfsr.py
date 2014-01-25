@@ -96,11 +96,21 @@ def cfsr_file_data(files,quiet=False):
   '''
 
 
+
   def load_time(f):
     time=np.array((),datetime.datetime)
     ff=glob.glob(f)
     ff.sort()
     for f in ff: time=np.append(time,netcdf.nctime(f,'time'))
+    return time
+
+
+  def load_time_main(f):
+    time=load_time(f)
+    # I want 0,6,12,... after 2006 results may be 3,9,15, ...
+    if time[0].hour in [3,9,15,21]: time=time+datetime.timedelta(hours=3)
+    # for 2011 1st time is not 0!
+    if time[0].hour==6: time=np.hstack((time[0].replace(hour=0),time))
     return time
 
 
@@ -110,7 +120,11 @@ def cfsr_file_data(files,quiet=False):
       print '     1,7,... to 0,6,...'
       var=(var[1:]*5+var[:-1]*1)/6.
       t=t[1:]-datetime.timedelta(hours=1)
-
+    elif t[0].hour in [3,9,15,21]:
+      print '     3,9,... to 0,6,...'
+      var=(var[1:]*3+var[:-1]*3)/6.
+      t=t[1:]-datetime.timedelta(hours=3)
+  
     cond=(t>=t0)&(t<=t1)
     t=t[cond]
     var=var[cond]
@@ -123,6 +137,11 @@ def cfsr_file_data(files,quiet=False):
       v[1:]=var
       v[0]=var[0]
       var=v
+      t_=np.zeros((t.shape[0]+1,)+t.shape[1:],t.dtype)
+      t_[1:]=t
+      t_[0]=t0
+      t=t_
+      
 
     if t[-1]<t1:
       dt=t1-t[-1]
@@ -132,8 +151,12 @@ def cfsr_file_data(files,quiet=False):
       v[:-1]=var
       v[-1]=var[-1]
       var=v
+      t_=np.zeros((t.shape[0]+1,)+t.shape[1:],t.dtype)
+      t_[:-1]=t
+      t_[-1]=t1
+      t=t_
 
-    return var
+    return var,t
 
 
   out={}
@@ -142,9 +165,9 @@ def cfsr_file_data(files,quiet=False):
   if 0:
     time=netcdf.nctime(files['cc'],'time')
     # files have diff units !! so, cannot load all times at once!
-    # thse result will use only units of 1st file!!
+    # these result will use only units of 1st file!!
   else:
-    time=load_time(files['cc'])
+    time=load_time_main(files['cc'])
 
 
   out['time']=time
@@ -162,8 +185,12 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    tair=fix_time(ttmp,tair,time[0],time[-1])
-    print ' ...fixed!'
+    tair,tfix=fix_time(ttmp,tair,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['tair']=Data(x,y,tair,'C')
 
 
@@ -180,8 +207,12 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    rhum=fix_time(ttmp,rhum,time[0],time[-1])
-    print ' ...fixed!'
+    rhum,tfix=fix_time(ttmp,rhum,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time): 
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['rhum']=Data(x,y,rhum,'0--1')
 
 
@@ -197,15 +228,22 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    pres=fix_time(ttmp,pres,time[0],time[-1])
-    print ' ...fixed!'
+    pres,tfix=fix_time(ttmp,pres,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['pres']=Data(x,y,pres,'Pa')
 
 
   # P rate [kg m-2 s-1 -> cm/d]
   if not quiet: print ' --> P rate'
   f=files['pr']
-  prate=netcdf.use(f,'PRATE_L1')
+  if 'PRATE_L1' in netcdf.varnames(f):
+    prate=netcdf.use(f,'PRATE_L1')
+  else:
+    prate=netcdf.use(f,'PRATE_L1_Avg_1')
   x=netcdf.use(f,'lon'); x[x>180]=x[x>180]-360
   y=netcdf.use(f,'lat')
   x,y=np.meshgrid(x,y)
@@ -217,8 +255,12 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    prate=fix_time(ttmp,prate,time[0],time[-1])
-    print ' ...fixed!'
+    prate,tfix=fix_time(ttmp,prate,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['prate']=Data(x,y,prate,'cm/d')
 
 
@@ -239,8 +281,12 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    sw_net=fix_time(ttmp,sw_net,time[0],time[-1])
-    print ' ...fixed!'
+    sw_net,tfix=fix_time(ttmp,sw_net,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['radsw']=Data(x,y,sw_net,'W m-2',info='positive downward')
 
 
@@ -261,9 +307,13 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    lw_net=fix_time(ttmp,lw_net,time[0],time[-1])
-    lw_down=fix_time(ttmp,lw_down,time[0],time[-1])
-    print ' ...fixed!'
+    lw_net,tfix1=fix_time(ttmp,lw_net,time[0],time[-1])
+    lw_down,tfix2=fix_time(ttmp,lw_down,time[0],time[-1])
+    if  tfix1.size==tfix2.size==time.size and np.all((tfix1==time)&(tfix2==time)):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   # ROMS convention: positive upward
   out['radlw']=Data(x,y,-lw_net,'W m-2',info='positive upward')
   # downward lw:
@@ -283,9 +333,13 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    uwnd=fix_time(ttmp,uwnd,time[0],time[-1])
-    vwnd=fix_time(ttmp,vwnd,time[0],time[-1])
-    print ' ...fixed!'
+    uwnd,tfix1=fix_time(ttmp,uwnd,time[0],time[-1])
+    vwnd,tfix2=fix_time(ttmp,vwnd,time[0],time[-1])
+    if  tfix1.size==tfix2.size==time.size and np.all((tfix1==time)&(tfix2==time)):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   #
   if not quiet: print ' --> calc wind speed and stress'
   speed = np.sqrt(uwnd**2+vwnd**2)
@@ -301,7 +355,10 @@ def cfsr_file_data(files,quiet=False):
   # Cloud cover [0--100 --> 0--1]:
   if not quiet: print ' --> Cloud cover'
   f=files['cc']
-  clouds=netcdf.use(f,'T_CDC_L200')
+  if 'T_CDC_L200' in netcdf.varnames(f):
+    clouds=netcdf.use(f,'T_CDC_L200')
+  else:
+    clouds=netcdf.use(f,'T_CDC_L200_Avg_1')
   x=netcdf.use(f,'lon'); x[x>180]=x[x>180]-360
   y=netcdf.use(f,'lat')
   x,y=np.meshgrid(x,y)
@@ -311,9 +368,12 @@ def cfsr_file_data(files,quiet=False):
   if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
   else:
     print '   time differs !!!!',
-    clouds=fix_time(ttmp,clouds,time[0],time[-1]) # cc is currently used to get
-                                                  # time, so this step is not needed!
-    print ' ...fixed!'
+    clouds,tfix=fix_time(ttmp,clouds,time[0],time[-1])
+    if tfix.size==time.size and np.all(tfix==time):
+      print ' ...fixed!'
+    else:
+      print 'time is NOT OK. Please check !!'
+      return
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')
 
   # rhum has different resolution (0.5, just like dew point!)
@@ -321,7 +381,7 @@ def cfsr_file_data(files,quiet=False):
   # other vars resolution:
   if out['rhum'].data.shape!=out['uwnd'].data.shape:
     from okean import calc
-    print 'rhum shape differs!! --> interp:'
+    print 'rhum shape differs!! --> inter:'
     nt,ny,nx=out['uwnd'].data.shape
     x,y=out['uwnd'].x,out['uwnd'].y
     rhum=np.zeros((nt,ny,nx), out['rhum'].data.dtype)

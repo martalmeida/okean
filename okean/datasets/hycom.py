@@ -1,3 +1,91 @@
+import datetime
+
+def get_ij_inds(grd,**kargs):
+  f=kargs.get('url','http://tds.hycom.org/thredds/dodsC/glb_analysis')
+  vlon=kargs.get('vlon','Longitude')
+  vlat=kargs.get('vlat','Latitude')
+  lon=kargs.get('lon',False)
+  lat=kargs.get('lat',False)
+  lon_add=kargs.get('lon_add',-360)
+
+  if lon is False:
+    lon=netcdf.use(f,vlon)
+    if lon_add: lon=np.mod(lon,360)+lon_add
+
+  if lat is False:
+    lat=netcdf.use(f,vlat)
+
+  g=roms.Grid(grd)
+  xlim=g.lon.min(),g.lon.max()
+  ylim=g.lat.min(),g.lat.max()
+  from okean import calc
+  i1,i2,j1,j2=calc.ij_limits(lon,lat,xlim,ylim,margin=1)
+
+  i1=i1-2
+  i2=i2+2
+  j1=j1-2
+  j2=j2+2
+
+  np.array([ i1,i2,j1,j2]).dump(fsave)
+  print '%d %d %d %d  saved in %s'%(i1,i2,j1,j2,fsave)
+
+
+
+def src(date,agg=False):
+  if agg: return src_agg(date)
+  else: return src_files(date)
+
+def src_files(date,agg=False):
+  if date>=datetime.datetime(2011,1,3):
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_90.9/%d'%date.year
+  elif date>=datetime.datetime(2009,5,7):
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_90.8/%d'%date.year
+  elif date>=datetime.datetime(2008,9,18):
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_90.6/%d'%date.year
+  elif date>=datetime.datetime(2007,4,27):
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_90.3/%d'%date.year
+  elif date>=datetime.datetime(2007,1,1):
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_90.2/%d'%date.year
+  else:
+    url0='http://dap.hycom.org:8080/opendap/nph-dods/datasets/GLBa0.08/expt_60.5/%d'%date.year
+
+  res={}
+  yd=(date-datetime.datetime(date.year,1,1)).days+1
+  for v in ['temp','salt','u','v','ssh']:
+    if   v=='temp': fname=url0+'/temp/archv.%d_%d_00_3zt.nc'%(date.year,yd)
+    elif v=='salt': fname=url0+'/salt/archv.%d_%d_00_3zs.nc'%(date.year,yd)
+    elif v=='u':    fname=url0+'/uvel/archv.%d_%d_00_3zu.nc'%(date.year,yd)
+    elif v=='v':    fname=url0+'/vvel/archv.%d_%d_00_3zv.nc'%(date.year,yd)
+    elif v=='ssh':  fname=url0+'/2d/archv.%d_%d_00_2d.nc'%(date.year,yd)
+
+    res[v]=fname
+
+  return res
+
+def src_agg(date):
+  '''may be very very slow !!'''
+
+  if date>=datetime.datetime(2011,1,3):
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_90.9'
+  elif date>=datetime.datetime(2009,5,7):
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_90.8/%d'%date.year
+  elif date>=datetime.datetime(2008,9,18):
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_90.6/%d'%date.year
+  elif date>=datetime.datetime(2007,4,27):
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_90.3/%d'%date.year
+  elif date>=datetime.datetime(2007,1,1):
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_90.2/%d'%date.year
+  else:
+    url='http://tds.hycom.org/thredds/dodsC/GLBa0.08/expt_60.5/%d'%date.year
+
+
+  res={}
+  for v in ['temp','salt','u','v','ssh']:
+    res[v]=url
+
+  return res
+
+''' OLD HYCOM.py. Probably not needed anymore!!! REMOVE some day. (jan2014)
 import numpy as np
 import os
 from okean import dateu, netcdf
@@ -86,3 +174,4 @@ def get_ij(lon,lat,lons,lats):
       j2=j2+1
 
   return i1,i2,j1,j2
+'''

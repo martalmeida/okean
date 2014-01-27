@@ -3,7 +3,7 @@ import numpy as np
 
 
 class InteractiveLine:
-  '''Create and edit intercative broken line or spline
+  '''Create and edit intercative broken line, polygon or spline
 
      - auxiliary points are created with left mouse button and stored in self.x and self.y
      - stop creation with other mouse button
@@ -20,7 +20,13 @@ class InteractiveLine:
     mma, Texas A&M
   '''
 
-  def __init__(self,ax=False,xy=False,cmd=False,axis=False,type='spline',nmax=-1):
+  def __init__(self,ax=False,xy=False,cmd=False,cmd_disable_edit=True,axis=False,type='spline',nmax=-1):
+    '''Line types:
+      - broken line (type=blin)
+      - closed broken line, ie, polygon (type=cblin)
+      - spline (type=spline')
+    '''
+
     if not ax: ax=plt.gca()
 
     self.x=np.array(())
@@ -61,10 +67,26 @@ class InteractiveLine:
           self.events['mousemove'] = self.figure.canvas.mpl_connect('motion_notify_event', self.mousemove_edit)
           self.events['mouseup'] = self.figure.canvas.mpl_connect('button_release_event',self.stop_edit)
         elif  event.mouseevent.button==2: # remove
-          self.x=np.delete(self.x,event.ind)
-          self.y=np.delete(self.y,event.ind)
+          if self.type=='cblin':
+            rmMax=3
+            event.ind=event.ind[0]
+            if event.ind in (0,len(self.x)-1):
+              self.x=np.delete(self.x,0)
+              self.y=np.delete(self.y,0)
+              self.x=np.delete(self.x,-1)
+              self.y=np.delete(self.y,-1)
+              self.x=np.append(self.x,self.x[0])
+              self.y=np.append(self.y,self.y[0])
+            else:
+              self.x=np.delete(self.x,event.ind)
+              self.y=np.delete(self.y,event.ind)
 
-          if self.x.size<2: # remove all line if only one point
+          else:
+            rmMax=2
+            self.x=np.delete(self.x,event.ind)
+            self.y=np.delete(self.y,event.ind)
+
+          if self.x.size<rmMax: # remove all line if only one point
             self.stop()
             self.remove_line()
           else:
@@ -129,9 +151,14 @@ class InteractiveLine:
         xnew=np.array((),'f')
         ynew=np.array((),'f')
         for i in range(self.x.size-1):
-          m=(self.y[i+1]-self.y[i])/(self.x[i+1]-self.x[i])
-          xx=np.linspace(self.x[i],self.x[i+1],10)
-          yy=m*(xx-self.x[i])+self.y[i]
+          if self.x[i+1]!=self.x[i]:
+            m=(self.y[i+1]-self.y[i])/(self.x[i+1]-self.x[i])
+            xx=np.linspace(self.x[i],self.x[i+1],10)
+            yy=m*(xx-self.x[i])+self.y[i]
+          else:
+            yy=np.linspace(self.y[i],self.y[i+1],10)
+            xx=yy*0+self.x[i]
+
           xnew=np.append(xnew,xx[:-1])
           ynew=np.append(ynew,yy[:-1])
 
@@ -207,6 +234,11 @@ class InteractiveLine:
         else:
           self.x=self.x[:-1]
           self.y=self.y[:-1]
+
+          if self.type=='cblin':
+            self.x=np.append(self.x,self.x[0])
+            self.y=np.append(self.y,self.y[0])
+
           self.update_line()
 
       self.stop()
@@ -227,16 +259,21 @@ class InteractiveLine:
         self.y[self.pind]=event.ydata
         self.update_line(calc_inds=False)
 
+
   def stop(self,run=True):
     # stop line creation
     self.figure.canvas.mpl_disconnect(self.events['mousedown'])
     self.figure.canvas.mpl_disconnect(self.events['mousemove'])
 
+    exec_cmd=run and callable(self.cmd)
+    enable_edit=False
+    if not exec_cmd or (exec_cmd and not self.cmd_disable_edit): enable_edit=True
+
+    if enable_edit:
+        self.events['key']=self.figure.canvas.mpl_connect('key_press_event', self.onkey)
+
     # do something after line is created:
-    if run and callable(self.cmd): return self.cmd()
-    else:
-      # enable/disable edition witj key "e"
-      self.events['key']=self.figure.canvas.mpl_connect('key_press_event', self.onkey)
+    if exec_cmd: return self.cmd()
 
 
   def stop_edit(self,event):

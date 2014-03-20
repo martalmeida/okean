@@ -24,7 +24,7 @@ class InteractiveLine:
     '''Line types:
       - broken line (type=blin)
       - closed broken line, ie, polygon (type=cblin)
-      - spline (type=spline')
+      - spline (type=spline, default)
     '''
 
     if not ax: ax=plt.gca()
@@ -39,6 +39,7 @@ class InteractiveLine:
     self.nmax=nmax
     self.cmd=cmd
     self.axis=axis
+    self.cmd_disable_edit=cmd_disable_edit
 
     self.ax=ax
     self.figure=ax.figure

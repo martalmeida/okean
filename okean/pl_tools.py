@@ -473,7 +473,7 @@ def trend_cmap(cmap,N=2):
       a,A=N[0]
       b,B=N[1]
       C=N[2]
-      a,A,b,B=[i*256./C for i in (a,A,b,B)]
+      a,A,b,B=[i*255./C for i in (a,A,b,B)]
       C=256
       x=np.zeros(C,'f')
 
@@ -484,7 +484,7 @@ def trend_cmap(cmap,N=2):
     elif len(N)==2: # [(a,B),C]
       a,A=N[0]
       C=N[1]
-      a,A=[i*256./C for i in (a,A)]
+      a,A=[i*255./C for i in (a,A)]
       C=256
       x=np.zeros(C,'f')
 
@@ -495,36 +495,64 @@ def trend_cmap(cmap,N=2):
 
   return _trend_cmap(cmap,x)
 
-class ucmaps:
+
+class cmap_aux:
+  def __init__(self): pass
+
+  def _store(self,names,cmaps):
+    self.cmap_d={}
+
+    for i in range(len(names)):
+       self.cmap_d[names[i]]=cmaps[i]
+       setattr(self,names[i],cmaps[i])
+       setattr(self,names[i]+'_r',self._invert(cmaps[i]))
+
+    for k in names: self.cmap_d[k]=getattr(self,k)
+
+  def _invert(self,c):
+    if isinstance(c,plt.matplotlib.colors.LinearSegmentedColormap):
+      return invert_lsc(c) 
+    elif isinstance(c,plt.matplotlib.colors.ListedColormap):
+      return invert_lc(c)
+
+
+  def show(self):
+    '''Display colormaps'''
+
+    a=np.outer(np.arange(0,1,0.01),np.ones(10))
+    plt.figure(figsize=(8,5))
+    plt.subplots_adjust(top=0.8,bottom=0.05,left=0.05,right=0.95)
+
+    l=len(self.cmap_d)+1
+    names=sorted(self.cmap_d.keys())
+    for i,name in enumerate(names):
+      m=self.cmap_d[name]
+      plt.subplot(1,l,i+1)
+      plt.axis("off")
+      plt.imshow(a,aspect='auto',cmap=m,origin="lower")
+      plt.text(0.5,1.01,name,rotation=50,fontsize=10,
+              transform=plt.gca().transAxes,va='bottom')
+
+    plt.show()
+
+
+
+class ucmaps(cmap_aux):
   def __init__(self):
-    self.mod_jet    = self.gen_mod_jet()
-    self.mod_jet_r  = self.invert(self.gen_mod_jet())
 
-    self.mod_jet2   = self.gen_mod_jet2()
-    self.mod_jet2_r = self.invert(self.gen_mod_jet2())
+    # names and cmaps:
+    names='mod_jet','mod_jet2','mod_jet3','freshwater','freshwater2',\
+          'oxygen'
 
-    self.mod_jet3   = self.gen_mod_jet3()
-    self.mod_jet3_r = self.invert(self.gen_mod_jet3())
-
-    self.freshwater   = self.gen_freshwater()
-    self.freshwater_r = self.invert(self.gen_freshwater())
-
-    self.freshwater2   = self.gen_freshwater2()
-    self.freshwater2_r = self.invert(self.gen_freshwater2())
-
-    self.oxygen   = self.gen_oxygen()
-    self.oxygen_r = self.invert(self.gen_oxygen())
+    cmaps=[getattr(self,'gen_'+n)() for n in names]
 
     for i in range(16):
-      setattr(self,'oceano_%02d'%i,self.gen_oceano(i))
-      setattr(self,'oceano_%02d_r'%i,self.invert(self.gen_oceano(i)))
+      names+='oceano_%02d'%i,
+      cmaps+=[self.gen_oceano(i)]
 
+    # store cmap and inverted cmap:
+    self._store(names,cmaps)
 
-    self.cmaps='mod_jet','mod_jet2', 'mod_jet3','freshwater','freshwater2','oxygen'
-    for i in range(16): self.cmaps=self.cmaps+('oceano_%02d'%i,)
-
-    self.cmap_d={}
-    for k in self.cmaps: self.cmap_d[k]=getattr(self,k)
 
   def gen_mod_jet(self):
     cdict =   {'red':   ((0.00, 0.4,  0.4),
@@ -684,6 +712,7 @@ class ucmaps:
                          (0.3,  0.61,  0.61),
                          (0.9,  0.0,   0.0),
                          (1.0,  0.85,  0.0))}
+      cdict=plt.cm.revcmap(cdict)
 
     else:
       i=((28,23,3),(28,28,3),(28,3,23),(28,3,28),
@@ -701,12 +730,86 @@ class ucmaps:
     cdict=plt.cm.revcmap(cdict)
     return plt.matplotlib.colors.LinearSegmentedColormap('oceano_%02d'%ind,cdict,256)
 
-  def invert(self,C):
-    r=plt.cm.revcmap(C._segmentdata)
-    return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
 
-cm=ucmaps()
-
-def invertcm(C):
+def invert_lsc(C):
+  '''Invert linearSegmentedColormap'''
   r=plt.cm.revcmap(C._segmentdata)
   return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
+
+
+def invert_lc(C):
+  '''Invert ListedColormap'''
+  r=np.flipud(C.colors)
+  return plt.matplotlib.colors.ListedColormap(r, name=C.name+'_r', N=C.N)
+
+
+class ncview_cmaps(cmap_aux):
+  def __init__(self,filespath='auto'):
+    self.filespath=filespath
+
+    # find ncview colormap files:
+    if self.filespath=='auto':
+      import os
+      here=os.path.dirname(os.path.abspath(__file__))
+      self.filespath=os.path.join(here,'data','ncview_cmaps')
+
+    import glob
+    files=glob.glob(os.path.join(self.filespath,'colormaps_*.h'))
+
+    # names and cmaps:
+    names=[]
+    cmaps=[]
+    for f in files:
+      cmaps+=[self.gen_cmap(f)]
+      names+=[cmaps[-1].name]
+
+    # store cmap and inverted cmap:
+    self._store(names,cmaps)
+
+
+  def read_file(self,f):
+    '''Read ncview colormaps_<name>.h file'''
+
+    l=open(f).readlines()
+
+    i=-1
+    for k in l:
+      i+=1
+      if k.startswith('static'): break
+
+    l=l[i:]
+
+    i0=l[0].find('{')
+    i1=l[-1].find('}')
+
+    l[0]=l[0][i0+1:]
+    l[-1]=l[-1][:i1]
+
+    r=[]
+    for i in range(len(l)):
+      line=l[i].replace(',',' ').strip()
+      vals=[int(j) for j in line.split()]
+      r=np.hstack((r,vals))
+
+    r.shape=r.size/3,3
+    return r/255.
+
+
+  def gen_cmap(self,file,name='auto',N=None):
+    '''Read ncview colormaps_<name>.h file'''
+
+    if name=='auto': name=file.split('colormaps_')[-1][:-2]
+    r=self.read_file(file)
+    return plt.matplotlib.colors.ListedColormap(r, name=name, N=N)
+
+
+# my cmaps:
+cm=ucmaps()
+
+# other colormaps,
+# basemap:
+from mpl_toolkits. basemap import cm as cm_basemap
+
+# ncview:
+cm_ncview=ncview_cmaps()
+

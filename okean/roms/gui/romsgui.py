@@ -94,9 +94,9 @@ try:
   cities_lon,cities_lat,cities_name,cities_c=locs.inside([-180,180],[-90,90])
 except: cities_name=False
 
-def get_ucmaps(name):
-  from okean.pl_tools import ucmaps
-  return getattr(ucmaps(),name)
+##def get_ucmaps(name):
+##  from okean.pl_tools import ucmaps
+##  return getattr(ucmaps(),name)
 
 def get_colormaps():
   matlabCmaps='jet hsv hot cool spring summer autumn winter gray bone'.split()+\
@@ -116,15 +116,19 @@ def get_colormaps():
   res['other']=[]
   res['usersdef']=[]
   res['basemap']=[]
+  res['ncview']=[]
 
-  from okean.pl_tools import ucmaps
-  u=ucmaps()
-  for k in u.cmaps:#.keys():
-    res['usersdef']+=['_'+k]#u.cmaps[k].name]
+  ##from okean.pl_tools import ucmaps
+  ##u=ucmaps()
+  for k in sorted(pl_tools.cm.cmap_d.keys()):
+    res['usersdef']+=['_'+k]
 
   bcm=basemap_cm._cmapnames
   bcm.sort()
   res['basemap']=bcm
+
+  for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
+    res['ncview']+=[' '+k]
 
   try:    names=pylab.cm._cmapnames
   except: names=pylab.cm.cmapnames
@@ -1337,7 +1341,9 @@ class rgui:
       self.reset_file('grid')
       self.__set_grid_lims()
       self.__init_depths()#hauto_hvals()
-      ################################################self.show_vars('grid')
+      # also show vars for grid?: (comment if not)
+      self.show_vars('grid')
+
       # finfo:
       self.widgets['finfo'].config(text=self.files['grid_finfo'])
 
@@ -2012,7 +2018,10 @@ class rgui:
     if cmapr: cmap=cmap+'_r'
 
     if cmap.startswith('_'): # usersdef
-      cmap=get_ucmaps(cmap[1:])
+##      cmap=get_ucmaps(cmap[1:])
+      cmap=pl_tools.cm.cmap_d[cmap[1:]]
+    elif cmap.startswith(' '): # ncview
+      cmap=pl_tools.cm_ncview.cmap_d[cmap[1:]]
     else:
       try:
         cmap=getattr(pylab.cm,cmap)
@@ -2270,7 +2279,7 @@ class rgui:
     '''chstate to be used with clicking with mouse on button zoom
     chstate not use when calling after show, to continue zooming
     '''
-    if not self.files.has_key('His'): return
+#####    if not self.files.has_key('His'): return
 
     ob=self.widgets['zoom']
     relief=ob['relief']

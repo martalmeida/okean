@@ -275,6 +275,9 @@ class rgui:
 
 #    print TODO
 
+    import datetime
+    self.start_date=datetime.datetime.now()
+
     self.url='http://pong.tamu.edu/~mma'
 
     self.bg='#dddddd'
@@ -974,6 +977,34 @@ class rgui:
     y=y+h
     lab.place(relx=x,y=y,relwidth=ww,height=h)
 
+    # masked values:
+    vmsk = tk.Entry(self.widgets['fbot'])
+    vmsk.insert(0, "v==0")
+    x=x+ww+relw*.1
+    ww=3.5*relw
+    y=yb0
+    vmsk.place(relx=x,y=y,relwidth=ww,height=h) 
+    vmsk.bind('<Return>',self.show)
+    self.widgets['user_mask']=vmsk
+    # label:
+    lab=tk.Label(self.widgets['fbot'],text='mask',bg=self.bg,fg=self.fg,anchor='w')
+    xx=x+ww
+    lab.place(relx=xx,y=y,relwidth=relw,height=h)
+
+
+    # calcs:
+    vclc = tk.Entry(self.widgets['fbot'])
+    vclc.insert(0, "v*1")
+    ww=3.5*relw
+    y=yb0+h
+    vclc.place(relx=x,y=y,relwidth=ww,height=h) 
+    vclc.bind('<Return>',self.show)
+    self.widgets['user_oper']=vclc
+    # label:
+    lab=tk.Label(self.widgets['fbot'],text='oper',bg=self.bg,fg=self.fg,anchor='w')
+    xx=x+ww
+    lab.place(relx=xx,y=y,relwidth=relw,height=h)
+
 
     # ----------------------------------------------------------------
     # var info:
@@ -991,12 +1022,12 @@ class rgui:
     msg.place(relx=0,rely=.9,relw=.3,relh=.1)
     self.widgets['msg']=msg
 
-########
-    if 0:
-      b = tk.Button(root, text="go!",command=self.show)
-      b.place(x=10,y=400,width=20,height=20)
-      self.widgets['go']=b
-
+#
+#    if 0:
+#      b = tk.Button(root, text="go!",command=self.show)
+#      b.place(x=10,y=400,width=20,height=20)
+#      self.widgets['go']=b
+#
 #    '''
 #    f = Figure(figsize=(5,4), dpi=100)
 #    a = f.add_subplot(111)
@@ -1005,6 +1036,9 @@ class rgui:
 ##    canvas.get_tk_widget().place(x=figpos[0],y=figpos[1],width=figpos[2],height=figpos[3])
 #    canvas.get_tk_widget().place(relx=.15,y=24,relwidth=0.7,relheight=.6)
 #    '''
+
+    self.root.bind('<F2>',self.sync_load)
+    self.root.bind('<F3>',self.sync_save)
 
     self.root.bind('m',self.time_inc)
     self.root.bind('l',self.time_dec)
@@ -1015,26 +1049,13 @@ class rgui:
     self.root.bind('S',self.__set_zlevel)
     self.root.bind('B',self.__set_zlevel)
 
-#    self.root.bind('s',self.__set_varname)
-#    self.root.bind('u',self.__set_varname)
-#    self.root.bind('v',self.__set_varname)
-#    self.root.bind('h',self.__set_varname)
-#    self.root.bind('z',self.__set_varname)
-#    self.root.bind('<KeyPress-U>',self.__set_varname)
-#    self.root.bind('<KeyPress-V>',self.__set_varname)
 
     self.files={}
-#    self.axes=a
-#    self.canvas=canvas
 
 
-#    self.select_file('/home/mma/roms_his.nc')
-    #self.select_file('/home/mma/longRun_down/spring_2002/gen_ini/roms_ini_spr02.nc')
-
-    # se font for all widgets:
+    # set font for all widgets:
     self.gui_chfont()
 
-#    self.select_file('/home/mma/works_remo/iousp/op_figs_tmp/roms_his_20100324_a_n0.nc')
 
     #root.mainloop()
 
@@ -1247,8 +1268,14 @@ class rgui:
 
     if show: self.show()
 
-  def time_inc(self,evt=False): self.chtime(1)
-  def time_dec(self,evt=False): self.chtime(-1)
+  def time_inc(self,evt=False):
+    if evt and evt.widget.widgetName in ('entry',): return
+    self.chtime(1)
+
+  def time_dec(self,evt=False):
+    if evt and evt.widget.widgetName in ('entry',): return
+    self.chtime(-1)
+
   def time_show(self):
      if self.files.has_key('His'):
        self.reset_file('his')
@@ -1518,7 +1545,7 @@ class rgui:
 
   def __set_varname(self,evt=False,varname=False,show=True):
     if evt:
-      print evt.keysym
+      if evt.widget.widgetName in ('entry',): return
       if   evt.keysym=='t': varname='temp'
       elif evt.keysym=='s': varname='salt'
       elif evt.keysym=='u': varname='u'
@@ -1540,6 +1567,7 @@ class rgui:
 
   def __set_zlevel(self,evt=False,lev=False,show=True):
     if evt:
+      if evt.widget.widgetName in ('entry',): return
       if   evt.keysym=='B': lev=0
       elif evt.keysym=='S':
         var=self.__get_varname()
@@ -1741,6 +1769,7 @@ class rgui:
     if msg: # slice error!!
       return msg
 
+
     data=x,y,z,v, currents,spherical
 
     print 'STORING NEW SLICE...'
@@ -1826,6 +1855,7 @@ class rgui:
     self.swapp['caxis_mode']='manual'
     self.show()
 
+
   def show(self,evt=False,newfig=False,derived=False,**kargs):
 
     try: what=kargs['what']
@@ -1906,15 +1936,49 @@ class rgui:
     ntick=12
     ticksAuto=True
     if cax:
-      try:    vmin,vmax=cax
-      except:
+      if len(cax)==2:
+        vmin,vmax=cax
+      elif len(cax)==3:
         vmin,vmax,ntick=cax
         ticksAuto=False
+      elif len(cax)>3:
+        vmin,vmax=cax[0],cax[-1]
+        ticksAuto=cax
+
+#      try:    vmin,vmax=cax
+#      except:
+#        vmin,vmax,ntick=cax
+#        ticksAuto=False
     else:
       vmin,vmax=v.min(),v.max()
       self.__set_caxis((vmin,vmax))
 
     print '4===',pytime.time()-t0
+
+    # user mask:
+    umask=self.widgets['user_mask'].get()
+    if umask.strip():
+      try:
+        umask=umask.replace('grid','self.files["Grid"]')
+        umask=eval(umask)
+        if np.ma.isMA(v):
+          #v.mask[umask]=True like this the array needs to be copied !
+          v=np.ma.masked_where(v.mask|umask,v.data)
+        else: v=np.ma.masked_where(umask,v)
+        self.widgets['user_mask'].config(fg='black')
+      except:
+        self.widgets['user_mask'].config(fg='red')
+
+    # user operations:
+    uoper=self.widgets['user_oper'].get()
+    if uoper.strip():
+      try:
+        uoper=uoper.replace('grid','self.files["Grid"]')
+        v=eval(uoper)
+        self.widgets['user_oper'].config(fg='black')
+      except:
+        self.widgets['user_oper'].config(fg='red')
+
 
     t0=pytime.time()
     # start plotting:
@@ -2008,10 +2072,12 @@ class rgui:
     # pcolor/contourf:
     if vmin==vmax:
       vals=np.array([vmin-1,vmin,vmin+1])
-    elif ticksAuto:
-      vals=ticks.loose_label_n(vmin,vmax,ntick=ntick)
-    else:
-      vals=np.linspace(vmin,vmax,ntick+1)
+    elif ticksAuto in [0,1]:
+      if ticksAuto:
+        vals=ticks.loose_label_n(vmin,vmax,ntick=ntick)
+      else:
+        vals=np.linspace(vmin,vmax,ntick+1)
+    else: vals=ticksAuto
 
     cmap=self.options['colormap'].get()
     cmapr=self.options['colormap_r'].get()
@@ -2113,7 +2179,8 @@ class rgui:
       print 'adding cbar...',handle,cbar,cbarOrientation
       if self.options['graf']=='pcolor':cbarDrawEdges=False
       else: cbarDrawEdges=True
-      cb=pylab.colorbar(handle,cax=cbar,orientation=cbarOrientation,drawedges=cbarDrawEdges)
+      cb=pylab.colorbar(handle,cax=cbar,orientation=cbarOrientation,drawedges=cbarDrawEdges,
+                        spacing='proportional')
 
 
       # bathy contour and border:
@@ -2192,6 +2259,107 @@ class rgui:
     # to allow use binds, like time change +-
     self.root.focus()
 
+    self.sync_save()
+
+
+  def sync_fname(self):
+    import tempfile
+    p=tempfile.gettempdir()
+    label=self.start_date.isoformat('_').replace('-','').replace(':','').replace('.','_')
+    fname=os.path.join(p,'rgui_%s.sync'%label)
+    return fname
+
+
+  def sync_save(self,evt=None,fname=None):
+    if fname is None: f=self.sync_fname()
+    else: f=self.sync_fname(fname)
+
+    s=''
+
+    import datetime
+    now=datetime.datetime.now().isoformat()
+    s+='[*date*]\n'
+    s+='%s\n'%now
+
+    for k in self.files.keys():
+      if isinstance(self.files[k],basestring): s+=self.files[k]+'\n'
+
+    # varname:
+    derived =False # CHECK THIS !!
+    varname = self.__get_varname(derived=derived)
+    s+='[varname]\n'
+    s+='%s\n'%varname
+
+    # xlim
+    s+='[xlim]\n'
+    s+='%s %s\n'%(self.widgets['lon1'].get(),self.widgets['lon2'].get())
+    
+    # ylim
+    s+='[ylim]\n'
+    s+='%s %s\n'%(self.widgets['lat1'].get(),self.widgets['lat2'].get())
+
+    # clim:     
+    s+='[clim]\n'
+    s+='%s\n'%self.widgets['cax'].get()
+
+    # zlev:     
+    s+='[zlev]\n'
+    s+='%s\n'%self.widgets['zlev'].get()
+
+    # time:     
+    s+='[time]\n'
+    s+='%s\n'%self.widgets['time'].get()
+
+    open(f,'w').write(s)
+
+
+  def sync_latest(self):
+    import tempfile
+    import glob
+    current=self.sync_fname()
+    p=tempfile.gettempdir()
+    files=glob.glob(os.path.join(p,'rgui_*.sync'))
+    mtime = lambda f: os.stat(f).st_mtime
+    files.sort(key=mtime)
+    files.remove(current)
+    return files[-1]
+
+
+  def sync_load(self,evt=None,f=None):
+    if f is None:
+      f=self.sync_latest()
+
+    lines=open(f).readlines()
+    for i in range(len(lines)):
+      if '[xlim]' in lines[i]:
+        v=lines[i+1].strip().split()
+        self.widgets['lon1'].delete(0,'end')
+        self.widgets['lon2'].delete(0,'end')
+        self.widgets['lon1'].insert(0,v[0])
+        self.widgets['lon2'].insert(0,v[1])
+      elif '[ylim]' in lines[i]:
+        v=lines[i+1].strip().split()
+        self.widgets['lat1'].delete(0,'end')
+        self.widgets['lat2'].delete(0,'end')
+        self.widgets['lat1'].insert(0,v[0])
+        self.widgets['lat2'].insert(0,v[1])
+      elif '[clim]' in lines[i]:      
+        v=lines[i+1].strip()
+        self.widgets['cax'].delete(0,'end')
+        self.widgets['cax'].insert(0,v)
+        self.swapp['caxis_mode']='manual'
+      elif '[zlev]' in lines[i]:      
+        v=lines[i+1].strip()
+        self.widgets['zlev'].delete(0,'end')
+        self.widgets['zlev'].insert(0,v)
+      elif '[time]' in lines[i]:      
+        v=lines[i+1].strip()
+        self.widgets['time'].delete(0,'end')
+        self.widgets['time'].insert(0,v)
+      elif '[varname]' in lines[i]:      
+        vname=lines[i+1].strip()
+
+    self.__set_varname(varname=vname,show=True)
 
   def savefig(self,fname=False):
     if not fname:

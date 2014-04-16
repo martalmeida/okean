@@ -454,9 +454,10 @@ class Pyncgroup(Common):
     About compression:
 
     Compression kargs options (available for netcdf4 interface)
-      gzip, default True: gzip compression
+      zlib, default True, turn on compression
       lsd (least_significant_digit), default is None: lossy
         compression with lsd precision
+      complevel, 1..9, copression level, default 4
 
 
     About vartype:
@@ -495,15 +496,14 @@ class Pyncgroup(Common):
       # NOTA: ocorre erro ao criar ex int64 em ncver 3. Pode fazer sentido
       # converter para int? ie, qd o tipo nao e suportado pela ncver!?
 
-      zlib=True
-      lsd=None
-      fill_value=None
-      if 'gzip' in kargs: zlib = kargs['gzip']
-      if 'lsd'  in kargs: lsd  = kargs['lsd']
-      if 'fill_value'  in kargs: fill_value  = kargs['fill_value']
+      zlib = kargs.get('zlib',True)
+      lsd  = kargs.get('lsd',None)
+      complevel  = kargs.get('complevel',4)
+      fill_value = kargs.get('fill_value',None)
 
       self._nc.createVariable(varname,vartype,dimnames,zlib=zlib,
-                              least_significant_digit=lsd,fill_value=fill_value)
+                              complevel=complevel,least_significant_digit=lsd,
+                              fill_value=fill_value)
 
       newvar=Pyncvar(self,varname)
 
@@ -593,7 +593,7 @@ class Pyncgroup(Common):
 
 
 class Pync(Pyncgroup):
-  def __init__(self,filename,perm='r',interface=Interface,version=4,ncdump=False):
+  def __init__(self,filename,perm='r',interface=Interface,version=3,ncdump=False):
 
     if interface!='netcdf4': version=3
 
@@ -617,8 +617,10 @@ class Pync(Pyncgroup):
 
     elif interface=='netcdf4':
       if perm=='w' and os.path.isfile(filename): perm='a'
-      format='NETCDF'+str(version)
-      if format=='NETCDF3': format='NETCDF3_CLASSIC'
+      if not isinstance(version,basestring):
+        format='NETCDF'+str(version)
+        if format=='NETCDF3': format='NETCDF3_CLASSIC'
+      else: format=version
       if not isinstance(filename,basestring) or filename.find('*')!=-1 or filename.find('?')!=-1:
         nc=pnc.MFDataset(filename)
       else:

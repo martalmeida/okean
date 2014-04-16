@@ -5,11 +5,13 @@ original from Robert Hetland, Texas A&M
 
 data available at http://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/
 
-The env variable GSHHS_DATA must be set
+The env variable GSHHS_DATA must be set (folder where files like
+gshhs_c.b, etc, should be placed)
 """
 
 import struct
 from numpy import *
+import numpy as np
 import pylab as pl
 import os
 from matplotlib.ticker import FuncFormatter
@@ -73,13 +75,6 @@ class gshhs(object):
         plot polygons in a new figure (or in axis=ax if ax is not None).  Other
         inputs determine the colors of land, water, and the coastlines.
     """
-
-    def _datadir(self):
-      return os.environ['GSHHS_DATA']
-      #if   self.version=='1.2':   p = 'gshhs-data/1.2'
-      #elif self.version=='2.1.1': p = 'gshhs-data/2.1.1'
-      #return os.path.join(os.path.dirname(__file__),p)
-
 
     def _get_header(self):
         nb_i = struct.calcsize('i') # 4 bytes in 'int'
@@ -212,8 +207,8 @@ class gshhs(object):
             self._ur_lon = self.ur_lon
             self._ll_lon = self.ll_lon
 
-        filename = 'gshhs_' + resolution + '.b'
-        gshhs_file = os.sep.join([self._datadir(), filename])
+        filename = 'gshhs_%s.b'%resolution
+        gshhs_file=os.sep.join((os.environ['GSHHS_DATA'],filename))
 
         self.aspect = 1.0/float(cos(0.5*(self.ll_lat+self.ur_lat)*pi/180.))
 
@@ -270,10 +265,11 @@ class gshhs(object):
         pass
 
 
-def aca(res='i',version='2.1.1',clip=True):
-  '''add to current axes'''
-  ax=pl.gca()
-  g=gshhs(ax.axis(), resolution=res,area_thresh=0., max_level=inf,clip=clip)
+def add_coastline(ax,res='i',version='2.1.1',clip=True):
+  '''Add land and lakes to axes'''
+
+  g=gshhs(ax.axis(), resolution=res,area_thresh=0., max_level=inf,
+          clip=clip,version=version)
   edge_color  = '#8f0d0d'
   land_color  = '#dcc683'
   water_color = '#90c7d5'
@@ -283,21 +279,50 @@ def aca(res='i',version='2.1.1',clip=True):
     else:
       ax.fill(lon, lat, ec=edge_color, fc=water_color)
 
-def save_txt(sname,xlim,ylim,res='h',version='2.1.1',clip=True):
+
+def get_coastline0(xlim,ylim,res='h',version='2.1.1',clip=True):
+  '''Load coastline from gshhs data folder, set in environment variable
+  GSHHS_DATA. Supported data versions: 1.2 and 2.1.1
+
+  There may be some problems with the data extraction... If so, use
+  get_coastline (uses Basemap tools to extract data)
+  '''
+
   lims=xlim[0],xlim[-1],ylim[0],ylim[-1]
-  g=gshhs(lims, resolution=res,area_thresh=0., max_level=inf,clip=clip)
-  s=''
+  g=gshhs(lims, resolution=res,area_thresh=0., max_level=inf,clip=clip,
+          version=version)
+  res=np.zeros((0,2),'f')
   for lon, lat, level in zip(g.lon, g.lat, g.level):
-    for i in range(len(lon)): s+='%8.4f  %8.4f\n'%(lon[i],lat[i])
-    s+='nan nan\n'
+    for i in range(len(lon)): res=np.vstack((res,(lon[i],lat[i])))
+    res=np.vstack((res,(999.,999.)))
 
-  open(sname,'w').write(s)
+  return np.ma.masked_where(res==999,res).T
 
 
-def gen_bna(fname,axis,resolution='i'):
-  '''bna file for noaa gnome'''
+def get_coastline(xlim,ylim,res='h'):
+  '''Load coastline from Basemap GSHHS data'''
 
-  g=gshhs(axis, resolution=resolution,area_thresh=0., max_level=2,clip=True)
+  from mpl_toolkits.basemap import Basemap
+  m=Basemap(projection='cyl',llcrnrlat=ylim[0],urcrnrlat=ylim[1],
+            llcrnrlon=xlim[0],urcrnrlon=xlim[1],resolution=res)
+
+  out=np.zeros((0,2),'f')
+  for seg in m.coastsegs:
+    for i in range(len(seg)): out=np.vstack((out,(seg[i][0],seg[i][1])))
+    out=np.vstack((out,(999.,999.)))
+
+  return np.ma.masked_where(out==999,out).T
+
+
+def gen_bna0(fname,xylim,res='i'):
+  '''Create Boundary File (BNA).
+  This file is ready to be used by the NOAA oil spill model GNOME.
+
+  This tool can deal with outdated gshhs datasets. Use gen_bna instead
+  (based on Basemap).
+  '''
+
+  g=gshhs(xylim, resolution=res,area_thresh=0., max_level=2,clip=True)
 
   s=''
   n=0
@@ -314,6 +339,37 @@ def gen_bna(fname,axis,resolution='i'):
 
 
   open(fname,'w').write(s)
+
+
+def gen_bna(fname,xylim,res='i'):
+  '''Create Boundary File (BNA).
+  This file is ready to be used by the NOAA oil spill model GNOME.
+  '''
+
+  xlim,ylim=xylim[:2],xylim[2:]
+  from mpl_toolkits.basemap import Basemap
+  m=Basemap(projection='cyl',llcrnrlat=ylim[0],urcrnrlat=ylim[1],
+            llcrnrlon=xlim[0],urcrnrlon=xlim[1],resolution=res)
+
+  s=''
+  n=0
+  for i in range(len(m.coastpolygons)):
+    n+=1
+    level=m.coastpolygontypes[i]
+    lon=m.coastpolygons[i][0]
+    lat=m.coastpolygons[i][1]
+    if (level == 1): # land
+      sign=1
+    else: # water
+      sign=-1
+
+    s+='"%s","1",%s\n' % (n,sign*len(lon))
+    for i in range(len(lon)):
+      s+='%8.4f, %8.4f\n' % (lon[i],lat[i])
+
+
+  open(fname,'w').write(s)
+
 
 
 if __name__ == '__main__':

@@ -1,3 +1,1 @@
-main=0.7
-rev=20
-version_str=str(main)+'.'+str(rev)
+2014-11-27 10:19:02.041340

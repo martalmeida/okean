@@ -36,18 +36,6 @@ class my_install(install):
         print '''
         enjoy okean
         '''
-        '''
-        ---------------------------- INFO -----------------------------
-        The usage of some gshhs tools needs the env variable GSHHS_DATA
-        gshhs data can be downloaded from
-        http://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/
-
-        Check folder misc for some utilities...
-
-
-        enjoy okean
-        ---------------------------------------------------------------
-        '''
 
 
 alg = Extension(name = 'alg',
@@ -65,14 +53,14 @@ rtools22 = Extension(name = 'roms.rtools_vs2vt2',
 rtools42 = Extension(name = 'roms.rtools_vs4vt2',
                 sources=['okean/roms/ext/rtools_vs4vt2.f'])
 
+import glob
+ncview_cm=glob.glob('okean/data/ncview_cmaps/*')
+rgui_icons=glob.glob('okean/roms/gui/icons/*')
 
 doclines = __doc__.split("\n")
 
 def get_version():
-  l=open('okean/version.py').readlines()
-  s0=l[0].split('=')[1].strip()
-  s1=l[1].split('=')[1].strip()
-  return s0+'.'+s1
+  return open('okean/version.py').read().strip()
 
 if __name__ == '__main__':
     from numpy.distutils.core import setup
@@ -95,13 +83,13 @@ if __name__ == '__main__':
           platforms = ["any"],
           ext_package='okean',
           ext_modules = [alg,pnpoly,rtools,rtools22,rtools42],
-          data_files = [('okean/roms/gui', [#'okean/roms/gui/cities_world.txt',
-                                            #'okean/roms/gui/cities_more.txt',
-                                            'okean/roms/gui/romsgui.derived',
+          data_files = [('okean/roms/gui', ['okean/roms/gui/romsgui.derived',
                                             'okean/roms/gui/rgui.png']),
+                         ('okean/roms/gui/icons', rgui_icons),
                          ('okean/data', ['okean/data/cities_world.txt',
-                                   'okean/data/cities_more.txt']),
+                                         'okean/data/cities_more.txt']),
                          ('okean/misc', ['okean/misc/hull_code.tar.gz']),
+                         ('okean/data/ncview_cmaps/', ncview_cm),
                          ('',['EUPL v.1.1 - licencia.pdf'])],
           classifiers = filter(None, classifiers.split("\n")),
           scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate'],

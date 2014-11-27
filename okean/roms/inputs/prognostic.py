@@ -341,12 +341,27 @@ def data2z(data,**kargs):
   **kargs:
   ij : axis for vertical interpolations (*i,j)
   quiet : output messages flag (True by default)
+  rep_surf: repeat surface level, ie, add a new surface level with same
+    data as the old surface. This will ensure extrapolations in vertical
+    slices do not occur horizontally, ie, misture will occur in the vertical
+    not along the slice (True by default)
   '''
 
-  ij='j'
-  quiet=True
-  if 'ij'    in kargs.keys(): ij    = kargs['ij']
-  if 'quiet' in kargs.keys(): quiet = kargs['quiet']
+  ij=kargs.get('ij','j')
+  quiet=kargs.get('quiet',True)
+  rep_surf=kargs.get('rep_surf',True)
+
+  # repeat surface:
+  if rep_surf:
+    for vname in ['z3d','temp','salt','u','v']:
+      if np.ma.isMA(data[vname]):
+        data[vname]=np.ma.vstack((data[vname],data[vname][-1][np.newaxis,...]))
+      else:
+        data[vname]=np.vstack((data[vname],data[vname][-1][np.newaxis,...]))
+
+    data['z3d'][-1]=data['z3d'].max()+1
+    data['NZ']=data['NZ']+1
+
 
   Z = data['depth'] # new depths 1D
   z = data['z3d'] # 3D depths

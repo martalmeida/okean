@@ -460,6 +460,14 @@ class His(Common,Derived):
   def path_s_levels(self,time,x,y,rw='r'):
     xr,yr,h,m=self.grid.vars()
     zeta=self.use('zeta',SEARCHtime=time)
+
+    if np.ma.isMA(zeta): h=np.ma.masked_where(zeta.mask,h)
+    else:# probably a clm/ini file. Mask maskc point (pygridgen complex grid):
+      if 'maskc' in netcdf.varnames(self.grid.name):
+        mc=self.grid.use('maskc')
+        h=np.ma.masked_where(mc==0,h)
+        zeta=np.ma.masked_where(mc==0,zeta)
+
     h    = calc.griddata(xr,yr,h,x,y,extrap=False)
     zeta = calc.griddata(xr,yr,zeta,x,y,extrap=False)
 

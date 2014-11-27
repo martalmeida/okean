@@ -1,15 +1,27 @@
 import pylab as pl
 import numpy as np
-import ticks
 
 
 def fillout(x,y,lims,color=False,**kargs):
-  # check polygon direction... ie, check need for flip x,y !!
+  '''
+  Fill outside polygon.
+  Fill the region between the polygon x,y and the rectangle lims
+  (x0,x1,y0,y1). If no color is provided, the final polygon (ready to
+  be used with pl.fill) is returned. Otherwise, pl.fill is done
+  using alguments color and kargs. In this case, will be used the
+  current axes or the one provided by key ax.
+
+  Example:
+    x=np.array([0,1,1,0.5])
+    y=np.array([0,-.1,1.1,1])
+    fillout(x,y,[-2,2,-2,2],'g',edgecolor='none')
+  '''
+
+  from okean.calc import poly_area
+  if poly_area(x,y)<0:
+    x,y=x[::-1],y[::-1]
+
   xi,xe,yi,ye=lims
-
-  x=np.flipud(x)
-  y=np.flipud(y)
-
   i=np.where(x==x.min())[0][0]
 
   x=np.concatenate([x[i:], x[:i+1]])
@@ -23,7 +35,8 @@ def fillout(x,y,lims,color=False,**kargs):
 
   if color is False: return x,y
   else:
-    o=pl.fill(x,y,color,**kargs)
+    ax=kargs.pop('ax',pl.gca())
+    o=ax.fill(x,y,color,**kargs)
     return x,y,o
 
 
@@ -43,90 +56,38 @@ def wind_rose(D,F,**kargs):
   wind_rose(D,V)
 
   '''
-  if isinstance(D,list) or isinstance(D,tuple): D=np.array(D)
-  if isinstance(F,list) or isinstance(F,tuple): F=np.array(F)
 
-  if D is 0:
-    d=np.arange(0,360,10)
-    D=np.array([])
-    F=np.array([])
-    for i in range(len(d)):
-      n=d[i]/10.
-      D=np.append(D,d[i]+np.zeros((1,n)))
-      F=np.append(F,range(1,n+1))
+  D=np.asarray(D)
+  F=np.asarray(F)
 
-
-  dtype='standard'
-  nAngles=36
-  ri=1/30.
-  quad=0
-  legType=0
-  percBg='w'
-  titStr=''
-  legStr=''
-  cmap='jet'
-  colors=[]
-  Ag=False # intensity subdivs.
-  ci=[] # percentage circles
-  lineColors='k'
-  borderColor=False
-  onAxes=False
-  iflip=0
-  inorm=0
-  parent=0
-  IncHiLow=1 # include values higher and lower that the limits of Ag.
-  figPos=False
-  axPos=False
-  FontSize=8
-  LineWidth=.5
-  legTickLab=True
-  NSEWlab=True
-  percLabels=True
-  labels=True
-
-  for k in kargs.keys():
-    if   k=='dtype':     dtype       = kargs[k]
-    elif k=='n':         nAngles     = kargs[k]
-    elif k=='ri':        ri          = kargs[k]
-    elif k=='quad':      quad        = kargs[k]
-    elif k=='legtype':   legType     = kargs[k]
-    elif k=='percbg':    percBg      = kargs[k]
-    elif k=='labtitle':  titStr      = kargs[k]
-    elif k=='lablegend': legStr      = kargs[k]
-    elif k=='cmap':      cmap        = kargs[k]
-    elif k=='colors':    colors      = kargs[k]
-    elif k=='di':        Ag          = kargs[k]
-    elif k=='ci':        ci          = kargs[k]
-    elif k=='lcolor':    lineColors  = kargs[k]
-    elif k=='bcolor':    borderColor = kargs[k]
-    elif k=='iflip':     iflip       = kargs[k]
-    elif k=='inorm':     inorm       = kargs[k]
-    elif k=='parent':    parent      = kargs[k]
-    elif k=='incout':    IncHiLow    = kargs[k]
-    elif k=='figpos':    figPos      = kargs[k]
-    elif k=='axpos':     axPos       = kargs[k]
-    elif k=='fontsize':  FontSize    = kargs[k]
-    elif k=='linewidth': LineWidth   = kargs[k]
-    elif k=='lablegticks':legTickLab  = kargs[k]
-    elif k=='NSEWlab':   NSEWlab  = kargs[k]
-    elif k=='labels':    labels  = kargs[k]
-    elif k=='percLabels': percLabels  = kargs[k]
-    elif k=='ax':
-      try:
-        onAxes,onAxesX,onAxesY,onAxesR= kargs[k]
-      except:
-        print ':: cannot place wind rose on axes, bad argument for ax'
-        return
+  ax          = kargs.get('ax',          pl.gca())
+  bg          = kargs.get('bg',          'w')
+  dtype       = kargs.get('dtype',       'standard')
+  nAngles     = kargs.get('n',           36)
+  ri          = kargs.get('ri',          1/30.)
+  quad        = kargs.get('quad',        0)
+  legType     = kargs.get('legtype',     0)
+  percBg      = kargs.get('percbg',      'w')
+  titStr      = kargs.get('title',       '')
+  legStr      = kargs.get('legend',      '')
+  cmap        = kargs.get('cmap',        None)
+  colors      = kargs.get('colors',      [])
+  Ag          = kargs.get('di',          False) # intensity subdivs
+  ci          = kargs.get('ci',          []) # percentage circles
+  lineColors  = kargs.get('lcolor',      'k')
+  borderColor = kargs.get('bcolor',      False)
+  iflip       = kargs.get('iflip',       0)
+  inorm       = kargs.get('inorm',       0)
+  IncHiLow    = kargs.get('incout',      1) # include values higher and lower that the limits of Ag
+  FontSize    = kargs.get('fontsize',    8)
+  LineWidth   = kargs.get('linewidth',   0.5)
+  legTickLab  = kargs.get('lablegticks', True)
+  NSEWlab     = kargs.get('NSEWlab',     True)
+  labels      = kargs.get('labels',      True)
+  percLabels  = kargs.get('percLabels',  True)
 
   if not labels:
     legTickLab=NSEWlab=percLabels=False
-
-  #  open fig:
-  if parent:
-    fig=parent
-  else:
-    if figPos: fig=pl.figure(figsize=figPos)
-    else:      fig=pl.figure()
 
   # other options:
   # size of the full rectangle:
@@ -144,6 +105,7 @@ def wind_rose(D,F,**kargs):
 
   # calc instensity subdivisions:
   if Ag is False:
+    from okean import ticks
     Ag=ticks.loose_label_n(F.min(),F.max(),ntick=7)
 
   E=np.zeros([len(Ay)-1,len(Ag)-1])
@@ -195,19 +157,13 @@ def wind_rose(D,F,**kargs):
     g=max(max(ci),max(b))
 
   # plot axes, percentage circles and percent. data:
-  if onAxes:
-    wrAx=onAxes
-  else:
-    if axPos: wrAx=fig.add_axes(axPos)
-    else:     wrAx=fig.add_axes()
-
-  try: pl.axes(wrAx)
-  except: pass
-
   ri=g*ri
-  pl.fill([-rs*g, rl*g, rl*g, -rs*g],[-rs*g, -rs*g, rs*g, rs*g],'w',edgecolor='w',linewidth=LineWidth,label='wr_bg')
-  pl.plot([-g-ri, -ri, np.nan, ri, g+ri, np.nan, 0, 0, np.nan, 0, 0],
-          [0, 0, np.nan, 0, 0, np.nan, -g-ri, -ri, np.nan, ri, g+ri],':',color=lineColors,linewidth=LineWidth)
+  if bg: ax.fill([-rs*g, rl*g, rl*g, -rs*g],[-rs*g, -rs*g, rs*g, rs*g],
+                 bg,edgecolor='w',linewidth=LineWidth,label='wr_bg')
+
+  ax.plot([-g-ri, -ri, np.nan, ri, g+ri, np.nan, 0, 0, np.nan, 0, 0],
+          [0, 0, np.nan, 0, 0, np.nan, -g-ri, -ri, np.nan, ri, g+ri],
+          ':',color=lineColors,linewidth=LineWidth)
 
   t0=np.arange(0,361)*np.pi/180
   labs=[]
@@ -220,9 +176,9 @@ def wind_rose(D,F,**kargs):
     x=(ci[i]+ri)*np.cos(t0)
     y=(ci[i]+ri)*np.sin(t0)
 
-    pl.plot(x,y,':',color=lineColors,linewidth=LineWidth);
+    ax.plot(x,y,':',color=lineColors,linewidth=LineWidth);
 
-    if percLabels: pl.text((ci[i]+ri)*np.cos(Ang[quad]),(ci[i]+ri)*np.sin(Ang[quad]),str(ci[i])+'%',
+    if percLabels: ax.text((ci[i]+ri)*np.cos(Ang[quad]),(ci[i]+ri)*np.sin(Ang[quad]),str(ci[i])+'%',
       verticalalignment=Valign[quad],horizontalalignment=Halign[quad],
       backgroundcolor=percBg,fontsize=FontSize)
 
@@ -230,11 +186,10 @@ def wind_rose(D,F,**kargs):
   # calc colors:
   if not colors:
     cor=range(len(Ag)-1)
-    q=pl.cm.ScalarMappable()
+    q=pl.cm.ScalarMappable(cmap=cmap)
     q.set_clim([Ag[0], Ag[-2]])
     for j in range(len(Ag)-1):
       cor[j]=q.to_rgba(Ag[j])
-      #cor[j]=caxcolor(Ag(j),[Ag[0], Ag[-2]],cmap);
   else:
     cor=colors
 
@@ -260,27 +215,26 @@ def wind_rose(D,F,**kargs):
       #else, jcor=j;
       #end
 
-        if E[i,j]>0: pl.fill(x,y,facecolor=cor[j],linewidth=LineWidth)
+        if E[i,j]>0: ax.fill(x,y,facecolor=cor[j],linewidth=LineWidth)
         r1=r2;
-
 
 
   # N S E W labels:
   if NSEWlab:
     bg='none';
     args={'backgroundcolor':bg,'fontsize':FontSize}
-    pl.text(-g-ri, 0,'WEST', verticalalignment='top',   horizontalalignment='left', **args);
-    pl.text( g+ri, 0,'EAST', verticalalignment='top',   horizontalalignment='right',**args);
-    pl.text( 0,-g-ri,'SOUTH',verticalalignment='bottom',horizontalalignment='left', **args);
-    pl.text( 0, g+ri,'NORTH',verticalalignment='top',   horizontalalignment='left', **args);
+    ax.text(-g-ri, 0,'WEST', verticalalignment='top',   horizontalalignment='left', **args);
+    ax.text( g+ri, 0,'EAST', verticalalignment='top',   horizontalalignment='right',**args);
+    ax.text( 0,-g-ri,'SOUTH',verticalalignment='bottom',horizontalalignment='left', **args);
+    ax.text( 0, g+ri,'NORTH',verticalalignment='top',   horizontalalignment='left', **args);
 
 
   # scale legend:
-  L=(g*rl-g-ri)/7
-  h=(g+ri)/10
+  L=(g*rl-g-ri)/7.
+  h=(g+ri)/10.
   dy=h/3
 
-  x0=g+ri+(g*rl-g-ri)/7
+  x0=g+ri+(g*rl-g-ri)/7.
   x1=x0+L
   y0=-g-ri
 
@@ -291,12 +245,12 @@ def wind_rose(D,F,**kargs):
         lab=''
 
       y1=y0+h
-      pl.fill([x0, x1, x1, x0],[y0, y0, y1, y1],facecolor=cor[j],linewidth=LineWidth)
-      if legTickLab: pl.text(x1+L/4,y0,lab,verticalalignment='center',fontsize=FontSize)
+      ax.fill([x0, x1, x1, x0],[y0, y0, y1, y1],facecolor=cor[j],linewidth=LineWidth)
+      if legTickLab: ax.text(x1+L/4,y0,lab,verticalalignment='center',fontsize=FontSize)
       y0=y1
 
     if legTickLab and not (hasH and IncHiLow):
-      pl.text(x1+L/4,y0,str(Ag[-1]),verticalalignment='center',fontsize=FontSize)
+      ax.text(x1+L/4,y0,str(Ag[-1]),verticalalignment='center',fontsize=FontSize)
 
   else:
      for j in range(len(Ag)-1):
@@ -308,50 +262,84 @@ def wind_rose(D,F,**kargs):
         lab='>='+str(Ag[j])
 
       y1=y0+h
-      pl.fill([x0, x1, x1, x0],[y0+dy, y0+dy, y1, y1],facecolor=cor[j],linewidth=LineWidth)
-      if legTickLab: pl.text(x1+L/4,(y0+dy+y1)/2,lab,verticalalignment='center',fontsize=FontSize)
+      ax.fill([x0, x1, x1, x0],[y0+dy, y0+dy, y1, y1],facecolor=cor[j],linewidth=LineWidth)
+      if legTickLab: ax.text(x1+L/4,(y0+dy+y1)/2,lab,verticalalignment='center',fontsize=FontSize)
       y0=y1
 
 
   # title and legend label:
   x=np.mean([-g*rs,g*rl])
   y=np.mean([g+ri,g*rs])
-  pl.text(x,y,titStr,horizontalalignment='center',fontsize=FontSize)
+  ax.text(x,y,titStr,horizontalalignment='center',fontsize=FontSize)
 
   x=x0
   y=y1+dy
-  pl.text(x,y,legStr,horizontalalignment='left',verticalalignment='bottom',fontsize=FontSize)
+  ax.text(x,y,legStr,horizontalalignment='left',verticalalignment='bottom',fontsize=FontSize)
 
 
-  #pl.show()
-  pl.axis('image')
-  pl.axis('off')
-  return fig
+  ax.axis('equal') #'image')
+  ax.axis('off')
 
 
-def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
+
+def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',fill={},**kargs):
   '''
-  x = np.linspace(1,100,8)
-  y = np.linspace(1,100,10)
-  x,y = np.meshgrid(x,y)
-  major = (x+y)/30.
-  minor = np.sqrt(x+y)/10.
-  inc   = x/2.
-  phase = y
+  Draw ellipses with semi-major axis, semi-minor axis, inclination
+  and phase. Deppending on type, ellipses orientations and phase  can be
+  illustrated (in different ways).
 
-  plot_ellipse(x,y,major,minor,inc,phase)
-
-  options:
+  Options:
+    scale: 'auto' by default or some number
     ax, gca()
-    type: 0,1,2, different ways to show phase and orientation
-    color
+    type: 0,1,2,3,4 different ways to show phase and orientation
+    line options (color, lw, etc)
+    marker options for type 2 (dict inside kargs with key marker). Ex:
+      plot_ellipse(...,**{'marker':{'ms':20,'marker':'*'}})
+    default color is 'k'
+    default marker is '.'
+    relim: True, recalc axis limits (True if new axes is created)
+    fill: fill ellipse, use this argument to provide fill color, alpha, etc
+          Ex: ...fill={'color','b',alpha=.5}. Default: facecolor: 'b',
+          lw:0, alpha:.5
+
+  Examples:
+    x = np.linspace(1,100,8)
+    y = np.linspace(1,100,10)
+    x,y = np.meshgrid(x,y)
+    major = (x+y)/30.
+    minor = np.sqrt(x+y)/10.
+    inc   = x/2.
+    phase = y
+
+    pl.figure()
+    plot_ellipse(x,y,major,minor,inc,phase)
+    pl.figure()
+    opts=dict(color='g',marker=dict(color='r',marker='s',ms=5))
+    plot_ellipse(x,y,major,minor,inc,phase,type=2,**opts)
+
 
   mma 2013
   '''
 
+  type=kargs.get('type',0)
+  relim=kargs.get('relim',True)
+  try: kargs.pop('type')
+  except: pass
+  try: kargs.pop('relim')
+  except: pass
+
+  if not 'color' in kargs.keys(): kargs['color']='k'
+
+  # marker options for type 2:
+  if 'marker' in kargs.keys():
+    mkargs=kargs.pop('marker')
+    if not 'color'  in mkargs.keys(): mkargs['color']=kargs['color']
+    if not 'marker' in mkargs.keys(): mkargs['marker']='.'
+  else:
+    mkargs={'color': kargs['color'],'marker':'.'}
 
   if 'ax' in kargs.keys():
-    ax=kargs['ax']
+    ax=kargs.pop('ax')
     newax=False
   else:
     if len(pl.gcf().axes): newax=False
@@ -366,16 +354,13 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
     inc=np.asarray([inc])
     phase=np.asarray([phase])
 
-  def ellipse(major,minor,inc,phase,pos=(0,0),**kargs):
+  def ellipse(major,minor,inc,phase,pos=(0,0)):
     def cart2pol(x,y):
       return np.angle(x+1j*y),np.abs(x+1j*y)
     def pol2cart(a,r):
       return r*np.cos(a),r*np.sin(a)
 
-    type=kargs.get('type',0)
-    color=kargs.get('color','k')
-
-   # ellipse:
+    # ellipse:
     t=np.linspace(0,2*np.pi,100)
     x=major*np.cos(t-phase*np.pi/180)
     y=minor*np.sin(t-phase*np.pi/180)
@@ -384,6 +369,7 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
 
     if type in (0,1): a=major/10.
     elif type==2: a=major/20.
+    else: a=0
 
     Fi=30 #angle
     teta=np.arctan2(y[-1]-y[-2],x[-1]-x[-2])*180/np.pi
@@ -417,6 +403,8 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
       P2_aux2=[P1_aux2[0]+a*np.cos(fi_aux2)/np.cos(Fi),  P1_aux2[1]+a*np.sin(fi_aux2)/np.cos(Fi),  P1[-1]]
       P3_aux2=[P1_aux2[0]+a*np.cos(fii_aux2)/np.cos(Fi), P1_aux2[1]+a*np.sin(fii_aux2)/np.cos(Fi), P1[-1]]
 
+    x_fill=pos[0]+x
+    y_fill=pos[0]+y
     if type==0:
       x=pos[0]+np.concatenate(([0],x,[np.nan, P2[0], P1[0], P3[0]]))
       y=pos[1]+np.concatenate(([0],y,[np.nan, P2[1], P1[1], P3[1]]))
@@ -438,11 +426,23 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
 
       x=np.concatenate((x,[np.nan],x_aux, [np.nan], x_aux2))
       y=np.concatenate((y,[np.nan],y_aux, [np.nan], y_aux2))
+    elif type==3:
+      x=pos[0]+x
+      y=pos[1]+y
+    elif type==4:
+      x=pos[0]+np.concatenate(([0],x))
+      y=pos[1]+np.concatenate(([0],y))
 
-    res=[]
-    res+=[pl.matplotlib.lines.Line2D(x,y,color=color)]
+    res={}
+    res['line']=pl.matplotlib.lines.Line2D(x,y,**kargs)
     if type == 2:
-      res+=[pl.matplotlib.lines.Line2D(x1,y1,color=color,marker='.')]
+      res['marker']=pl.matplotlib.lines.Line2D(x1,y1,**mkargs)
+
+    if fill:
+      if not 'lw'        in fill.keys(): fill['lw']        = 0
+      if not 'facecolor' in fill.keys(): fill['facecolor'] = 'b'
+      if not 'alpha'     in fill.keys(): fill['alpha']     = .5
+      res['fill']=pl.matplotlib.patches.Ellipse(pos,2*major,2*minor,inc,**fill)
 
     return res
 
@@ -458,7 +458,7 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
       scale=float(L1)/major.mean()
       # remove 1/3:
       scale=scale*2/3.
-      print 'scale=',scale
+      #print 'scale=',scale
 
   major=major*scale
   minor=minor*scale
@@ -471,11 +471,13 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
   x=x.ravel()
   y=y.ravel()
   for i in range(x.size):
-    res+=ellipse(major[i],minor[i],inc[i],phase[i],pos=(x[i],y[i]),**kargs)
+    res+=[ellipse(major[i],minor[i],inc[i],phase[i],pos=(x[i],y[i]))]
 
-  [ax.add_artist(i) for i in res]
+  for k in res[0].keys():
+    [ax.add_artist(i[k]) for i in res]
 
-  if newax:
+  if newax: relim=True
+  if relim:
     # not working !!
     #ax.relim()
     #ax.autoscale_view(True,True,True)
@@ -484,8 +486,10 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
     xmax=-np.inf
     ymin=np.inf
     ymax=-np.inf
-    for i in res:
-      xd=i.get_xdata()
+    for i in ax.artists:#res:
+      try:
+        xd=i.get_xdata()
+      except: continue
       yd=i.get_ydata()
       if np.size(xd)<=1: continue
       xmin=np.min([xd[~np.isnan(xd)].min(),xmin])
@@ -495,3 +499,188 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',**kargs):
 
     ax.axis([xmin,xmax,ymin,ymax])
 
+  return res
+
+
+def parrow(x,y,n=4,d=0,d0=0,**kargs):
+  '''
+  Along path arrows.
+  Draws arrows connecting x,y points (1d). Each arrow will have n
+  points, d points between. Use d=-1 to have arrows connected. The
+  input d0 controls the beginning of the x,y path. It should be in
+  the range  d+1 >= d0 > 2-n. If negative, d0 points will be subtracted
+  in the first arrow.
+
+  Options:
+    head_scale, 1/5., arrow head length, relative to speed, as
+      defined by head_speed
+    head_speed, mean, sum or last. The speed to scale arrow head can
+      be the mean of the n-1 segments, the sum, or the length of only
+      the last segment
+    head_angle, 30 (deg), arrow head angle
+    ax, pl.gca()
+
+
+  Example:
+    r = np.arange(0, .075, 0.0005)
+    theta = 90*np.pi*r
+    y = r*np.sin(theta)
+    x = r*np.cos(theta)
+    parrow(x,y)
+    pl.axis('equal')
+
+  mma 2014
+  '''
+
+  head_scale = kargs.pop('head_scale',1./5)
+  head_speed = kargs.pop('head_speed','mean') # sum, last
+  head_angle = kargs.pop('head_angle',30) # deg
+  ax=kargs.pop('ax',pl.gca())
+  c=kargs.pop('C',None)
+
+  if c is None:
+    c=np.ma.zeros(x.shape,x.dtype)
+    noC=True
+  else: noC=False
+  try:
+    len(c.mask)
+  except:
+    c=np.ma.array(c)
+    c.mask=False*c.data
+
+  if d0:
+    if d0<0:
+      if n+d0<2: print 'Warning: d0 is too low!' # arrow is just one point...
+      x=np.hstack((x[0]+np.zeros(-d0),x))
+      y=np.hstack((y[0]+np.zeros(-d0),y))
+      c=np.ma.hstack((c[0]+np.zeros(-d0),c))
+      c.mask[:-d0]=True
+    else:
+      if d0>d+1: print 'Warning: d0 too high!' # a new arrow should be on the way...
+      x=x[d0:]
+      y=y[d0:]
+      c=c[d0:]
+
+  if d>=0:
+    N=n+d
+    X=np.reshape(x[:x.size/N*N],(x.size/N,N))
+    Y=np.reshape(y[:y.size/N*N],(y.size/N,N))
+    C=np.reshape(c[:c.size/N*N],(c.size/N,N))
+    X=X[:,:n]
+    Y=Y[:,:n]
+    C=C[:,:n]
+
+    nend=x.size%N
+    if nend>1:
+      xadd=np.zeros(X.shape[1],X.dtype)
+      xadd[:nend]=x[-nend:]
+      xadd[nend:]=x[-1]
+
+      yadd=np.zeros(Y.shape[1],Y.dtype)
+      yadd[:nend]=y[-nend:]
+      yadd[nend:]=y[-1]
+
+      cadd=np.zeros(C.shape[1],C.dtype)
+      cadd[:nend]=c[-nend:]
+      cadd[nend:]=c[-1]
+
+      X=np.vstack((X,xadd))
+      Y=np.vstack((Y,yadd))
+      C=np.ma.vstack((C,cadd))
+      C.mask[-1,nend:]=True
+
+    X,Y,C=X.T,Y.T,C.T
+
+
+
+  else: # d=-1, no space between arrows
+    N=n-1
+    X=np.zeros((x.size/N,n),x.dtype)
+    Y=np.zeros((y.size/N,n),y.dtype)
+    C=np.ma.zeros((c.size/N,n),c.dtype)
+
+    X[:,:-1]=np.reshape(x[:x.size/N*N],(x.size/N,N))
+    Y[:,:-1]=np.reshape(y[:y.size/N*N],(y.size/N,N))
+    C[:,:-1]=np.reshape(c[:c.size/N*N],(c.size/N,N))
+
+    X[:-1,-1]=X[1:,0]
+    Y[:-1,-1]=Y[1:,0]
+    C[:-1,-1]=C[1:,0]
+    C.mask[:-1,-1]=True
+
+    # add last val if available or remove last arrow!
+    try:
+      X[-1,-1]=x[x.size/N*N]
+      Y[-1,-1]=y[y.size/N*N]
+      C[-1,-1]=c[c.size/N*N]
+    except:
+      X=X[:-1,:]
+      Y=Y[:-1,:]
+      C=C[:-1,:]
+
+    nend=X.size-x.size-X.shape[0]+1 # points not used
+    if nend:
+      xadd=np.zeros(X.shape[1],X.dtype)
+      xadd[:-nend+1]=x[nend-1:]
+      xadd[-nend+1:]=x[-1]
+
+      yadd=np.zeros(Y.shape[1],Y.dtype)
+      yadd[:-nend+1]=y[nend-1:]
+      yadd[-nend+1:]=y[-1]
+
+      cadd=np.zeros(C.shape[1],C.dtype)
+      cadd[:-nend+1]=c[nend-1:]
+      cadd[-nend+1:]=c[-1]
+
+      X=np.vstack((X,xadd))
+      Y=np.vstack((Y,yadd))
+      C=np.ma.vstack((C,cadd))
+      C.mask[-1,-nend+1:]=True
+
+    X,Y,C=X.T,Y.T,C.T
+
+  if head_speed=='sum':
+    # use the whole n points speed to define arrow head:
+    s=np.sqrt((X[1:]-X[:-1])**2+(Y[1:]-Y[:-1])**2).sum(0)
+    a=s*head_scale
+  elif head_speed=='mean':
+    # or use avg instead:
+    s=np.sqrt((X[1:]-X[:-1])**2+(Y[1:]-Y[:-1])**2).mean(0)
+    a=s*head_scale*(n-1)
+  elif head_speed=='last':
+    s=np.sqrt((X[-1]-X[-2])**2+(Y[-1]-Y[-2])**2)
+    a=s*head_scale*(n-1)
+
+  if head_angle>0 and head_scale>0:
+    teta=np.arctan2(Y[-1]-Y[-2],X[-1]-X[-2])
+    Fi=head_angle*np.pi/180
+    fi=(np.pi-Fi+teta)
+    fii=(np.pi+Fi+teta)
+
+    Xa=np.vstack((X[-1]+a*np.cos(fi)/np.cos(Fi),X[-1],X[-1]+a*np.cos(fii)/np.cos(Fi)))
+    Ya=np.vstack((Y[-1]+a*np.sin(fi)/np.cos(Fi),Y[-1],Y[-1]+a*np.sin(fii)/np.cos(Fi)))
+    X=np.vstack((X,Xa))
+    Y=np.vstack((Y,Ya))
+
+    if (d<0 and nend) or (d>=0 and nend>1): # d<0 means d==-1 !
+      X[-3:,-1]=X[-4,-1]
+      Y[-3:,-1]=Y[-4,-1]
+
+
+  cm=None
+  if 'cmap' in kargs:
+    cm=kargs.pop('cmap')
+    norm=kargs.pop('norm',pl.matplotlib.colors.Normalize)
+    if noC: C=s # by default use speed to set colors
+    else: C=C.mean(0)
+  elif not 'color' in kargs:
+    kargs['color']='k'
+
+  p=ax.plot(X,Y,**kargs)
+  if cm:
+    cNorm  = norm(vmin=C.min(), vmax=C.max())
+    scalarMap = pl.cm.ScalarMappable(norm=cNorm, cmap=cm)
+    [p[i].set_color(scalarMap.to_rgba(C[i])) for i in range(len(p))]
+    scalarMap._A=[]
+    return p,scalarMap
+  else: return p

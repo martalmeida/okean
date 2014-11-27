@@ -12,8 +12,8 @@ def get_ij_inds(grd,**kargs):
   fsave=kargs.get('fsave','ijinds.pickle')
 
   if lon is False:
-    lon=netcdf.use(f,vlon)
-    if lon_add: lon=np.mod(lon,360)+lon_add
+    lon=np.mod(netcdf.use(f,vlon),360)
+    lon+=lon_add
 
   if lat is False:
     lat=netcdf.use(f,vlat)

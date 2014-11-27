@@ -13,3 +13,12 @@ lon_name: Okubo-Weiss parameter
 units: second-2
 req=u,v
 
+[rel vort]
+lon_name: Relative vorticity
+units: second-1
+req=u,v
+
+[diverg]
+lon_name: Horizontal divergence
+units: second-1
+req=u,v

@@ -136,7 +136,7 @@ Cf2py intent(out) z_w
 
       subroutine  depthof(v,z,mask,val,S,M,N,depth)
 
-      integer S, mask(M,N),dir
+      integer S, mask(M,N),dir, nInc, nDec
       real v(S,M,N),z(S,M,N),depth(M,N),val
 
 Cf2py intent(out) depth
@@ -149,17 +149,43 @@ Cf2py intent(out) depth
 
 
       ! find if v increases or decreases with depth:
+!      dir=0
+!      do i=1,M
+!        do j=1,N
+!          if (mask(i,j).eq.1) then
+!            if (v(1,i,j).gt.v(S,i,j)) then
+!              dir=1
+!            endif
+!            exit
+!          endif
+!        enddo
+!      enddo
+
+! can't just test the 1st non masked element. It can be on mask
+! with some extrapolated data, or it may not represent the whole
+! dataset. So, find the number or points where v increases and
+! decreases:
+
       dir=0
+      nInc=0
+      nDec=0
       do i=1,M
         do j=1,N
           if (mask(i,j).eq.1) then
             if (v(1,i,j).gt.v(S,i,j)) then
-              dir=1
+              nInc=nInc+1
+            else
+              nDec=nDec+1
             endif
-            exit
           endif
         enddo
       enddo
+      if (nInc.gt.nDec) then
+        dir=1
+      else
+        dir=0
+      endif
+!      print*, 'DIR=',dir, nInc, nDec
 
       if (dir.eq.1) then ! increases:
          do i=1,M

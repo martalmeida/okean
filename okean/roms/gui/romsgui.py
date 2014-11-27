@@ -793,6 +793,18 @@ class rgui:
     zlevLab=tk.Label(self.widgets['fright'],text='s or z',bg=self.bg,fg=self.fg)
     zlevLab.place(relx=x,y=y+3*h,relwidth=relw,height=h)
 
+# NEW
+    y=10*h
+    import gui_tools
+    gtools=gui_tools.rgui_tools(self.widgets['fright'])
+    gtools['base'].place(relx=relw/2,y=y,anchor='n')#,relwidth=relw,height=h
+
+    gtools['nozoom'].command=self.reset_lims
+    gtools['zoom'].command=self.interactive_zoom
+    gtools['path'].command=self.interactive_vslice
+    self.gtools=gtools
+# NEW
+
 
     # reset lims:
     ll_reset = tk.Button(self.widgets['fbot'],text="x",command=self.reset_lims)
@@ -1281,7 +1293,7 @@ class rgui:
        self.reset_file('his')
        self.widgets['ttime'].config(text=self.files['His'].TIME-1)
 
-  def reset_lims(self):  self.__set_grid_lims(show=True)
+  def reset_lims(self,*e):  self.__set_grid_lims(show=True)
 
   def __set_grid_lims(self,show=False,lims=False):
     if lims is False:
@@ -2013,7 +2025,9 @@ class rgui:
       t0=pytime.time()
 
       if self.options['coastline_res'].get()!='none':
-        self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
+        try:
+          self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
+        except: pass
 
       if self.options['draw_rivers'].get():
         self.map.drawrivers(linewidth=.5,color='blue',ax=ax)
@@ -2060,10 +2074,14 @@ class rgui:
                               fontsize=7)
 
       meridians,paralels=self.__calc_xyticks()
-      self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
+      try:
+        self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
                         color='#4d4d4d',ax=ax,dashes=[1,4])
-      self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
+      except: pass
+      try:
+        self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
                         color='#4d4d4d',ax=ax,dashes=[1,4])
+      except: pass
 
 
     print '6===',pytime.time()-t0
@@ -2449,18 +2467,20 @@ class rgui:
     '''
 #####    if not self.files.has_key('His'): return
 
-    ob=self.widgets['zoom']
-    relief=ob['relief']
+#    ob=self.widgets['zoom']
+#    relief=ob['relief']
+    ob=self.gtools['zoom']
 
-    if chstate and relief=='sunken':
-      ob.config(relief='raised')
+#    if chstate and relief=='sunken':
+    if chstate and ob.state==0:
+#      ob.config(relief='raised')
       self.active_tool=None
       self.zoom.cmd=False
       self.zoom.stop(False) # stop the zoom events that may be active
       self.__set_cursor()
 
     else:
-      ob.config(relief='sunken')
+#      ob.config(relief='sunken')
 
       self.__set_cursor('tcross')
 

@@ -130,8 +130,11 @@ def get_colormaps():
   for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
     res['ncview']+=[' '+k]
 
-  try:    names=pylab.cm._cmapnames
-  except: names=pylab.cm.cmapnames
+  try:names=pylab.cm._cmapnames
+  except AttributeError:
+    try: names=pylab.cm.cmapnames
+    except AttributeError: names=pylab.cm.cmap_d.keys()
+
   for n in names:
     for k in colorbrewer.keys():
       if n in colorbrewer[k]:
@@ -1757,20 +1760,27 @@ class rgui:
     else: spherical=True
 
     # slice:
+    if zlev>=0: zlev=int(zlev)
     if varname[0]=='*':
-      x,y,z,v=romsobj.slice_derived(varname[1:],zlev,time)
-      msg=''
+      #x,y,z,v,msg=romsobj.slice_derived(varname[1:],zlev,time,msg=True,surf_nans=surf_nans)
+      data=romsobj.slice_derived(varname[1:],zlev,time,surf_nans=surf_nans)
+      x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
     else:
       if zlev>=0:
-        zlev=int(zlev)
-        x,y,z,v,msg=romsobj.slicek(varname,zlev,time,msg=True)
+        #x,y,z,v,msg=romsobj.slicek(varname,zlev,time,msg=True)
+        data=romsobj.slicek(varname,zlev,time,msg=True)
+        x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
       else:
-        x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        #x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
 
     if currents:
       if varname in ('zeta','ubar','vbar'): vel_zlev='bar'
       else: vel_zlev=zlev
-      x_vel,y_vel,z_vel,u_vel,v_vel=romsobj.sliceuv(vel_zlev,time)
+      #x_vel,y_vel,z_vel,u_vel,v_vel=romsobj.sliceuv(vel_zlev,time)
+      data_vel=romsobj.sliceuv(vel_zlev,time)
+      x_vel,y_vel,z_vel,u_vel,v_vel=data_vel.x,data_vel.y,data_vel.z,data_vel.v[0],data_vel.v[1]
 
       if spherical:
         # rotate to proj angles:
@@ -1800,7 +1810,9 @@ class rgui:
     z_title=''
     t_title=''
     v_title=''
-    if varname[0]=='*':  return '' # derived var
+
+    if varname[0]=='*': isDerived=True
+    else: isDerived=False
 
     # about var and currents:
     v_title=varname
@@ -1809,18 +1821,18 @@ class rgui:
       else: v_title+='+currents'
 
     # about depth:
-    if romsobj.hasz(varname):
+    if isDerived or romsobj.hasz(varname):
       if zlev>=0: z_title=' k='+str(zlev)+' '
       else: z_title=' z='+str(zlev)+'m '
 
     # about date:
-    if romsobj.hast(varname):
-      if not romsobj.datetime is False:
+    if isDerived or romsobj.hast(varname):
+      if not romsobj.time is False:
         try:
-          t_title=' '+romsobj.datetime[time].isoformat(' ')
+          t_title=' '+romsobj.time[time].isoformat(' ')
         except:
            # some old dates have not isoformat !!!
-           t_title=' '+str(romsobj.datetime[time])
+           t_title=' '+str(romsobj.time[time])
       else:
         try: yorig=int(self.widgets['yorig'].get())
         except: yorig=1
@@ -2608,11 +2620,15 @@ class rgui:
       y=y[0]
 
     if type=='profile':
-        x,y,z,v=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        #x,y,z,v=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        data=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        x,y,z,v=data.x,data.y,data.z,data.v
     elif type=='time_series':
         zlev    = self.__get_zlevel()
         print var,x,y,zlev
-        t,z,v=q.time_series(var,x,y,depth=zlev)
+        #t,z,v=q.time_series(var,x,y,depth=zlev)
+        data=q.time_series(var,x,y,depth=zlev)
+        t,z,v=data.t,data.z,data.v
 
 
     # draw:
@@ -2739,9 +2755,13 @@ class rgui:
     # slicell:
     try:
       self.map.xmin
-      d,z,v=q.slicell(var,X,Y,itime,dist=True)
+      #d,z,v=q.slicell(var,X,Y,itime,dist=True)
+      data=q.slicell(var,X,Y,itime,dist=True)
+      d,z,v=data.d,data.z,data.v
     except:
-      x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+      #x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+      data=q.slicell(var,X,Y,itime,dist=False)
+      x,y,z,v=data.x,data.y,data.z,data.v
       x=x[0,...]
       y=y[0,...]
       #print x.shape, y.shape

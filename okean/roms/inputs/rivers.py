@@ -7,7 +7,6 @@ mma  feb 2011, Texas A&M
 import numpy as np
 import pylab as pl
 import datetime
-import netcdftime
 import os
 
 from okean import netcdf, cookbook as cb, dateu as dts
@@ -139,7 +138,7 @@ class RiverFrc:
 
     # convert time to tunits:
     time=data['time']
-    for i in range(len(time)): time[i]=netcdftime.date2num(time[i],self.tunits)
+    for i in range(len(time)): time[i]=netcdf.date2num(time[i],self.tunits)
 
     nc=netcdf.Pync(self.fname,'a')
 

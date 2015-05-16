@@ -73,29 +73,39 @@ def varnames(fname,interface='auto'):
   return res
 
 
+def num2date(tnum,tunits,calendar='standard'):
+  from netcdftime import utime
+  return utime(tunits,calendar).num2date(tnum)
+
+def date2num(tdate,tunits,calendar='standard'):
+  from netcdftime import utime
+  return utime(tunits,calendar).date2num(tdate)
+
+
 def nctime(filename,varname,interface='auto',**kargs):
   time=use(filename,varname,interface=interface,**kargs)
   units=vatt(filename,varname,'units')
-  import netcdftime
 
-  # dates like 2004-01-01T00:00:00Z not supported by older varsion
-  # units also cannot have multiple spaces...
-  if netcdftime.__version__ <'0.9.2': # dont really know which version...
-    units=units.replace('T',' ').replace('Z',' ')
-    units=' '.join(units.split())
+  # dates like 2004-01-01T00:00:00Z not supported by old varsions of
+  # netcdftime (older than 0.9.2, dont really know which version).
+  # units also cannot have multiple spaces... so:
 
-  return netcdftime.num2date(time,units)
+  units=units.replace('T',' ').replace('Z',' ')
+  units=' '.join(units.split())
+  return num2date(time,units)
 
 
-def use(filename,varname,interface='auto',masked=True,**kargs):
+def use(filename,varname,interface='auto',**kargs):
   nc,close=__open(filename,interface)
 
   if varname not in nc.varnames: return
 
   v=nc.vars[varname]
   shape=v.shape()
-  #if not shape: return v[0]
-  if not shape: return v[:][0] # may be needed for dtype='|S1'
+
+  if not shape:
+    try: return v[:][0] # may be needed for dtype='|S1'
+    except: return v[:]
 
 
   d=v.dims
@@ -142,7 +152,8 @@ def use(filename,varname,interface='auto',masked=True,**kargs):
     miss=False
     if   '_FillValue'    in v.attnames: miss = v.atts['_FillValue']['value']
     elif 'missing_value' in v.attnames: miss = v.atts['missing_value']['value']
-    if not miss is False and masked and v.nctype()!='STRING':
+    maskMissing=kargs.get('maskMissing',True)
+    if not miss is False and maskMissing and v.nctype()!='STRING':
       res=np.ma.masked_where(res==miss,res)
 
     ## ensure strings have no mask:
@@ -161,6 +172,12 @@ def use(filename,varname,interface='auto',masked=True,**kargs):
   if close: nc.close()
 
   if 1 in res.shape and res.ndim>1: res=np.squeeze(res)
+
+  # mask nan
+  maskNaN=kargs.get('maskNaN',True)
+  if maskNaN and not res.dtype.type==np.string_ and not np.ma.isMA(res) and np.any(np.isnan(res)):
+    res=np.ma.masked_where(np.isnan(res),res)
+
   return res
 
 

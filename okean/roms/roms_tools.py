@@ -9,6 +9,7 @@ from okean import netcdf, calc, dateu
 def depthof(v,z,val):
   '''
   Depths where variable, increasing/dec with depth, has some value
+  val can be 2d
 
   Output is masked where surface is higher/lower than value or where all
   water column is lower/higher than value
@@ -19,6 +20,9 @@ def depthof(v,z,val):
   A[A==9999]=-h
   A=A+zeta
   '''
+
+  try: val.shape==v.shape[1:]
+  except: val=np.ones(v.shape[1:],v.dtype)*val
 
   import rtools
   mask=(~v[0].mask).astype('i')
@@ -35,6 +39,8 @@ def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True):
 
   if vt==1 and vs==1:
     import rtools
+  elif vt==2 and vs==1:
+    import rtools_vs1vt2 as rtools
   elif vt==2 and vs==4:
     import rtools_vs4vt2 as rtools
   elif vt==2 and vs==2:
@@ -57,6 +63,8 @@ def s_levels(h,zeta,sparams,rw=False):
 
   if vt==1 and vs==1:
     import rtools
+  elif vt==2 and vs==1:
+    import rtools_vs1vt2 as rtools
   elif vt==2 and vs==4:
     import rtools_vs4vt2 as rtools
   elif vt==2 and vs==2:
@@ -183,7 +191,10 @@ def psi2uvr(vp,pt):
   elif  pt=='u': M_,L_=M+1,L
   elif  pt=='v': M_,L_=M,L+1
 
-  vr=np.zeros((M_,L_),vp.dtype)
+  if np.ma.isMA(vp):
+    vr=np.ma.zeros((M_,L_),vp.dtype)
+  else:
+    vr=np.zeros((M_,L_),vp.dtype)
 
   if pt[0]=='r':
     vr[1:-1,1:-1]=0.25*(vp[:-1,:-1]+vp[:-1,1:]+vp[1:,:-1]+vp[1:,1:])

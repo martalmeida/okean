@@ -137,7 +137,7 @@ Cf2py intent(out) z_w
       subroutine  depthof(v,z,mask,val,S,M,N,depth)
 
       integer S, mask(M,N),dir, nInc, nDec
-      real v(S,M,N),z(S,M,N),depth(M,N),val
+      real v(S,M,N),z(S,M,N),depth(M,N),val(M,N)
 
 Cf2py intent(out) depth
 ! Cf2py integer optional, intent(in) :: S=shape(v,0)
@@ -191,11 +191,11 @@ Cf2py intent(out) depth
          do i=1,M
            do j=1,N
              depth(i,j)=999.
-             if ((mask(i,j).eq.1).and.(v(S,i,j).le.val)) then
+             if ((mask(i,j).eq.1).and.(v(S,i,j).le.val(i,j))) then
                do k=S,2,-1
-                 if (v(k,i,j).gt.val) then
-                   a=v(k,i,j)-val
-                   b=val-v(k+1,i,j)
+                 if (v(k,i,j).gt.val(i,j)) then
+                   a=v(k,i,j)-val(i,j)
+                   b=val(i,j)-v(k+1,i,j)
                    depth(i,j)=(z(k,i,j)*b+z(k+1,i,j)*a)/(a+b)
                    exit
                  endif
@@ -211,11 +211,11 @@ Cf2py intent(out) depth
          do i=1,M
            do j=1,N
              depth(i,j)=999.
-             if ((mask(i,j).eq.1).and.(v(S,i,j).ge.val)) then
+             if ((mask(i,j).eq.1).and.(v(S,i,j).ge.val(i,j))) then
                do k=S,2,-1
-                 if (v(k,i,j).lt.val) then
-                   a=v(k,i,j)-val
-                   b=val-v(k+1,i,j)
+                 if (v(k,i,j).lt.val(i,j)) then
+                   a=v(k,i,j)-val(i,j)
+                   b=val(i,j)-v(k+1,i,j)
                    depth(i,j)=(z(k,i,j)*b+z(k+1,i,j)*a)/(a+b)
                    exit
                  endif

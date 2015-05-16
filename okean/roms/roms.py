@@ -1,11 +1,11 @@
 import numpy as np
-import pylab
+#import pylab as pl
 import os
-import netcdftime
 
 from okean import calc, netcdf, ticks
 import roms_tools as rt
 from derived import Derived
+from okean.vis import Data
 
 try:
   from mpl_toolkits.basemap import Basemap
@@ -14,8 +14,30 @@ except:
 
 __all__='His','Grid'
 
+#class Aux:
+#  def __init__(self):
+#    self.x=None
+#    self.y=None
+#    self.d=None
+#    self.z=None
+#    self.t=None
+#    self.tnum=None # used with time_series (2d times)
+#    self.msg=''
+#
+#  def info(self):
+#    for i in ['x','y','d','z','t','tnum']:
+#      a=getattr(self,i)
+#      try: print '%5s shape=%12s size=%d'%(i,str(a.shape),a.size)
+#      except: print '%5s %s'%(i,str(a))
+#
+#    if not self.msg: msg='EMPTY'
+#    else: msg=self.msg
+#    print ' == msg == %s'%msg
+    
+
 class Common:
   def load_vars(self,vars):
+    #self.quiet=0
     var,nc=netcdf.var(self.name)
     varnames=var.keys()
     for i in vars:
@@ -25,10 +47,8 @@ class Common:
         iname, iopts = i.items()[0]
       elif isinstance(i,basestring):
         iname=i
-        iopts=i
-      elif isinstance(i,tuple):
-        iname=False
-        iopts=i
+        if iname.startswith('@'): iopts=iname[1:]
+        else: iopts=iname
 
       if not isinstance(iopts,tuple):
         iopts=(iopts,)
@@ -36,9 +56,15 @@ class Common:
       found=0
       if not hasattr(self,'var_as'): self.var_as={}
       for j in iopts:
-        if not iname: iname=j
         if j in varnames:
-          setattr(self,iname,var[j][:])
+          if iname.startswith('@'):
+            iname=iname[1:]
+            setattr(Common, iname, property(fget=lambda self: self.use(j)))
+            # not working as expected! self.use is executed in the end, for last variable only!
+            # check later...
+          else:
+            setattr(self,iname,var[j][:])
+
           found=1
           if not self.quiet: print '  - found %s as %s'  % (iname,j)
 
@@ -122,8 +148,13 @@ class Common:
 
 class Grid(Common):
   def __init__(self,grd,quiet=True):
-    if grd.startswith('http'): self.name=grd
-    else: self.name=os.path.realpath(grd)
+    if grd.startswith('http'):
+      self.name=grd
+      self.isremote=True
+    else:
+      self.name=os.path.realpath(grd)
+      self.isremote=False
+
     self.type='grid'
     self.quiet=quiet
 
@@ -132,13 +163,23 @@ class Grid(Common):
     self.load_uvp()
     self.load_atts()
 
+
   def load(self):
-    vars={'lon':('lon_rho','x_rho')}, {'lonu':('lon_u','x_u')},\
-         {'lonv':('lon_v','x_v')},    {'lonp':('lon_psi','x_psi')},\
-         {'lat':('lat_rho','y_rho')}, {'latu':('lat_u','y_u')},\
-         {'latv':('lat_v','y_v')},    {'latp':('lat_psi','y_psi')},\
-         {'mask':'mask_rho'},{'masku':'mask_u'},{'maskv':'mask_v'},{'maskp':'mask_psi'},\
-         'h','angle', 'pm','pn'
+    self.isremote=1
+    if self.isremote: # load as few vars as possible! @ means loaded only when needed!
+      vars={'lon':('lon_rho','x_rho')},{'lat':('lat_rho','y_rho')},\
+           {'mask':'mask_rho'},'h','angle','pm','pn'
+#           {'mask':'mask_rho'},'h','@angle','@pm','@pn'
+
+    else:
+      vars={'lon':('lon_rho','x_rho')}, {'lonu':('lon_u','x_u')},\
+           {'lonv':('lon_v','x_v')},    {'lonp':('lon_psi','x_psi')},\
+           {'lat':('lat_rho','y_rho')}, {'latu':('lat_u','y_u')},\
+           {'latv':('lat_v','y_v')},    {'latp':('lat_psi','y_psi')},\
+           {'mask':'mask_rho'},{'masku':'mask_u'},{'maskv':'mask_v'},{'maskp':'mask_psi'},\
+           'h','angle', 'pm','pn'
+#           'h','@angle', '@pm','@pn'
+
     self.load_vars(vars)
 
     # some vars may not be present... set defaults:
@@ -291,13 +332,14 @@ class Grid(Common):
 #    return x[i1:i2,j1:j2],y[i1:i2,j1:j2],data[i1:i2,j1:j2]
 
 
-  def ingrid(self,x,y,retInds=False):
+  def ingrid(self,x,y):#,retInds=False):
     '''in polygon of region border'''
     xb,yb=self.border()
-    i=calc.inpolygon(x,y,xb,yb)
-    if retInds:
-      return x[i!=0], y[i!=0], np.where(i)[0]
-    else: return x[i!=0], y[i!=0]
+    return calc.inpolygon(x,y,xb,yb)
+#    i=calc.inpolygon(x,y,xb,yb)
+#    if retInds:
+#      return x[i!=0], y[i!=0], np.where(i)[0]
+#    else: return x[i!=0], y[i!=0]
 
 
   def resolution(self):
@@ -308,7 +350,64 @@ class Grid(Common):
     return self.lon,self.lat,dx,dy
 
 
+  def plot3d(self,type='surface',**kargs):
+    nmax=kargs.get('nmax',200) # max wireframe lines
+
+    if type=='surface':
+
+      # mayavi and pylab version<3 needs the environment variable
+      # QT_API=pyqt, otherwise there will be the error "ValueError: API
+      # 'QString' has already been set to version 1
+      # This is because ipython uses pyqt4 using the version 1 of the api
+      # see: http://mail.scipy.org/pipermail/ipython-user/2012-February/009478.html
+
+      import sys
+      pver=eval(sys.version[:3]) 
+      qtapi=os.environ.get('QT_API','')
+
+      if pver<3 and qtapi!='pyqt':
+        print 'warning: environmen variable QT_API may need to be set as pyqt '\
+              'in python <3 so that mayavi can be used after pylab' \
+ 
+        a=raw_input('Wanna continue ([n],y) ?')
+        if a!='y': return 
+      
+      from mayavi import mlab
+
+      z=-self.h.copy()
+      z[self.mask==0]=np.nan
+
+      rx=self.lon.max()-self.lon.min()
+      ry=self.lat.max()-self.lat.min()
+      r=2*(self.h.max()-self.h.min())/(0.5*(rx+ry))
+
+      mlab.mesh(self.lon,self.lat,z/r)
+
+
+    else: # wireframe
+      from mpl_toolkits.mplot3d import axes3d
+      import pylab as pl
+      fig=pl.figure()
+
+      ax=fig.add_subplot(111, projection='3d')
+
+      ny,nx=self.h.shape
+      dx=int(np.round(nx/float(nmax)))
+      dy=int(np.round(ny/float(nmax)))
+
+      x=self.lon[::dy,::dx]
+      y=self.lat[::dy,::dx]
+      h=-self.h[::dy,::dx]
+
+      h[self.mask[::dy,::dx]==0]=np.nan
+
+      ax.plot_wireframe(x,y,h,lw=0.5,alpha=.5)
+      ax.contour3D(self.lon,self.lat,self.mask,[.5])
+
+
+
   def plot(self,**kargs):
+    import pylab as pl
     bathy      = kargs.get('bathy','contourf')
     hvals      = kargs.get('hvals','auto')
     resolution = kargs.get('res','i')
@@ -320,13 +419,13 @@ class Grid(Common):
     xlim       = kargs.get('xlim',False)
     ylim       = kargs.get('ylim',False)
     title      = kargs.get('title','auto')
-    cmap       = kargs.get('cmap',pylab.cm.gist_earth_r)
+    cmap       = kargs.get('cmap',pl.cm.gist_earth_r)
     proj       = kargs.get('proj','merc')
     ax         = kargs.get('ax',False)
 
     if not ax:
-      fig=pylab.figure()
-      ax=pylab.axes()
+      fig=pl.figure()
+      ax=pl.axes()
     else: fig=ax.figure
 
     h=np.ma.masked_where(self.mask==0,self.h)
@@ -348,11 +447,21 @@ class Grid(Common):
     if meridians=='auto': meridians=xt
 
     if Basemap and proj:
-      m = Basemap(projection=proj,lat_ts=0.0,
+
+      key=Lonlims,Lonlims,proj,resolution
+      if not hasattr(self,'_proj'):
+        self._proj={}
+      
+      if self._proj.has_key(key):
+        m=self._proj[key]
+      else:
+        m = Basemap(projection=proj,lat_ts=0.0,
                   #lon_0=self.lon[0].mean(),
                   resolution=resolution,
                   urcrnrlon=Lonlims[1], urcrnrlat=Latlims[1],
                   llcrnrlon=Lonlims[0], llcrnrlat=Latlims[0])
+
+        self._proj[key]=m
 
       m.drawcoastlines(ax=ax)
       m.fillcontinents(ax=ax,color=(0.7604,    1.0000,    0.7459))
@@ -390,7 +499,7 @@ class Grid(Common):
         if m.xmax-m.xmin<m.ymax-m.ymin: orientation='horizontal'
         else: orientation='vetical'
 
-        cbh = pylab.colorbar(pch,orientation=orientation,ax=ax)
+        cbh = pl.colorbar(pch,orientation=orientation,ax=ax)
         cbh.set_label('Depth')
         if title=='auto': ax.set_title(self.name)
         elif title: ax.set_title(title)
@@ -435,18 +544,19 @@ class His(Common,Derived):
     # netcdf time:
     try:
       # units must have the format <units> since <date>
-      self.datetime=netcdftime.num2date(self.time,self.var_as['time']['units'])
-    except: self.datetime=False
+      self.time=netcdf.num2date(self.time,self.var_as['time']['units'])
+    except: pass
 
-
-    # time is usually seconds, but may be days!!, so:
-    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
-
-    if len(self.time)>1:
-      self.dt=self.time[1]-self.time[0]
-    else: self.dt=0
-
-    self.tdays=self.time/86400.
+###    self.datetime=self.time
+###
+###    # time is usually seconds, but may be days!!, so:
+###    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
+###
+###    if len(self.time)>1:
+###      self.dt=self.time[1]-self.time[0]
+###    else: self.dt=0
+###
+###    self.tdays=self.time/86400.
 
 
     # s params:
@@ -499,410 +609,561 @@ class His(Common,Derived):
 
 # --------
 
-  def slicei(self,varname,ind,time=0,dist=1,plot=False,**opts):
-    savename=False
-    if 'savename' in opts.keys(): savename=opts['savename']
+  def check_slice(self,varname,**dims):
+    msg=''
 
-    d,x,y,z,v=[[]]*5
-
+    # check varname:
     if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
-      if dist: return  d,z,v
-      else:  return  x,y,z,v
+      return ':: variable %s not found' % varname
 
-    isU=varname=='u'
-    isV=varname=='v'
-
-    if isU:
-      XI= self.XI_U
-      xi='XI_U'
-    elif isV:
-      if hasattr(self,'XI_V'):
-        XI= self.XI_V
-        xi='XI_V'
-      else: # this happens in current roms-agrif
-        XI= self.XI_RHO
-        xi='XI_RHO'
-    else:
-      XI= self.XI_RHO
-      xi='XI_RHO'
-
-    if ind >= XI:  print 'j = %d exceeds %s dimension (%d)' % (ind,xi,XI)
-
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),i=ind)
-    karg={'SEARCHtime':time,xi.lower(): ind}
-    v=self.use(varname,**karg)
-    if v.ndim==2:
-      z=self.s_levels(time=time,ruvpw=self.var_at(varname),i=ind)
-    elif v.ndim==1:
-      z=[]
-
-    N=v.shape[0]
-    if dist:
-      d=calc.distance(x,y)
-      if plot:
-
-        pylab.figure()
-        if v.ndim==2:
-          pylab.pcolor(np.tile(d,(N,1)),z,np.ma.masked_where(np.tile(m,(N,1))==0,v),shading='flat')
-          pylab.plot(d,-h)
-          pylab.colorbar(shrink=.7)
-        elif  v.ndim==1:
-           pylab.plot(d,v)
-
-        if savename:
-          pylab.savefig(savename,dpi=pylab.gcf().dpi)
-          pylab.close(pylab.gcf())
-
-      if v.ndim==2:
-        return np.tile(d,(N,1)),z,v #,np.tile(m,(N,1))==0
-      elif v.ndim==1:
-        return d,z,v #,m==0
-
-    else:
-      if plot:
-        pylab.figure()
-        if v.ndim==2:
-          pylab.pcolor(np.tile(y,(N,1)),z,np.ma.masked_where(np.tile(m,(N,1))==0,v),shading='flat')
-          pylab.colorbar(shrink=.7)
-          pylab.plot(y,-h)
-        elif  v.ndim==1:
-          pylab.plot(y,v)
-
-        if savename:
-          pylab.savefig(savename,dpi=pylab.gcf().dpi)
-          pylab.close(pylab.gcf())
-
-      if v.ndim==2:
-        return np.tile(x,(N,1)),np.tile(y,(N,1)),z,v #,np.tile(m,(N,1))==0
-      elif v.ndim==1:
-         return x,y,z,v #,m==0
-
-
-  def slicej(self,varname,ind,time=0,dist=1,plot=False,**opts):
-    savename=False
-    if 'savename' in opts.keys(): savename=opts['savename']
-
-    d,x,y,z,v=[[]]*5
-
-    if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
-      if dist: return  d,z,v
-      else:  return  x,y,z,v
-
-    isU=varname=='u'
-    isV=varname=='v'
-
-    if isU:
-      if hasattr(self,'ETA_U'):
-        ETA= self.ETA_U
-        eta='ETA_U'
-      else: # this happens in current roms-agrif
-        ETA= self.ETA_RHO
-        eta='ETA_RHO'
-    elif isV:
-      ETA= self.ETA_V
-      eta='ETA_V'
-    else:
-      ETA= self.ETA_RHO
-      eta='ETA_RHO'
-
-    if ind >= ETA:
-      print 'j = %d exceeds %s dimension (%d)' % (ind,eta,ETA)
-      if dist: return  d,z,v
-      else:  return  x,y,z,v
-
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),j=ind)
-    karg={'SEARCHtime':time,eta.lower(): ind}
-    v=self.use(varname,**karg)
-    if v.ndim==2:
-      z=self.s_levels(time=time,ruvpw=self.var_at(varname),j=ind)
-    elif v.ndim==1:
-      z=[]
-
-    N=v.shape[0]
-    if dist:
-      d=calc.distance(x,y)
-      if plot:
-        pylab.figure()
-        if v.ndim==2:
-          pylab.pcolor(np.tile(d,(N,1)),z,np.ma.masked_where(np.tile(m,(N,1))==0,v),shading='flat')
-          pylab.plot(d,-h)
-          pylab.colorbar(shrink=.7)
-        elif v.ndim==1:
-          pylab.plot(d,v)
-
-        if savename:
-          pylab.savefig(savename,dpi=pylab.gcf().dpi)
-          pylab.close(pylab.gcf())
-
-      if v.ndim==2:
-        return np.tile(d,(N,1)),z,v
-      elif v.ndim==1:
-         return d,z,v #np.ma.masked_where(m==0,v)
-
-    else:
-      if plot:
-        pylab.figure()
-        if v.ndim==2:
-          pylab.pcolor(tile(x,(N,1)),z,ma.masked_where(tile(m,(N,1))==0,v),shading='flat')
-          pylab.colorbar(shrink=.7)
-          pylab.plot(x,-h)
-        elif v.ndim==1:
-          pylab.plot(x,v)
-
-        if savename:
-          pylab.savefig(savename,dpi=pylab.gcf().dpi)
-          pylab.close(pylab.gcf())
-
-      if v.ndim==2:
-        m=np.tile(m,(N,1))==0
-        return np.tile(x,(N,1)),np.tile(y,(N,1)),z,v #np.ma.masked_where(m,v)
-      elif v.ndim==1:
-         return x,y,z,v #np.ma.masked_where(m==0,v)
-
-
-
-  def slicek(self,varname,ind,time=0,plot=False,**opts):
-    x,y,z,v=[[]]*4
-
-    RetVarOnly=False
-    savename=False
-    retMsg=False
-
-    if ind in ('s','surf','surface'): ind=-1
-    if 'retvar'   in opts.keys(): RetVarOnly = opts['retvar']
-    if 'savename' in opts.keys(): savename   = opts['savename']
-    if 'msg'      in opts.keys(): retMsg     = opts['msg']
-
-
-    if varname not in netcdf.varnames(self.name):
-      msg=':: variable %s not found' % varname
-      if retMsg: return x,y,z,v,msg
-      else:
-        print msg
-        return x,y,z,v
-
+    isU=varname in ('u','ubar')
+    isV=varname in ('v','vbar')
     isW=varname=='w'
-    hasZ=self.hasz(varname)
 
-    if hasZ:
-      if isW and ind >= self.S_W:
-        msg='k = %d exceeds S_W dimension (%d)' % (ind,self.S_W)
-        if retMsg: return x,y,z,v,msg
-        else:
-          print msg
-          return x,y,z,v
+    for dim,ind in dims.items():
+      # check time:
+      if dim=='t':
+        if self.hast(varname) and ind>=self.TIME:
+          msg='t = %d exceeds TIME dimension (%d)' % (ind,self.TIME)
 
-      elif ind >= self.S_RHO:
-        msg='k = %d exceeds S_RHO dimension (%d)' % (ind,self.S_RHO)
-        if retMsg: return x,y,z,v,msg
-        else:
-          print msg
-          return x,y,z,v
+      # check dim k:
+      elif dim=='k':
+        if self.hasz(varname):
+          if isW: s='S_W'
+          else: s='S_RHO'
+          indMax=getattr(self,s)
+          if ind >= indMax: msg='k = %d exceeds %s dimension (%d)' % (ind,s,indMax)
 
-    if self.hast(varname) and time>=self.TIME:
-      msg='t = %d exceeds TIME dimension (%d)' % (time,self.TIME)
-      if retMsg: return x,y,z,v,msg
-      else:
-        print msg
-        return x,y,z,v
+      # check dim i:
+      elif dim=='i':
+        xi='XI_RHO'
+        if isU: xi='XI_U'
+        elif isV and hasattr(self,'XI_V'): xi='XI_V' # needed for roms-agrif
+        indMax=getattr(self,xi)
+        if ind >= indMax:  msg='i = %d exceeds %s dimension (%d)' % (ind,xi,indMax)
 
-    if isW: v=self.use(varname,SEARCHtime=time,s_w=ind)
-    else:   v=self.use(varname,SEARCHtime=time,s_rho=ind)
+      # check dim j:
+      elif dim=='j':
+        eta='ETA_RHO'
+        if isU and hasattr(self,'ETA_U'): eta='ETA_U' # needed for roms-agrif
+        elif isV: eta='ETA_V'
+        indMax=getattr(self,eta)
+        if ind >= indMax: msg='j = %d exceeds %s dimension (%d)' % (ind,eta,indMax)
 
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
-    if hasZ:
-      z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
-    else:
-      z=self.use('zeta',SEARCHtime=time)
-      z=rt.rho2uvp(z,varname)
+    return msg
 
-    if not np.ma.isMA(v): # roms agrif ...
+  @staticmethod
+  def _default_coords(slc):
+    if   slc=='slicei':      res='d,z,t'
+    elif slc=='slicej':      res='d,z,t'
+    elif slc=='slicek':      res='x,y,t'
+    elif slc=='slicez':      res='x,y,t'
+    elif slc=='slicell':     res='d,z,t'
+    elif slc=='sliceuv':     res='x,y,t'
+    elif slc=='sliceiso':    res='x,y,t'
+    elif slc=='time_series': res='x,y,z,t'
+##    return sorted(res)
+    return ','.join(sorted(res.split(',')))
+
+  def slicei(self,varname,ind,time=0,**opts):
+    coords=opts.get('coords',self._default_coords('slicei')).split(',')
+
+    out=Data() 
+    out.msg=self.check_slice(varname,t=time,i=ind)
+    if out.msg: return out
+    
+    v=self.use(varname,SEARCHtime=time,xi_SEARCH=ind)
+
+    # add mask if not masked:
+    if not np.ma.isMA(v):
+      m=self.grid.vars(ruvp=self.var_at(varname),i=ind)[-1]
+      if v.ndim==2: m=np.tile(m,(v.shape[0],1))
       v=np.ma.masked_where(m==0,v)
 
-    if plot:
-      p=self.grid.plot(bathy=None,**opts)
-      xm, ym = p(x,y)
-      pch=pylab.pcolor(xm,ym,v,shading='flat')
-      pylab.colorbar(pch,shrink=.7)
-      pylab.axis([p.xmin, p.xmax, p.ymin, p.ymax])
-      if savename:
-        pylab.savefig(savename,dpi=pylab.gcf().dpi)
-        pylab.close(pylab.gcf())
-
-    if RetVarOnly:
-      return v
-    else:
-      if retMsg: return x,y,z,v,''
-      else: return x,y,z,v
+    out.v=v
+    out.info['v']['name']=varname
+    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    except: pass
 
 
-  def slicez(self,varname,ind,time=0,plot=False,**opts):
-    x,y,z,v=[[]]*4
+    # coords:
+    if 'z' in coords and v.ndim==2:
+      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),i=ind)
+      out.info['z']=dict(name='Depth',units='m')
 
-    savename  = False
-    retMsg    = False
-    surf_nans = True
+    if any([i in coords for i in 'xyd']):
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),i=ind)
 
-    if 'savename'  in opts.keys(): savename  = opts['savename']
-    if 'msg'       in opts.keys(): retMsg    = opts['msg']
-    if 'surf_nans' in opts.keys(): surf_nans = opts['surf_nans']
+    if 'd' in coords:
+      d=calc.distance(x,y)
+      if d[-1]-d[0]>1e4:
+        d=d/1000.
+        dunits='km'
+      else: dunits='m'
+
+      if v.ndim==2: d=np.tile(d,(v.shape[0],1))
+      out.d=d
+      out.info['d']=dict(name='Distance',units=dunits)
+
+    if 'x' in coords:
+      if v.ndim==2: x=np.tile(x,(v.shape[0],1))
+      out.x=x
+      out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+
+    if 'y' in coords:
+      if v.ndim==2: y=np.tile(y,(v.shape[0],1))
+      out.y=y
+      out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+
+    if 't' in coords: out.t=self.time[time]
+
+    if v.ndim==2:
+      out.extra=[Data()]
+      if 'd' in coords: out.extra[0].x=out.d[0]
+      if 'y' in coords: out.extra[0].x=out.y[0]
+      if 'x' in coords: out.extra[0].y=out.x[0]
+      out.extra[0].v=-h
+      out.extra[0].config['1d.plot']='fill_between'
+      out.extra[0].config['1d.y0']=-h.max()-(h.max()-h.min())/20.
+      out.extra[0].alias='bottom'
+
+    out.coordsReq=','.join(sorted(coords))
+    return out 
 
 
-    if varname not in netcdf.varnames(self.name):
-      msg=':: variable %s not found' % varname
-      if retMsg: return x,y,z,v,msg
-      else:
-        print msg
-        return x,y,z,v
+  def slicej(self,varname,ind,time=0,**opts):
+    coords=opts.get('coords',self._default_coords('slicej')).split(',')
 
-    if self.hast(varname) and time>=self.TIME:
-      msg='t = %d exceeds TIME dimension (%d)' % (time,self.TIME)
-      if retMsg: return x,y,z,v,msg
-      else:
-        print msg
-        return x,y,z,v
+    out=Data()
+    out.msg=self.check_slice(varname,t=time,j=ind)
+    if out.msg: return out
 
-    v=self.use(varname,SEARCHtime=time);
+    v=self.use(varname,SEARCHtime=time,eta_SEARCH=ind)
+
+    # add mask if not masked:
+    if not np.ma.isMA(v):
+      m=self.grid.vars(ruvp=self.var_at(varname),j=ind)[-1]
+      if v.ndim==2: m=np.tile(m,(v.shape[0],1))
+      v=np.ma.masked_where(m==0,v)
+
+    out.v=v
+    out.info['v']['name']=varname
+    out.info['v']['slice']='j=%d'%ind
+    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    except: pass
+
+    # coords:
+    if 'z' in coords and v.ndim==2:
+      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),j=ind)
+      out.info['z']=dict(name='Depth',units='m')
+
+    if any([i in coords for i in 'xyd']):
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),j=ind)
+
+    if 'd' in coords:
+      d=calc.distance(x,y)
+      if d[-1]-d[0]>1e4:
+        d=d/1000.
+        dunits='km'
+      else: dunits='m'
+
+      if v.ndim==2: d=np.tile(d,(v.shape[0],1))
+      out.d=d
+      out.info['d']=dict(name='Distance',units=dunits)
+
+    if 'x' in coords:
+      if v.ndim==2: x=np.tile(x,(v.shape[0],1))
+      out.x=x
+      out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+
+    if 'y' in coords:
+      if v.ndim==2: y=np.tile(y,(v.shape[0],1))
+      out.y=y
+      out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+
+    if 't' in coords: out.t=self.time[time]
+
+    if v.ndim==2:
+      out.extra=[Data()]
+      if 'd' in coords: out.extra[0].x=out.d[0]
+      if 'x' in coords: out.extra[0].y=out.x[0]
+      if 'y' in coords: out.extra[0].x=out.y[0]
+      out.extra[0].v=-h
+      out.extra[0].config['1d.plot']='fill_between'
+      out.extra[0].config['1d.y0']=-h.max()-(h.max()-h.min())/20.
+      out.extra[0].alias='bottom'
+
+    out.coordsReq=','.join(sorted(coords))
+    return out
+
+
+  def slicek(self,varname,ind,time=0,**opts):
+    coords=opts.get('coords',self._default_coords('slicek')).split(',')
+
+    out=Data()
+    out.msg=self.check_slice(varname,t=time,k=ind)
+    if out.msg: out
+
+    v=self.use(varname,SEARCHtime=time,s_SEARCH=ind)
+
+    # add mask if not masked:
+    if not np.ma.isMA(v): 
+      m=self.grid.vars(ruvp=self.var_at(varname))[-1]
+      v=np.ma.masked_where(m==0,v)
+
+    out.v=v
+    out.info['v']['name']=varname
+    out.info['v']['slice']='k=%d'%ind
+    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    except: pass
+
+
+    # coords:
+    if 'z' in coords and self.hasz(varname):
+      out.z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
+      out.info['z']=dict(name='Depth',units='m')
+
+
+    if any([i in coords for i in 'xy']):
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
+
+    if 'x' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.x=x
+         out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+       else:
+         out.x=x/1000.
+         out.info['x']=dict(name='Distance',units='km')
+         
+    if 'y' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.y=y
+         out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+       else:
+         out.y=y/1000.
+         out.info['y']=dict(name='Distance',units='km')
+
+    if 't' in coords: out.t=self.time[time]
+
+    if v.ndim==2:
+      out.extra=[Data()]
+      if 'x' in coords: out.extra[0].x=out.x
+      if 'y' in coords: out.extra[0].y=out.y
+      out.extra[0].v=h
+      if h.max()>1000: cvals=200.,1000.
+      elif h>200: cvals=50.,100.,200.
+      else: cvals=3
+      out.extra[0].config['field.plot']='contour'
+      out.extra[0].config['field.cvals']=cvals
+      out.extra[0].config['field.linecolors']='k'
+      out.extra[0].alias='bathy'
+
+
+    out.coordsReq=','.join(sorted(coords))
+    return out
+
+
+  def slicez(self,varname,ind,time=0,**opts):
+    if not self.hasz(varname):
+      return self.slicek(varname,ind,time,**opts)
+
+    surf_nans=opts.get('surf_nans',True)
+    coords=opts.get('coords',self._default_coords('slicez')).split(',')
+
+    out=Data()
+    out.msg=self.check_slice(varname,t=time)
+    if out.msg: return out##None,au
+
+    v=self.use(varname,SEARCHtime=time)
     x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
-    if len(v.shape)==2: # no vertical comp
-      if retMsg: return x,y,ind+np.zeros(v.shape),np.ma.masked_where(m==0,v),''
-      else: return x,y,ind+np.zeros(v.shape),np.ma.masked_where(m==0,v)
-
     v,mask=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans)
     v=np.ma.masked_where(mask,v)
 
-    if plot:
-      p=self.grid.plot(bathy=None,**opts)
-      xm, ym = p(x,y)
-      pch=pylab.pcolor(xm,ym,v,shading='flat')
-      pylab.colorbar(pch,shrink=.7)
-      pylab.axis([p.xmin, p.xmax, p.ymin, p.ymax])
-      if savename:
-        pylab.savefig(savename,dpi=pylab.gcf().dpi)
-        pylab.close(pylab.gcf())
-
-    if retMsg: return x,y,ind+np.zeros(v.shape),v,''
-    else: return x,y,ind+np.zeros(v.shape),v
+    out.v=v
+    out.info['v']['name']=varname
+    out.info['v']['slice']='z=%d'%ind
+    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    except: pass
 
 
-  def slicell(self,varname,X,Y,time=0,plot=False,**opts):
-    x,y,z,v,m=[[]]*5
+    # coords:
+    if 'x' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.x=x
+         out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+       else:
+         out.x=x/1000.
+         out.info['x']=dict(name='Distance',units='km')
+
+    if 'y' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.y=y
+         out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+       else:
+         out.y=y/1000.
+         out.info['y']=dict(name='Distance',units='km')
+
+    if 'z' in coords:
+      out.z=ind+np.zeros(v.shape)
+      out.info['z']=dict(name='Depth',units='m')
+
+    if 't' in coords: out.t=self.time[time]
+
+    if v.ndim==2:
+      out.extra=[Data()]
+      if 'x' in coords: out.extra[0].x=out.x
+      if 'y' in coords: out.extra[0].y=out.y
+      out.extra[0].v=h
+      if h.max()>1000: cvals=200.,1000.
+      elif h>200: cvals=50.,100.,200.
+      else: cvals=3
+      out.extra[0].config['field.plot']='contour'
+      out.extra[0].config['field.cvals']=cvals
+      out.extra[0].config['field.linecolors']='k'
+      out.extra[0].alias='bathy'
+
+
+    out.coordsReq=','.join(sorted(coords))
+    return out
+
+
+  def slicell(self,varname,X,Y,time=0,**opts):
+#    x,y,z,v,m=[[]]*5
+########    plot= opts.get('plot',False)
+#########    ax  = opts.get('ax',None)
+    coords=opts.get('coords',self._default_coords('slicell')).split(',')
 
     data      = opts.get('data',False)
-    dist      = opts.get('dist',False)
+#    dist      = opts.get('dist',False)
     extrap    = opts.get('extrap',False)
-    varOnly   = opts.get('retv',False)
+#    varOnly   = opts.get('retv',False)
     maskLimit = opts.get('lmask',0.5) # points where interpolated mask are above
                                       # this value are considered as mask!
                                       # Most strict value is 0
 
+    out=Data()
+    out.msg=self.check_slice(varname,t=time)
+    if out.msg: return out#None,aux
 
-    X=np.array(X)
-    Y=np.array(Y)
+    X=np.asarray(X)
+    Y=np.asarray(Y)
     if X.ndim>1: X=np.squeeze(X)
     if Y.ndim>1: Y=np.squeeze(X)
 
-    if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
-      return x,y,z,v,m
-
-    if time>=self.TIME:
-      print 't = %d exceeds TIME dimension (%d)' % (time,self.TIME)
-      return x,y,z,v,m
-
-    if data is False: v=self.use(varname,SEARCHtime=time)
-    else: v=data
+#    if varname not in netcdf.varnames(self.name):
+#      print ':: variable %s not found' % varname
+#      return x,y,z,v,m
+#
+#    if time>=self.TIME:
+#      print 't = %d exceeds TIME dimension (%d)' % (time,self.TIME)
+#      return x,y,z,v,m
 
     x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
+    if True: # extrat only portion of data needed:
+##      print 'start', x.shape,y.shape,X.shape
+      i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
+##      print 'end'
+      xi='%d:%d'%(i0,i1)
+      eta='%d:%d'%(j0,j1)
 
-    if v.ndim==3:
-      V=calc.griddata(x,y,v,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
-    elif v.ndim==2:
-      V=calc.griddata(x,y,np.ma.masked_where(m==0,v),X,Y,extrap=extrap, keepMaskVal=maskLimit)
+      if data is False: V=self.use(varname,SEARCHtime=time,xi_SEARCH=xi,eta_SEARCH=eta)
+      else: v=data[...,j0:j1,i0:i1]
 
-    if varOnly: return V
+      x=x[j0:j1,i0:i1]
+      y=y[j0:j1,i0:i1]
+      h=h[j0:j1,i0:i1]
+      m=m[j0:j1,i0:i1]
 
-    # Z:
-    if v.ndim==3:
-      Z=self.path_s_levels(time,X,Y,rw=varname[0])
-    else: Z=0.*X
-
-
-    # X, Y, dist:
-    if dist:
-      Dist=calc.distance(X,Y)
-      if v.ndim==3:
-        Dist=np.tile(Dist,(v.shape[0],1))
     else:
-      if v.ndim==3:
-        X=np.tile(X,(v.shape[0],1))
-        Y=np.tile(Y,(v.shape[0],1))
-
-    if dist:
-      return Dist,Z,V
-    else:
-      return X,Y,Z,V
+      if data is False: V=self.use(varname,SEARCHtime=time)
+      else: v=data
 
 
-  def sliceuv(self,ind,time=0,plot=False,**opts):
-    savename=False
-    if savename in opts.keys(): savename=opts['savename']
+#    print V.shape, xi,eta
+#    return 0,0
+#    print 'EXTRACT ONLY NEEDED RANGE!'
+
+##    print 'start1'
+    if V.ndim==3:
+      v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
+##      print v.shape
+    elif V.ndim==2:
+      v=calc.griddata(x,y,np.ma.masked_where(m==0,V),X,Y,extrap=extrap, keepMaskVal=maskLimit)
+##    print 'end1'
+##    return 0,0
+#    if varOnly: return V
+#
+    # coords:
+    if 'z' in coords and V.ndim==3:
+      out.z=self.path_s_levels(time,X,Y,rw=varname[0])
+#    else: Z=0.*X
+
+    if 'd' in coords:
+      d=calc.distance(X,Y)
+      if v.ndim==2: d=np.tile(d,(v.shape[0],1))
+      out.d=d
+
+    if 'x' in coords:
+      if v.ndim==2: X=np.tile(X,(v.shape[0],1))
+      out.x=X
+
+    if 'y' in coords:
+      if v.ndim==2: Y=np.tile(Y,(v.shape[0],1))
+      out.y=Y
+
+    if 't' in coords: out.t=self.time[time]
+
+#    # X, Y, dist:
+#    if dist:
+#      Dist=calc.distance(X,Y)
+#      if v.ndim==3:
+#        Dist=np.tile(Dist,(v.shape[0],1))
+#    else:
+#      if v.ndim==3:
+#        X=np.tile(X,(v.shape[0],1))
+#        Y=np.tile(Y,(v.shape[0],1))
+#
+#    if dist:
+#      return Dist,Z,V
+#    else:
+#      return X,Y,Z,V
+#
+#    if plot:
+#      if not ax: ax=pl.gca()
+#      if v.ndim==2:
+#        if 'x' in coords:
+#          p=ax.pcolormesh(out.x,out.z,v)
+###          ax.plot(aux.x[0],-h)
+#        elif 'y' in coords:
+#          p=ax.pcolormesh(out.y,out.z,v)
+###          ax.plot(aux.y[0],-h)
+#        else:
+#          p=ax.pcolormesh(out.d,out.z,v)
+####          ax.plot(aux.d[0],-h)
+##
+#        pl.colorbar(p,shrink=.7)
+##      elif  v.ndim==1:
+#        if 'x' in coords:
+#          ax.plot(out.x,v)
+#        elif 'y' in coords:
+#          ax.plot(out.y,v)
+#        else:
+#          ax.plot(out.d,v)
+#
+    out.v=v
+    out.coordsReq=','.join(sorted(coords))
+    return out###v,aux
+
+
+  def sliceuv(self,ind,time=0,**opts):#plot=False,**opts):
+###    plot= opts.pop('plot',False)
+###    opts['plot']=False
+###    ax  = opts.get('ax',None)
+    coords=opts.get('coords',self._default_coords('sliceuv')).split(',')
+
+####    out=Data()
+####
+#    savename=opts.pop('savename',False)
+#    retMsg=opts.pop('msg',False)
 
     if ind=='bar':
-      isK,uname,vname,ind = True, 'ubar','vbar', 9999
+      slc,uname,vname,ind = self.slicek, 'ubar','vbar', 9999
     elif ind in ('s','surf','surface'):
-      isK,uname,vname,ind = True,  'u','v', -1
+      slc,uname,vname,ind = self.slicek,  'u','v', -1
     elif ind>=0:
-      isK,uname,vname,ind = True,  'u','v', ind
+      slc,uname,vname,ind = self.slicek,  'u','v', ind
     elif ind <0:
       isK=False
-      isK,uname,vname,ind = False, 'u','v', ind
+      slc,uname,vname,ind = self.slicez, 'u','v', ind
 
 
-    if isK:
-      xu,yu,zu,u=self.slicek(uname,ind,time)
-      xv,yv,zv,v=self.slicek(vname,ind,time)
-    else:
-      xu,yu,zu,u=self.slicez(uname,ind,time)
-      xv,yv,zv,v=self.slicez(vname,ind,time)
+##    if isK:
+#      xu,yu,zu,u,msg1=self.slicek(uname,ind,time,msg=True,**opts)
+#      xv,yv,zv,v,msg2=self.slicek(vname,ind,time,msg=True,**opts)
+##    u,auxu=slc(uname,ind,time,**opts)
+##    v,auxv=slc(vname,ind,time,**opts)
+    outu=slc(uname,ind,time,**opts)
+    outv=slc(vname,ind,time,**opts)
 
-    z=(zu[1:,:]+zu[:-1,:])/2.
+    if   outu.msg: return outu##None,None,auxu
+    elif outv.msg: return outv##None,None,auxv
+
+    # at psi:
+    u,v=outu.v,outv.v
     u=( u[1:,:]+ u[:-1,:])/2.
     v=( v[:,1:]+ v[:,:-1])/2.
-
-    x=self.grid.lonp
-    y=self.grid.latp
 
     # rotate uv:
     ang=rt.rho2uvp(self.grid.angle,'p')
     u,v=calc.rot2d(u,v,-ang)
 
 
-    if plot:
-      p=self.grid.plot(bathy=None)
-      xm, ym = p(x,y)
-      mm=0*m
-      mm[::3,::3]=1
-      mm=mm*m==1
-      s=np.sqrt(u**2+v**2)
-      q=pylab.quiver(xm[mm],ym[mm],u[mm],v[mm],s[mm])
-      pylab.colorbar(shrink=.7)
-      pylab.axis([p.xmin, p.xmax, p.ymin, p.ymax])
-      qk = pylab.quiverkey(q, .05, .01, 0.2, '0.2 m/s',labelpos='E',
-                                              coordinates='axes')
-      if savename:
-        pylab.savefig(savename,dpi=pylab.gcf().dpi)
-        pylab.close(pylab.gcf())
+##    else:
+##      xu,yu,zu,u,msg1=self.slicez(uname,ind,time,msg=True,**opts)
+##      xv,yv,zv,v,msg2=self.slicez(vname,ind,time,msg=True,**opts)
+##
+##    if msg1: msg=msg1+' and '+msg2
+##    else: msg=msg2
 
-    return x,y,z,u,v
+    out=outu
+    out.v=u,v
+    out.info['v']['name']=uname+vname
+
+    if 'z' in coords: out.z=(out.z[1:,:]+out.z[:-1,:])/2.
+    if 'x' in coords: out.x=(out.x[1:,:]+out.x[:-1,:])/2.
+    if 'y' in coords: out.y=(out.y[1:,:]+out.y[:-1,:])/2.
+
+    out.coordsReq=','.join(sorted(coords))
+    return out###u,v,aux
 
 
-  def sliceiso(self,vname,iso,time,plot=False,**opts):
+##    # coords:
+##    if 'z' in coords:
+##      out.z=(outu.z[1:,:]+outu.z[:-1,:])/2.
+##
+##    if 'x' in coords: out.x=self.grid.lonp
+##    if 'y' in coords: out.y=self.grid.latp
+##    if 't' in coords: out.t=self.time[time]
+##
+##
+##    if plot:
+##      if not ax:
+##        ax=pl.gca()
+##        opts['ax']=ax
+##
+##      prj=self.grid.plot(bathy=None,**opts)
+##      xm, ym = prj(out.x,out.y)
+##
+##      mm=(0*xm).astype('bool')
+##      nMax=150
+##      nj,ni=xm.shape
+##      dj=np.ceil(nj/float(nMax))
+##      di=np.ceil(ni/float(nMax))
+##      mm[::dj,::di]=1
+######      mm=mm*self.grid.maskp==1
+##
+##      s=np.sqrt(u**2+v**2)
+##      q=ax.quiver(xm[mm],ym[mm],u[mm],v[mm],s[mm])
+##      pl.colorbar(q,shrink=.7)
+##      ax.axis([prj.xmin, prj.xmax, prj.ymin, prj.ymax])
+##      qk = ax.quiverkey(q, .05, .01, 0.2, '0.2 m/s',labelpos='E',
+##                                              coordinates='axes')
+####      if savename:
+####        pylab.savefig(savename,dpi=pylab.gcf().dpi)
+####        pylab.close(pylab.gcf())
+##
+####    if retMsg: return x,y,z,u,v, msg
+####    else: return x,y,z,u,v
+##
+##    out.v=u,v
+##    out.coordsReq=','.join(sorted(coords))
+##    return out###u,v,aux
+
+
+  def sliceiso(self,varname,iso,time,**opts):
     '''
     Depths where variable, increasing/dec with depth, has some value.
 
@@ -910,116 +1171,250 @@ class His(Common,Derived):
     water column is lower/higher than value.
     '''
 
-    v=self.use(vname,SEARCHtime=time)
-    z=self.s_levels(time=time,ruvpw=self.var_at(vname))
+
+    coords=opts.get('coords',self._default_coords('sliceiso')).split(',')
+
+    out=Data()
+    out.msg=self.check_slice(varname,t=time)
+    if out.msg: return out
+
+    if not self.hasz(varname):
+      out.msg='a depth dependent variable is needed for sliceiso!'
+      return out
+
+    v=self.use(varname,SEARCHtime=time)
+    z=self.s_levels(time=time,ruvpw=self.var_at(varname))
     v=rt.depthof(v,z,iso)
 
-    if plot:
-      p=self.grid.plot(bathy=None)
-      xm, ym = p(x,y)
-      pylab.pcolormesh(xm,ym,v)
-      pylab.colorbar()
+    out.v=v
+    out.info['v']['name']=varname
 
-    return x,y,v
+    if isinstance(iso,np.ndarray) and iso.ndim==2: siso='2d'
+    else: siso=str(iso)
+
+    out.info['v']['slice']='iso=%s'%siso
+    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    except: pass
+
+    # coords:
+    if any([i in coords for i in 'xy']):
+      x,y,h=self.grid.vars(ruvp=self.var_at(varname))[:3]
+
+    if 'x' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.x=x
+         out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+       else:
+         out.x=x/1000.
+         out.info['x']=dict(name='Distance',units='km')
+
+    if 'y' in coords:
+       if self.grid.use('spherical') in (1,'T'):
+         out.y=y
+         out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+       else:
+         out.y=y/1000.
+         out.info['y']=dict(name='Distance',units='km')
+
+    if 'z' in coords:
+      # makes no sense... v is the depth!
+      coords.remove('z')
+
+    if 't' in coords: out.t=self.time[time]
+
+    if v.ndim==2:
+      out.extra=[Data()]
+      if 'x' in coords: out.extra[0].x=out.x
+      if 'y' in coords: out.extra[0].y=out.y
+      out.extra[0].v=h
+      if h.max()>1000: cvals=200.,1000.
+      elif h>200: cvals=50.,100.,200.
+      else: cvals=3
+      out.extra[0].config['field.plot']='contour'
+      out.extra[0].config['field.cvals']=cvals
+      out.extra[0].config['field.linecolors']='k'
+      out.extra[0].alias='bathy'
+
+    out.coordsReq=','.join(sorted(coords))
+    return out
 
 
-  def time_series(self,varname,x,y,times=False,depth=False,**opts):
-    t,z,v=[[]]*3
+  def time_series(self,varname,x,y,times=None,depth=None,**opts):
+########    plot= opts.get('plot',False)
+########    ax  = opts.get('ax',None)
+    coords=opts.get('coords',self._default_coords('sliceiso')).split(',')
 
-    RetVarOnly=False
-    savename=False
-    retMsg=False
-    nearest=True  # UNIQUE case Currently
-    plot=False
+    if times is None: times=range(0,self.time.size)
 
-    if 'retvar'   in opts.keys(): RetVarOnly = opts['retvar']
-    if 'savename' in opts.keys(): savename   = opts['savename']
-    if 'msg'      in opts.keys(): retMsg     = opts['msg']
-    if 'nearest'  in opts.keys(): nearest    = opts['msg']
-    if 'plot'     in opts.keys(): plot       = opts['msg']
+    out=Data()
+    out.msg=self.check_slice(varname,t=np.max(times),k=depth) 
+    if out.msg: return out###None,aux
 
 
-    if varname not in netcdf.varnames(self.name):
-      msg=':: variable %s not found' % varname
-      if retMsg: return t,z,v,msg
-      else:
-        print msg
-        return t,z,v
+##    t,z,v=[[]]*3
+#
+#    RetVarOnly=False
+#    savename=False
+#    retMsg=False
+#    nearest=True  # UNIQUE case Currently
+#    plot=False
+#
+#    if 'retvar'   in opts.keys(): RetVarOnly = opts['retvar']
+#    if 'savename' in opts.keys(): savename   = opts['savename']
+#    if 'msg'      in opts.keys(): retMsg     = opts['msg']
+#    if 'nearest'  in opts.keys(): nearest    = opts['msg']
+#    if 'plot'     in opts.keys(): plot       = opts['msg']
+#
+#
+#    if varname not in netcdf.varnames(self.name):
+#      msg=':: variable %s not found' % varname
+#      if retMsg: return t,z,v,msg
+#      else:
+#        print msg
+#        return t,z,v
+#
+#    isW=varname=='w'
+#    hasZ=self.hasz(varname)
+#
+#    if not depth is False and hasZ :
+#      if isW and depth >= self.S_W:
+#        msg='k = %d exceeds S_W dimension (%d)' % (depth,self.S_W)
+#        if retMsg: return t,z,v,msg
+#        else:
+#          print msg
+#          return t,z,v
+#
+#      elif depth >= self.S_RHO:
+#        msg='k = %d exceeds S_RHO dimension (%d)' % (depth,self.S_RHO)
+#        if retMsg: return t,z,v,msg
+#        else:
+#          print msg
+#          return t,z,v
+#
+#    if times is False:
+#      times=0,len(self.tdays)
+#
+#    if self.hast(varname) and times[-1]>self.TIME:
+#      msg='t = %d exceeds TIME dimension (%d)' % (times[-1],self.TIME)
+#      if retMsg: return t,z,v,msg
+#      else:
+#        print msg
+#        return t,z,v
+#
 
-    isW=varname=='w'
-    hasZ=self.hasz(varname)
-
-    if not depth is False and hasZ :
-      if isW and depth >= self.S_W:
-        msg='k = %d exceeds S_W dimension (%d)' % (depth,self.S_W)
-        if retMsg: return t,z,v,msg
-        else:
-          print msg
-          return t,z,v
-
-      elif depth >= self.S_RHO:
-        msg='k = %d exceeds S_RHO dimension (%d)' % (depth,self.S_RHO)
-        if retMsg: return t,z,v,msg
-        else:
-          print msg
-          return t,z,v
-
-    if times is False:
-      times=0,len(self.tdays)
-
-    if self.hast(varname) and times[-1]>self.TIME:
-      msg='t = %d exceeds TIME dimension (%d)' % (times[-1],self.TIME)
-      if retMsg: return t,z,v,msg
-      else:
-        print msg
-        return t,z,v
-
+    # find nearest point:
     lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
     dist=(lon-x)**2+(lat-y)**2
     i,j=np.where(dist==dist.min())
     i,j=i[0],j[0]
-    v=self.use(varname,xiSEARCH=j,etaSEARCH=i,SEARCHtime=range(times[0],times[-1])).T
 
-    # time:
-    t=self.tdays[range(times[0],times[-1])]
-    t=t+0.*v
+    if depth>=0: arg={'s_SEARCH':depth}
+    else: arg={}
+    v=self.use(varname,xiSEARCH=j,etaSEARCH=i,SEARCHtime=times,**arg).T
 
-    # depth:
-    if hasZ:
+    # calculate depths:
+    if self.hasz(varname):
       h=self.grid.h[i,j]
-      zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=range(times[0],times[-1]))
+      zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=times)
       h=h+0*zeta
       z=rt.s_levels(h,zeta,self.s_params,rw=varname)
       z=np.squeeze(z)
 
-      if not depth is False:
-        if depth>=0:
-          t=t[0,:]
-          z=z[depth,:]
-          v=v[depth,:]
-        else:
-          t0,z0=t,z
-          t=t[0,:]
-          z=depth+0.*t
-          v=calc.griddata(t0,z0,v,t,z,extrap=False,norm_xy=True)
+    # depth slice:
+    if not depth is None and self.hasz(varname) and depth<0:
+      if v.ndim==2:
+        from matplotlib.dates import date2num
+        t=np.tile(date2num(self.time[times]),(v.shape[0],1))
+        v=calc.griddata(t,z,v,t[0],depth+np.zeros(t[0].shape),
+          extrap=opts.get('extrap',False),norm_xy=opts.get('norm_xy',False))
+          # norm_xy True may be needed!
+          # extrap also may be needed cos the 1st and last value may be masked!
 
-    else: # not hasZ
-      z=0.*t
+      else: # one time only
+        v=np.interp(depth,z,v,left=np.nan,right=np.nan)
+        v=np.ma.masked_where(np.isnan(v),v) 
+     
+    # coords
+    if 't' in coords:
+      if v.ndim==2:
+        out.t=np.tile(self.time[times],(v.shape[0],1))
+        from matplotlib.dates import date2num
+        out.tnum=np.tile(date2num(self.time[times]),(v.shape[0],1))
+      else: out.t=self.time[times]
+
+    if 'z' in coords and self.hasz(varname):
+      if not depth is None:
+        if depth>=0: out.z=z[depth,...]
+        else: out.z=depth+0*v
+      else: out.z=z
+
+    if 'x' in coords: out.x=lon[i,j]
+    if 'y' in coords: out.y=lat[i,j]
+   
+##    if plot and v.ndim:
+##      if not ax:
+##        ax=pl.gca()
+##        opts['ax']=ax
+##
+##      if v.ndim==2:
+##        p=ax.pcolormesh(out.tnum,out.z,v)
+##        #ax.xaxis_date()
+##        pl.colorbar(p,shrink=.7)
+##      elif v.size>1:
+##        if out.t.size>1: # time series:
+##          ax.plot(out.t,v)
+##        else: # vertical profile:
+##          ax.plot(v,out.z)
+
+    out.v=v
+    out.coordsReq=','.join(sorted(coords))
+    return out##v,aux
+
+###    t=self.tdays[range(times[0],times[-1])]
+###    t=t+0.*v
+#
+#    # depth:
+#    if self.hasz(varname):
+#      h=self.grid.h[i,j]
+#      zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=range(times[0],times[-1]))
+#      h=h+0*zeta
+#      z=rt.s_levels(h,zeta,self.s_params,rw=varname)
+#      z=np.squeeze(z)
+#
+#      if not depth is False:
+#        if depth>=0:
+#          t=t[0,:]
+#          z=z[depth,:]
+#          v=v[depth,:]
+#        else:
+#          t0,z0=t,z
+#          t=t[0,:]
+#          z=depth+0.*t
+#          v=calc.griddata(t0,z0,v,t,z,extrap=False,norm_xy=True)
+#
+#    else: # not hasZ
+#      z=0.*t
+#
+#
+#    if plot:
+#      pass # TODO
+#
+#
+#    if RetVarOnly:
+#      return v
+#    else:
+#      if retMsg: return t,z,v,''
+#      else: return t,z,v
 
 
-    if plot:
-      pass # TODO
 
+  def extrap_at_mask(self,vname,time,**opts): 
+    method=opts.get('method','delaunay') # also available 'easy'
+    quiet=opts.get('quiet',True)
 
-    if RetVarOnly:
-      return v
-    else:
-      if retMsg: return t,z,v,''
-      else: return t,z,v
+    if method=='delaunay': extrap=calc.mask_extrap
+    elif method=='easy': extrap=calc.easy_extrap
 
-
-
-  def extrap_at_mask(self,vname,time,quiet=1,**opts):
     if not quiet: print 'Extrap at mask:\n  loading'
     v=self.use(vname,SEARCHtime=time)
     x,y,h,m=self.grid.vars(vname)
@@ -1028,10 +1423,11 @@ class His(Common,Derived):
       N=v.shape[0]
       for n in range(N):
         if not quiet: print '  extrap level %d of %d' % (n,N)
-        v[n,...]=calc.mask_extrap(x,y,np.ma.masked_where(m==0,v[n,...]))
+        v[n,...]=extrap(x,y,np.ma.masked_where(m==0,v[n,...]))
     else: # 2d
-        v=calc.mask_extrap(x,y,np.ma.masked_where(m==0,v))
+        v=extrap(x,y,np.ma.masked_where(m==0,v))
 
+    if np.ma.isMA(v) and v.count()==v.size: v=v.data # no need for masked array
     return v
 
 # ------------------------------------------------------------------------ OLD CODE FROM HERE
@@ -1186,17 +1582,21 @@ class Blk(Common):
     # netcdf time:
     try:
       # units must have the format <units> since <date>
-      self.datetime=netcdftime.num2date(self.time,self.var_as['time']['units'])
-    except: self.datetime=False
-
-    # time is usually seconds, but may be days!!, so:
-    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
-
-    if len(self.time)>1:
-      self.dt=self.time[1]-self.time[0]
-    else: self.dt=0
-
-    self.tdays=self.time/86400.
+      self.time=netcdf.num2date(self.time,self.var_as['time']['units'])
+    except: pass
+#    try:
+#      # units must have the format <units> since <date>
+#      self.datetime=netcdf.num2date(self.time,self.var_as['time']['units'])
+#    except: self.datetime=False
+#
+#    # time is usually seconds, but may be days!!, so:
+#    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
+#
+#    if len(self.time)>1:
+#      self.dt=self.time[1]-self.time[0]
+#    else: self.dt=0
+#
+#    self.tdays=self.time/86400.
 
 
   def get(self,what,**kargs):

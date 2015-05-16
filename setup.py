@@ -53,6 +53,9 @@ rtools22 = Extension(name = 'roms.rtools_vs2vt2',
 rtools42 = Extension(name = 'roms.rtools_vs4vt2',
                 sources=['okean/roms/ext/rtools_vs4vt2.f'])
 
+rtools12 = Extension(name = 'roms.rtools_vs1vt2',
+                sources=['okean/roms/ext/rtools_vs1vt2.f'])
+
 import glob
 ncview_cm=glob.glob('okean/data/ncview_cmaps/*')
 rgui_icons=glob.glob('okean/roms/gui/icons/*')
@@ -60,7 +63,13 @@ rgui_icons=glob.glob('okean/roms/gui/icons/*')
 doclines = __doc__.split("\n")
 
 def get_version():
-  return open('okean/version.py').read().strip()
+  v='unknonw'
+  lines=open('okean/__init__.py').readlines()
+  for l in  lines:
+    if l.startswith('__version__'): v=eval(l.split('=')[-1])
+
+  return v
+  
 
 if __name__ == '__main__':
     from numpy.distutils.core import setup
@@ -82,7 +91,7 @@ if __name__ == '__main__':
           license = 'EUPL',
           platforms = ["any"],
           ext_package='okean',
-          ext_modules = [alg,pnpoly,rtools,rtools22,rtools42],
+          ext_modules = [alg,pnpoly,rtools,rtools12,rtools22,rtools42],
           data_files = [('okean/roms/gui', ['okean/roms/gui/romsgui.derived',
                                             'okean/roms/gui/rgui.png']),
                          ('okean/roms/gui/icons', rgui_icons),
@@ -92,7 +101,7 @@ if __name__ == '__main__':
                          ('okean/data/ncview_cmaps/', ncview_cm),
                          ('',['EUPL v.1.1 - licencia.pdf'])],
           classifiers = filter(None, classifiers.split("\n")),
-          scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate'],
+          scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate','okean/bin/romsview'],
           cmdclass={'install': my_install},
           )
 

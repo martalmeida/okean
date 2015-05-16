@@ -1,6 +1,5 @@
 from os.path import isfile
 import numpy as np
-import netcdftime
 import datetime
 
 from okean import calc, cookbook as cb, netcdf
@@ -223,7 +222,7 @@ def load_data(f,quiet=0,**kargs):
   if not quiet: print '  loading time...'
   if t_units:
     times=netcdf.use(ncTime,sett.time_name)
-    times=netcdftime.num2date(times,t_units)
+    times=netcdf.num2date(times,t_units)
   else:
     times=netcdf.nctime(ncTime,sett.time_name)
 

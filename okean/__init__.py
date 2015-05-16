@@ -7,6 +7,6 @@ contains general modeling tools. Specific tools are also included for ROMS.
 '''
 
 
-__authors__ = 'Martinho Marta-Almeida <m.martalmeida@gmail.com>',
-from okean.version import version_str as __version__
-
+__authors__ = 'Martinho Marta-Almeida <m.martalmeida@gmail.com> \
+<Couto de Esteves, 3740-037, Portugal>',
+__version__='2015-05-04 00:49:49.957248'

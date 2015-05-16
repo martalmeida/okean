@@ -5,7 +5,7 @@ req=u,v
 
 [ke]
 lon_name: kinetic energy, 1/2(u2+v2)
-units: metre second-1
+units: metre2 second-2
 req=u,v
 
 [okubo]

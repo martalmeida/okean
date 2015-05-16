@@ -1,6 +1,5 @@
 from os.path import realpath
 import numpy as np
-import netcdftime
 from time import ctime
 
 from okean import netcdf
@@ -138,7 +137,7 @@ class GenIni(GenCommon):
     # about time:
     try:
       self.date=dts.parse_date(self.date)
-      self.time=netcdftime.date2num(self.date,self.tunits)
+      self.time=netcdf.date2num(self.date,self.tunits)
     except:
       self.time=self.date # date as number!
 
@@ -506,7 +505,7 @@ class GenClm(GenCommon):
     # about time:
     try:
       date=dts.parse_date(data['date'])
-      time=netcdftime.date2num(date,self.tunits)
+      time=netcdf.date2num(date,self.tunits)
     except:
       time=data['date'] # date as number!
 
@@ -791,7 +790,7 @@ class GenBry(GenCommon):
     # about time:
     try:
       date=dts.parse_date(data['date'])
-      time=netcdftime.date2num(date,self.tunits)
+      time=netcdf.date2num(date,self.tunits)
     except:
       time=data['date'] # date as number!
 
@@ -948,14 +947,30 @@ class GenBlk(GenCommon):
     if addOriginal:
       v=nc.add_var('radlw_original',np.dtype('d'),('time','y_original', 'x_original'))
       v.add_att('units','Watts metre-2')
+      if model=='roms':
+        v.add_att('negative_value','upward flux, cooling')
+      elif model=='roms-agrif':
+        v.add_att('positive','upward flux, cooling water')
+
+    if model=='roms': vname='lwrad_down'
+    elif model=='roms-agrif': vname='dlwrf'
+    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v.add_att('long_name','downward longwave radiation')
+    v.add_att('units','Watts metre-2')
+    v.add_att('time','time')
+    if model=='roms':
+      v.add_att('positive_value','downward flux, heating')
+      v.add_att('negative_value','upward flux, cooling')
+    elif model=='roms-agrif': # opposite to ROMS !!!
       v.add_att('positive','upward flux, cooling water')
 
-    if model=='roms-agrif':
-      # roms calculates this from cloud !!
-      v=nc.add_var('dlwrf',np.dtype('d'),('time','eta_rho', 'xi_rho'))
-      v.add_att('long_name','downward longwave radiation')
+    if addOriginal:
+      v=nc.add_var('dlwrf_original',np.dtype('d'),('time','y_original', 'x_original'))
       v.add_att('units','Watts metre-2')
-      v.add_att('time','time')
+      if model=='roms':
+        v.add_att('negative_value','upward flux, cooling')
+      elif model=='roms-agrif':
+        v.add_att('positive','upward flux, cooling water')
 
     if model=='roms': vname='swrad'
     elif model=='roms-agrif': vname='radsw'
@@ -1053,7 +1068,7 @@ class GenBlk(GenCommon):
     # about time:
     try:
       date=dts.parse_date(data['date'])
-      time=netcdftime.date2num(date,self.tunits)
+      time=netcdf.date2num(date,self.tunits)
     except:
       time=data['date'] # date as number!
 
@@ -1066,9 +1081,9 @@ class GenBlk(GenCommon):
     if 'Tair' in nc.varnames: # roms
       names=('Tair','tair'),('Pair','pres'),('Qair','rhum'),('rain','prate'),\
             ('swrad','radsw'),('lwrad','radlw'),('Uwind','uwnd'),('Vwind','vwnd'),\
-            'sustr','svstr','wspd','cloud'
+            'sustr','svstr','wspd','cloud',('lwrad_down','dlwrf')
       if not 'tair' in data.keys(): # assuming data has roms (not agrif) varnames:
-        names='Tair','Pair','Qair','rain','swrad','lwrad','Uwind','Vwind','sustr','svstr','wspd','cloud'
+        names='Tair','Pair','Qair','rain','swrad','lwrad','Uwind','Vwind','sustr','svstr','wspd','cloud','lwrad_down'
 
     elif 'tair' in nc.varnames: # roms-agrif
       names='tair','pres','rhum','prate','radlw','radsw','dlwrf','uwnd',\

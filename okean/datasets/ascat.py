@@ -6,7 +6,6 @@ import glob
 from okean import dateu, netcdf, roms, calc, cookbook as cb
 import numpy as np
 import datetime
-import netcdftime
 
 url='ftp.ifremer.fr'
 path='/ifremer/cersat/products/gridded/MWF/L3/ASCAT/Daily/Netcdf'
@@ -203,7 +202,7 @@ def fill_frc(fname,time,u,v):
   nc=netcdf.Pync(fname,'w')
 
   tunits=netcdf.vatt(nc,'wind_time','units')
-  time=netcdftime.date2num(time,tunits)
+  time=netcdf.date2num(time,tunits)
   tind=nc.dims['wind_time']
 
   nc.vars['wind_time'][tind]=time

@@ -297,6 +297,9 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',fill={},**kargs):
       plot_ellipse(...,**{'marker':{'ms':20,'marker':'*'}})
     default color is 'k'
     default marker is '.'
+    arrow_scale, arrow sclae for type 0, 1 and 2. Default is 1/10 (of major)
+    for type 0,1 and 1/20 for type 2.
+    arrow_angle, angle of arrow used in types 0, 1 and 2 (default is 30).
     relim: True, recalc axis limits (True if new axes is created)
     fill: fill ellipse, use this argument to provide fill color, alpha, etc
           Ex: ...fill={'color','b',alpha=.5}. Default: facecolor: 'b',
@@ -346,6 +349,15 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',fill={},**kargs):
     else: newax=True
     ax=pl.gca()
 
+  if 'arrow_scale' in kargs.keys():
+    sarrow_01=sarrow_2=kargs['arrow_scale']
+    kargs.pop('arrow_scale')
+  else:
+    sarrow_01=1/10.
+    sarrow_2=1/20.
+
+  aarrow=kargs.pop('arrow_angle',30)
+
   if not (isinstance(x,np.ndarray) or np.ma.isMA(x)):
     x=np.asarray([x])
     y=np.asarray([y])
@@ -367,11 +379,11 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',fill={},**kargs):
     th,r=cart2pol(x,y)
     x,y=pol2cart(th+inc*np.pi/180,r)
 
-    if type in (0,1): a=major/10.
-    elif type==2: a=major/20.
+    if type in (0,1): a=major*sarrow_01
+    elif type==2: a=major*sarrow_2
     else: a=0
 
-    Fi=30 #angle
+    Fi=aarrow #angle
     teta=np.arctan2(y[-1]-y[-2],x[-1]-x[-2])*180/np.pi
     fi=(180-Fi+teta)*np.pi/180
     fii=(180+Fi+teta)*np.pi/180
@@ -447,7 +459,7 @@ def plot_ellipse(x,y,major,minor,inc,phase,scale='auto',fill={},**kargs):
     return res
 
   # scale:
-  if x.size==1: scale=1
+  if x.size==1 and scale=='auto': scale=1
   else:
     if scale=='auto':
       L=np.sqrt((x.max()-x.min())**2+(y.max()-y.min())**2)

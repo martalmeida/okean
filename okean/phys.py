@@ -30,7 +30,7 @@ def okubo(u,v,pm,pn):
   ST=mn*rt.psi2rho(von[:,1:Lp]-von[:,:L]+uom[1:Mp,:]-uom[:M,:])
 
   # Sigma_N:
-  SN=np.zeros((Mp,Lp),u.dtype)
+  SN=np.ma.zeros((Mp,Lp),u.dtype)
   SN[1:-1,1:-1]=mn[1:-1,1:-1]*(uon[1:-1,1:]
                               -uon[1:-1,:-1]
                               -vom[1:,1:-1]

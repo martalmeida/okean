@@ -1,5 +1,4 @@
 import numpy as np
-import netcdftime
 import datetime
 
 from okean import calc, cookbook as cb, dateu as dts, netcdf, air_sea
@@ -37,7 +36,31 @@ def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
   return out, miss
 
 
-def load_blkdata_wrf(): pass
+def load_blkdata_wrf(wrfpath,date0=False,date1=False,quiet=True):
+  from okean.datasets import wrf
+  a=wrf.WRFData(wrfpath)
+  data=a.data(date0,date1,quiet)
+
+  out=cb.odict()
+  time=data['time']
+  for it in range(len(time)):
+    out[time[it]]={}
+    for k in data.keys():
+
+      if k in ('time',): continue
+      elif  k.startswith('INFO'):
+        out[time[it]][k]=data[k]
+      else:
+        out[time[it]][k]=data[k].data[it,...]
+
+        # x and y should be the same, so:
+        if not out[time[it]].has_key('x'):
+          out[time[it]]['x']=data[k].x
+          out[time[it]]['y']=data[k].y
+
+
+  return out
+
 
 def load_blkdata_ncep(): pass
 
@@ -139,7 +162,7 @@ def conv_units(data,model,quiet=True):
     prate    cm/day   kg m-2 s-1    cm/d       total precipitation
     radsw    W m-2       W m-2      W m-2      sw radiation
     radlw    W m-2      (-)W m-2    W m-2      lw radiation
-    dlwrf    W m-2       ------     W m-2      down lw radiation
+    dlwrf    W m-2      (-)W m-2    W m-2      down lw radiation
     uwnd     m s-1       m s-1      m s-1      u 10 m
     vwnd     m s-1       m s-1      m s-1      v 10 m
     ustress   Pa          Pa         Pa        u stress
@@ -157,6 +180,8 @@ def conv_units(data,model,quiet=True):
     data['prate'] = data['prate']*1000/(86400*100)  # cm day-1 --> kg m-2 s-1
     if not quiet: print ' radlw'
     data['radlw'] = data['radlw']*-1 # positive down
+    if not quiet: print ' dlwrf',
+    data['dlwrf'] = data['dlwrf']*-1 # positive down
 
 
 def data2romsblk(data,grd,**kargs):
@@ -193,7 +218,7 @@ def data2romsblk(data,grd,**kargs):
     if keepOriginal:
       # keep original data:
       if keepOriginal==1:
-        out[vname+'_original']=data[vname] # kepp all original data
+        out[vname+'_original']=data[vname] # keep all original data
       elif keepOriginal==2:
         out[vname+'_original']=data[vname][j1:j2,i1:i2] # keep data only inside vicinity rectangle
 
@@ -372,7 +397,39 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
     if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
     q.fill(D,quiet=quiet)
 
+def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
+  '''
+  see make_blk_interim
 
+  '''
+
+  quiet  = kargs.get('quiet',0)
+  create = kargs.get('create',1)
+  model  = kargs.get('model','roms') # or roms-agrif
+
+  data=load_blkdata_wrf(wrfpath,date0,date1,quiet) # unique diff from make_blk_interim !!
+
+  # about original data, run data2romsblk once to test for x_original:
+  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
+  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+  else: original=False
+
+  q=gennc.GenBlk(bulk,grd,**kargs)
+  if create: q.create(model,original)
+
+  for d in data.keys():
+    if model=='roms':
+       if not quiet: print '  converting units:',
+       conv_units(data[d],model,quiet)
+
+    D=data2romsblk(data[d],grd,**kargs)
+    D['date']=d
+
+    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    q.fill(D,quiet=quiet)
+
+
+# --------------------------- OLD stuff from here... to be removed soon --------
 def __update_wind(fname,datapath,source,**kargs):
   if source=='quikscat':
     new_wind_info='wind from quikscat'

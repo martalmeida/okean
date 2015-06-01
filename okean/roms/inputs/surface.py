@@ -36,9 +36,9 @@ def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
   return out, miss
 
 
-def load_blkdata_wrf(wrfpath,date0=False,date1=False,quiet=True):
+def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=True):
   from okean.datasets import wrf
-  a=wrf.WRFData(wrfpath)
+  a=wrf.WRFData(wrfpath,wrffiles)
   data=a.data(date0,date1,quiet)
 
   out=cb.odict()
@@ -46,6 +46,9 @@ def load_blkdata_wrf(wrfpath,date0=False,date1=False,quiet=True):
   for it in range(len(time)):
     out[time[it]]={}
     for k in data.keys():
+
+      # be sure time increases!
+      if out.keys() and time[ik]<=out.keys()[-1]: continue
 
       if k in ('time',): continue
       elif  k.startswith('INFO'):
@@ -406,8 +409,9 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
   quiet  = kargs.get('quiet',0)
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
+  wrffiles=kargs.get('wrffiles','wrfout*')
 
-  data=load_blkdata_wrf(wrfpath,date0,date1,quiet) # unique diff from make_blk_interim !!
+  data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,quiet) # unique diff from make_blk_interim !!
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)

@@ -1,12 +1,5 @@
-#import pylab as pl
 import numpy as np
-
-#from ompy.tools import num_tools as nt
-#from okean import cookbook as cb
-from okean import air_sea
-#from ompy.tools import date_tools as dts
-#from ompy.nc import netcdf
-from okean import netcdf
+from okean import air_sea, dateu, netcdf
 import datetime
 
 class Data:
@@ -169,6 +162,7 @@ def wrf_file_data(file,quiet=False):
   prate=accum2avg(prate,dt=time[1]-time[0]) # mm s-1
   conv= 0.1*86400       # from mm s-1      --> cm day-1
   prate=prate*conv # cm day-1
+  prate[prate<0]=0 # interpolation errors may result in negative rain!
   out['prate']=Data(x,y,prate,'cm day-1')
 
   # LW, SW, latent, sensible signs:

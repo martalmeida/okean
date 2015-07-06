@@ -65,20 +65,7 @@ def s_levels(h,zeta,sparams,rw=False):
   tts,ttb,hc,n,vt,vs=sparams
 
   import rtools
-#  if vt==1 and vs==1:
-#    import rtools
-#  elif vt==2 and vs==1:
-#    import rtools_vs1vt2 as rtools
-#  elif vt==2 and vs==4:
-#    import rtools_vs4vt2 as rtools
-#  elif vt==2 and vs==2:
-#    import rtools_vs2vt2 as rtools
-#  else:
-#    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-#    return
-
-
-  zr,zw=rtools.s_levels(h,zeta,hc,tts,ttb,n,vt,vs)
+  zr,zw=rtools.s_levels(h,zeta,tts,ttb,hc,n,vt,vs)
 
   # add zeta mask to z levels:
   if np.ma.isMA(zeta):

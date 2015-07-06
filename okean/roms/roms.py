@@ -455,7 +455,7 @@ class Grid(Common):
 
     if Basemap and proj:
 
-      key=Lonlims,Lonlims,proj,resolution
+      key=Lonlims,Latlims,proj,resolution
       if not hasattr(self,'_proj'):
         self._proj={}
       
@@ -846,7 +846,7 @@ class His(Common,Derived):
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
       if h.max()>1000: cvals=200.,1000.
-      elif h>200: cvals=50.,100.,200.
+      elif h.max()>200: cvals=50.,100.,200.
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals
@@ -914,7 +914,7 @@ class His(Common,Derived):
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
       if h.max()>1000: cvals=200.,1000.
-      elif h>200: cvals=50.,100.,200.
+      elif h.max()>200: cvals=50.,100.,200.
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals
@@ -1214,7 +1214,7 @@ class His(Common,Derived):
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
       if h.max()>1000: cvals=200.,1000.
-      elif h>200: cvals=50.,100.,200.
+      elif h.max()>200: cvals=50.,100.,200.
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals

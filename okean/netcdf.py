@@ -62,7 +62,7 @@ def var(fname,vname=False,perm='r',interface='auto'):
 
   if vname: res=nc.vars[vname]
   else:     res=nc.vars
-  return res, nc # nc should be closed when not needed !!
+  return res##, nc # nc should be closed when not needed !!
 
 
 def varnames(fname,interface='auto'):

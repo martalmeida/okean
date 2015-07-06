@@ -29,9 +29,14 @@ class my_install(install):
 
         # post installation:
 
-        #installation folder:
-        #from distutils.sysconfig import get_python_lib
-        #get_python_lib(plat_specific=1)
+
+        # link pppack
+        import os
+        from distutils.sysconfig import get_python_lib
+        p=get_python_lib(plat_specific=1) # installation folder
+        src=os.path.join(p,'okean','roms','rtools.so')
+        dest=os.path.join(p,'okean','pppack.so')
+#        os.symlink(src,dest)
 
         print '''
         enjoy okean
@@ -44,17 +49,25 @@ alg = Extension(name = 'alg',
 pnpoly = Extension(name = 'pnpoly',
                 sources=['okean/ext/pnpoly.f'])
 
+#rtools = Extension(name = 'roms.rtools',
+#                sources=['okean/roms/ext/rtools.f90'])
 rtools = Extension(name = 'roms.rtools',
-                sources=['okean/roms/ext/rtools.f'])
+                sources=['okean/roms/ext/rtools.f90','okean/ext/pppack.f90'])
 
-rtools22 = Extension(name = 'roms.rtools_vs2vt2',
-                sources=['okean/roms/ext/rtools_vs2vt2.f'])
+pppack = Extension(name = 'pppack',
+                sources=['okean/ext/pppack.f90'])
 
-rtools42 = Extension(name = 'roms.rtools_vs4vt2',
-                sources=['okean/roms/ext/rtools_vs4vt2.f'])
+lu = Extension(name = 'lusolver',
+                sources=['okean/ext/lu.f90'])
 
-rtools12 = Extension(name = 'roms.rtools_vs1vt2',
-                sources=['okean/roms/ext/rtools_vs1vt2.f'])
+#rtools22 = Extension(name = 'roms.rtools_vs2vt2',
+#                sources=['okean/roms/ext/rtools_vs2vt2.f'])
+#
+#rtools42 = Extension(name = 'roms.rtools_vs4vt2',
+#                sources=['okean/roms/ext/rtools_vs4vt2.f'])
+#
+#rtools12 = Extension(name = 'roms.rtools_vs1vt2',
+#                sources=['okean/roms/ext/rtools_vs1vt2.f'])
 
 import glob
 ncview_cm=glob.glob('okean/data/ncview_cmaps/*')
@@ -91,7 +104,7 @@ if __name__ == '__main__':
           license = 'EUPL',
           platforms = ["any"],
           ext_package='okean',
-          ext_modules = [alg,pnpoly,rtools,rtools12,rtools22,rtools42],
+          ext_modules = [alg,pnpoly,rtools,pppack,lu],
           data_files = [('okean/roms/gui', ['okean/roms/gui/romsgui.derived',
                                             'okean/roms/gui/rgui.png']),
                          ('okean/roms/gui/icons', rgui_icons),

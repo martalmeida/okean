@@ -33,24 +33,27 @@ def depthof(v,z,val):
   return np.ma.masked_where((zz==999)|(zz==9999),zz)
 
 
-def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True):
+def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
   tts,ttb,hc,Nr,vt,vs=sparams
 
+  import rtools
+#  if vt==1 and vs==1:
+#    import rtools
+#  elif vt==2 and vs==1:
+#    import rtools_vs1vt2 as rtools
+#  elif vt==2 and vs==4:
+#    import rtools_vs4vt2 as rtools
+#  elif vt==2 and vs==2:
+#    import rtools_vs2vt2 as rtools
+#  else:
+#    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
+#    return
 
-  if vt==1 and vs==1:
-    import rtools
-  elif vt==2 and vs==1:
-    import rtools_vs1vt2 as rtools
-  elif vt==2 and vs==4:
-    import rtools_vs4vt2 as rtools
-  elif vt==2 and vs==2:
-    import rtools_vs2vt2 as rtools
-  else:
-    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-    return
+  N,Ny,Nx=v.shape
+  res=rtools.roms_slicez(v,h,zeta, tts,ttb,hc,Nr,vt,vs,
+                         level,surface_nans,spline,
+                         N,Ny,Nx)
 
-  N,M,L=v.shape
-  res=rtools.roms_slicez(v,h,zeta,hc,tts,ttb,level,surface_nans,Nr,N,M,L)
   mask=np.where(res==-99.,0,1)*maskv==0
   return res, mask
 
@@ -61,20 +64,21 @@ def s_levels(h,zeta,sparams,rw=False):
   '''
   tts,ttb,hc,n,vt,vs=sparams
 
-  if vt==1 and vs==1:
-    import rtools
-  elif vt==2 and vs==1:
-    import rtools_vs1vt2 as rtools
-  elif vt==2 and vs==4:
-    import rtools_vs4vt2 as rtools
-  elif vt==2 and vs==2:
-    import rtools_vs2vt2 as rtools
-  else:
-    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-    return
+  import rtools
+#  if vt==1 and vs==1:
+#    import rtools
+#  elif vt==2 and vs==1:
+#    import rtools_vs1vt2 as rtools
+#  elif vt==2 and vs==4:
+#    import rtools_vs4vt2 as rtools
+#  elif vt==2 and vs==2:
+#    import rtools_vs2vt2 as rtools
+#  else:
+#    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
+#    return
 
 
-  zr,zw=rtools.s_levels(h,zeta,hc,tts,ttb,n)
+  zr,zw=rtools.s_levels(h,zeta,hc,tts,ttb,n,vt,vs)
 
   # add zeta mask to z levels:
   if np.ma.isMA(zeta):

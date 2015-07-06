@@ -404,7 +404,6 @@ class Data(Vis):
 #      x=x/1.e3
 #      xUnitsAdd=r'$\mathrm{\times10^3}$ '
 
-    print 'PPPPPPPPPPPPPPPPPP',proj
 
     if hasattr(self,'fig') and pl.fignum_exists(self.fig.number): pass
     else: self.init_figure()

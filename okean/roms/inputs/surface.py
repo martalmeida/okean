@@ -42,13 +42,17 @@ def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=Tr
   data=a.data(date0,date1,quiet)
 
   out=cb.odict()
+  if not data:
+    print 'no data found !'
+    return out
+
   time=data['time']
   for it in range(len(time)):
+    # be sure time increases!
+    if out.keys() and time[it]<=out.keys()[-1]: continue
+
     out[time[it]]={}
     for k in data.keys():
-
-      # be sure time increases!
-      if out.keys() and time[ik]<=out.keys()[-1]: continue
 
       if k in ('time',): continue
       elif  k.startswith('INFO'):
@@ -410,18 +414,35 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
   wrffiles=kargs.get('wrffiles','wrfout*')
+  dt     = kargs.get('dt',6)
 
-  data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,quiet) # unique diff from make_blk_interim !!
+  data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,quiet)
 
-  # about original data, run data2romsblk once to test for x_original:
-  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
-  else: original=False
+  if not len(data): return
 
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create:
+    # about original data, run data2romsblk once to test for x_original:
+    tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
+    if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+    else: original=False
+
+    q.create(model,original)
+
 
   for d in data.keys():
+
+    # be sure time increases. Note that in load_blkdata_wrf
+    # we checked if time increases in the dataset... not if dates are higher
+    # then previous dates in file
+    ntimes=netcdf.fdim(bulk,'time')
+    if ntimes:
+      tin=netcdf.nctime(bulk,'time')
+
+      if tin.size and (d-tin[-1])<datetime.timedelta(hours=dt-0.1):
+        print '-> not including %s'%d.isoformat()
+        continue
+
     if model=='roms':
        if not quiet: print '  converting units:',
        conv_units(data[d],model,quiet)

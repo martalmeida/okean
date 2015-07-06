@@ -1450,7 +1450,8 @@ class rgui:
 
     Vars=[]
     self.variables={}
-    vars,nc=netcdf.var(self.files[type])
+    nc=netcdf.ncopen(self.files[type])
+    vars=netcdf.var(nc)
     for k in vars.keys():
       if vars[k].ndim()>=2:
         Vars+=[k]
@@ -1458,7 +1459,8 @@ class rgui:
     nc.close()
 
     if type!='grid' and show_grid_vars:
-      vars,nc=netcdf.var(self.files['grid'])
+      nc=netcdf.ncopen(self.files['grid'])
+      vars=netcdf.var(nc)
       for k in vars.keys():
         if vars[k].ndim()>=2 and k not in Vars:
           Vars+=[k]
@@ -1755,9 +1757,7 @@ class rgui:
          print 'USING SWAPP...'
          return self.swapp['last_slices_data'][i]
 
-    # spherical:
-    if romsobj.grid.use('spherical') in (0,'F'): spherical=False
-    else: spherical=True
+    spherical=romsobj.grid.is_spherical
 
     # slice:
     if zlev>=0: zlev=int(zlev)
@@ -2026,7 +2026,8 @@ class rgui:
 
     print 'here 0'
     # use projection:
-    spherical=not self.files['Grid'].use('spherical') in (0,'F')
+    
+    spherical=self.files['Grid'].is_spherical
 
     if spherical:
       self.__start_proj()

@@ -38,7 +38,7 @@ __all__='His','Grid'
 class Common:
   def load_vars(self,vars):
     #self.quiet=0
-    var,nc=netcdf.var(self.name)
+    var=netcdf.var(self.nc)
     varnames=var.keys()
     for i in vars:
       if not self.quiet: print ':: loading var ',  i
@@ -75,11 +75,9 @@ class Common:
           break
       if not found and not self.quiet: print ':: %s not found in %s' % (str(iopts),self.name)
 
-    nc.close()
-
 
   def load_dims(self):
-    dms=netcdf.fdim(self.name)
+    dms=netcdf.fdim(self.nc)
     for k in dms.keys():
       if k in ('ocean_time','time','scrum_time'):
         setattr(self,'TIME',dms[k])
@@ -87,12 +85,12 @@ class Common:
         setattr(self,k.upper(),dms[k])
 
   def load_atts(self):
-    atts=netcdf.fatt(self.name)
+    atts=netcdf.fatt(self.nc)
     self.atts={}
     for k in atts.keys(): self.atts[k]=atts[k].value
 
   def load_grid(self,grd=False):
-    ats=netcdf.fatt(self.name)
+    ats=netcdf.fatt(self.nc)
     if not grd:
       if 'grd_file' in ats.keys(): grd=ats['grd_file'].value
       if grd and not os.path.isfile(grd): grd=False
@@ -105,17 +103,17 @@ class Common:
         self.grid=False
 
   def show(self):
-    netcdf.show(self.name)
+    netcdf.show(self.nc)
 
   def use(self,varname,**kargs):
-    return netcdf.use(self.name,varname,**kargs)
+    return netcdf.use(self.nc,varname,**kargs)
 
   def hasz(self,v):
     '''
     True if variable has depth dimension (s_rho or s_w)
     '''
 
-    dnames=netcdf.vdim(self.name,v)
+    dnames=netcdf.vdim(self.nc,v)
     return 's_rho' in dnames or 's_w' in dnames
 
   def hast(self,v):
@@ -123,7 +121,7 @@ class Common:
     True if variable has *time* dimension
     '''
 
-    dnames=netcdf.vdim(self.name,v)
+    dnames=netcdf.vdim(self.nc,v)
     for d in dnames:
       if d.find('time')>=0: return True
 
@@ -135,7 +133,7 @@ class Common:
     Possible values are u,v,r(rho), p(psi)
     If _3d, also checks if at w points
     '''
-    dims=netcdf.vdim(self.name,v).keys()
+    dims=netcdf.vdim(self.nc,v).keys()
 
     if _3d and 's_w' in dims: return 'w'
     elif 'xi_u'   in dims or   'eta_u'   in dims: return 'u'
@@ -158,6 +156,7 @@ class Grid(Common):
     self.type='grid'
     self.quiet=quiet
 
+    self.nc=netcdf.ncopen(self.name)
     self.load()
     self.load_dims()
     self.load_uvp()
@@ -185,6 +184,14 @@ class Grid(Common):
     # some vars may not be present... set defaults:
     if not hasattr(self,'mask'): self.mask=np.ones(self.h.shape)
     if not hasattr(self,'angle'): self.angle=np.zeros(self.h.shape)
+
+    # add spherical attr:
+    sph=self.use('spherical')
+    # may be 1, T, an array with 'T','','',... etc
+    try: sph=''.join(sph).strip()[0]
+    except: pass
+    if sph in (1,'T'): self.is_spherical=True
+    else: self.is_spherical=False
 
 
   def load_grid(): self.load()
@@ -496,13 +503,17 @@ class Grid(Common):
         pch = ax.contourf(x,y,h,hvals,cmap=cmap)
 
       if pch:
-        if m.xmax-m.xmin<m.ymax-m.ymin: orientation='horizontal'
-        else: orientation='vetical'
+        if m.xmax-m.xmin>m.ymax-m.ymin: orientation='horizontal'
+        else: orientation='vertical'
 
         cbh = pl.colorbar(pch,orientation=orientation,ax=ax)
-        cbh.set_label('Depth')
-        if title=='auto': ax.set_title(self.name)
-        elif title: ax.set_title(title)
+        cbh.set_label('Depth',fontsize=10)
+
+        if title=='auto': title=self.name
+        if len(title)>80: font=8
+        elif len(title)>60: font=9
+        else: font=10
+        ax.set_title(title,fontsize=font)
 
       xb, yb = m(xb,yb)
       ax.plot(xb,yb)
@@ -527,6 +538,7 @@ class His(Common,Derived):
     self.type='his'
     self.quiet=quiet
 
+    self.nc=netcdf.ncopen(self.name)
     self.load_grid(grd)
     self.load()
     self.load_dims()
@@ -538,33 +550,16 @@ class His(Common,Derived):
   def load(self):
     # time:
     vars={'time':('time','ocean_time','scrum_time','clim_time')},
-
     self.load_vars(vars)
 
-    # netcdf time:
+    # time:
     try:
       # units must have the format <units> since <date>
       self.time=netcdf.num2date(self.time,self.var_as['time']['units'])
     except: pass
 
-###    self.datetime=self.time
-###
-###    # time is usually seconds, but may be days!!, so:
-###    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
-###
-###    if len(self.time)>1:
-###      self.dt=self.time[1]-self.time[0]
-###    else: self.dt=0
-###
-###    self.tdays=self.time/86400.
-
-
     # s params:
-    # hasattr(obj, '__contains__')
-    if isinstance(self.name,basestring):
-      self.s_params=rt.s_params(self.name)
-    else: self.s_params=rt.s_params(self.name[0])
-
+    self.s_params=rt.s_params(self.nc)
 
 
   def path_s_levels(self,time,x,y,rw='r'):
@@ -573,7 +568,7 @@ class His(Common,Derived):
 
     if np.ma.isMA(zeta): h=np.ma.masked_where(zeta.mask,h)
     else:# probably a clm/ini file. Mask maskc point (pygridgen complex grid):
-      if 'maskc' in netcdf.varnames(self.grid.name):
+      if 'maskc' in netcdf.varnames(self.grid.nc):
         mc=self.grid.use('maskc')
         h=np.ma.masked_where(mc==0,h)
         zeta=np.ma.masked_where(mc==0,zeta)
@@ -613,7 +608,7 @@ class His(Common,Derived):
     msg=''
 
     # check varname:
-    if varname not in netcdf.varnames(self.name):
+    if varname not in netcdf.varnames(self.nc):
       return ':: variable %s not found' % varname
 
     isU=varname in ('u','ubar')
@@ -682,7 +677,7 @@ class His(Common,Derived):
 
     out.v=v
     out.info['v']['name']=varname
-    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
 
@@ -814,7 +809,7 @@ class His(Common,Derived):
     out.v=v
     out.info['v']['name']=varname
     out.info['v']['slice']='k=%d'%ind
-    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
 
@@ -828,7 +823,7 @@ class His(Common,Derived):
       x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
 
     if 'x' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
@@ -836,7 +831,7 @@ class His(Common,Derived):
          out.info['x']=dict(name='Distance',units='km')
          
     if 'y' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
@@ -868,6 +863,7 @@ class His(Common,Derived):
       return self.slicek(varname,ind,time,**opts)
 
     surf_nans=opts.get('surf_nans',True)
+    spline=opts.get('spline',True)
     coords=opts.get('coords',self._default_coords('slicez')).split(',')
 
     out=Data()
@@ -879,19 +875,19 @@ class His(Common,Derived):
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
-    v,mask=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans)
+    v,mask=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans,spline)
     v=np.ma.masked_where(mask,v)
 
     out.v=v
     out.info['v']['name']=varname
     out.info['v']['slice']='z=%d'%ind
-    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
 
     # coords:
     if 'x' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
@@ -899,7 +895,7 @@ class His(Common,Derived):
          out.info['x']=dict(name='Distance',units='km')
 
     if 'y' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
@@ -982,24 +978,14 @@ class His(Common,Derived):
       else: v=data
 
 
-#    print V.shape, xi,eta
-#    return 0,0
-#    print 'EXTRACT ONLY NEEDED RANGE!'
-
-##    print 'start1'
     if V.ndim==3:
       v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
-##      print v.shape
     elif V.ndim==2:
       v=calc.griddata(x,y,np.ma.masked_where(m==0,V),X,Y,extrap=extrap, keepMaskVal=maskLimit)
-##    print 'end1'
-##    return 0,0
-#    if varOnly: return V
-#
+
     # coords:
     if 'z' in coords and V.ndim==3:
       out.z=self.path_s_levels(time,X,Y,rw=varname[0])
-#    else: Z=0.*X
 
     if 'd' in coords:
       d=calc.distance(X,Y)
@@ -1193,7 +1179,7 @@ class His(Common,Derived):
     else: siso=str(iso)
 
     out.info['v']['slice']='iso=%s'%siso
-    try: out.info['v']['units']=netcdf.vatt(self.name,varname,'units')
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
     # coords:
@@ -1201,7 +1187,7 @@ class His(Common,Derived):
       x,y,h=self.grid.vars(ruvp=self.var_at(varname))[:3]
 
     if 'x' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
@@ -1209,7 +1195,7 @@ class His(Common,Derived):
          out.info['x']=dict(name='Distance',units='km')
 
     if 'y' in coords:
-       if self.grid.use('spherical') in (1,'T'):
+       if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:

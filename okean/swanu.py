@@ -505,9 +505,10 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
 #  print ' final  max and min dt = %6.2f %6.2f hrs = %6.2f %6.2f mins'%(d.max()*24, d.min()*24, d.max()*24*60, d.min()*24*60)
 
   print 'wind: loading u ...' 
-  u,nc=netcdf.var(frc,uname)
+  nc=netcdf.ncopen(frc)
+  u=netcdf.var(nc,uname)
   print 'wind: loading v ...' 
-  v,nc=netcdf.var(nc,uname)
+  v=netcdf.var(nc,uname)
 #  u=u[cond,...][::dt,...]
 #  v=v[cond,...][::dt,...]
   u=u[cond,...]

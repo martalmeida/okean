@@ -15,15 +15,12 @@ class RomsGlider:
     self.inds0={}
     self.uinds={}
 
-  def plot(self):
-    import pylab as pl
-    fig=pl.figure()
-    ax=pl.axes()
-    m=self.roms.grid.plot(ax=ax,title='')
-    x,y=m(self.x,self.y)
-    ax.plot(x,y,'r')
-    ax.plot(x[0],y[0],'bo')
-    ax.plot(x[-1],y[-1],'ro')
+  def plot(self,**kargs):
+    o=self.roms.grid.plot(**kargs)
+    x,y=o.map(self.x,self.y)
+    o.ax.plot(x,y,'r')
+    o.ax.plot(x[0],y[0],'bo')
+    o.ax.plot(x[-1],y[-1],'ro')
 
   def model_lon_lat(self,varname):
     return self.roms.grid.vars(ruvp=varname)[:2]

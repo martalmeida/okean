@@ -102,11 +102,9 @@ class Common:
       except:
         self.grid=False
 
-  def show(self):
-    netcdf.show(self.nc)
-
-  def use(self,varname,**kargs):
-    return netcdf.use(self.nc,varname,**kargs)
+  def show(self): netcdf.show(self.nc)
+  def showvar(self,vname): netcdf.showvar(self.nc,vname)
+  def use(self,varname,**kargs): return netcdf.use(self.nc,varname,**kargs)
 
   def hasz(self,v):
     '''
@@ -188,9 +186,15 @@ class Grid(Common):
     # add spherical attr:
     sph=self.use('spherical')
     # may be 1, T, an array with 'T','','',... etc
-    try: sph=''.join(sph).strip()[0]
+    try:
+      sph=''.join(sph).strip()
+      if len(sph): sph=sph[0]
     except: pass
-    if sph in (1,'T'): self.is_spherical=True
+    trueVals=[1,'T']
+    # let us assume that empty sph means True!! (may not be a very
+    # smart idea!
+    trueVals+=['']
+    if sph in trueVals: self.is_spherical=True
     else: self.is_spherical=False
 
 
@@ -388,8 +392,8 @@ class Grid(Common):
       ry=self.lat.max()-self.lat.min()
       r=2*(self.h.max()-self.h.min())/(0.5*(rx+ry))
 
-      mlab.mesh(self.lon,self.lat,z/r)
-
+      res=mlab.mesh(self.lon,self.lat,z/r)
+      return res
 
     else: # wireframe
       from mpl_toolkits.mplot3d import axes3d
@@ -399,8 +403,8 @@ class Grid(Common):
       ax=fig.add_subplot(111, projection='3d')
 
       ny,nx=self.h.shape
-      dx=int(np.round(nx/float(nmax)))
-      dy=int(np.round(ny/float(nmax)))
+      dx=max(int(np.round(nx/float(nmax))),1)
+      dy=max(int(np.round(ny/float(nmax))),1)
 
       x=self.lon[::dy,::dx]
       y=self.lat[::dy,::dx]
@@ -410,10 +414,30 @@ class Grid(Common):
 
       ax.plot_wireframe(x,y,h,lw=0.5,alpha=.5)
       ax.contour3D(self.lon,self.lat,self.mask,[.5])
-
+      return ax
 
 
   def plot(self,**kargs):
+    from okean import vis
+    from matplotlib.cm import gist_earth_r
+    h=np.ma.masked_where(self.mask==0,self.h)
+    a=vis.Data(x=self.lon,y=self.lat,v=h)
+    ht=ticks.loose_label_n(self.h.min(),self.h.max(),7)
+    a.set_param(field__plot='contourf',field__cvals=ht,field__cmap=gist_earth_r)
+    a.set_param(**kargs)
+
+    # also show domain boundary:
+    xb,yb=self.border()
+    b=vis.Data(x=xb,v=yb)
+    b.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
+    a.extra=[b]
+
+    a.plot(labels=0)
+
+    return a
+
+
+  def plot_old(self,**kargs):
     import pylab as pl
     bathy      = kargs.get('bathy','contourf')
     hvals      = kargs.get('hvals','auto')
@@ -710,7 +734,7 @@ class His(Common,Derived):
       out.y=y
       out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
     if v.ndim==2:
       out.extra=[Data()]
@@ -718,8 +742,8 @@ class His(Common,Derived):
       if 'y' in coords: out.extra[0].x=out.y[0]
       if 'x' in coords: out.extra[0].y=out.x[0]
       out.extra[0].v=-h
-      out.extra[0].config['1d.plot']='fill_between'
-      out.extra[0].config['1d.y0']=-h.max()-(h.max()-h.min())/20.
+      out.extra[0].config['d1.plot']='fill_between'
+      out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
       out.extra[0].alias='bottom'
 
     out.coordsReq=','.join(sorted(coords))
@@ -776,7 +800,7 @@ class His(Common,Derived):
       out.y=y
       out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
     if v.ndim==2:
       out.extra=[Data()]
@@ -784,8 +808,8 @@ class His(Common,Derived):
       if 'x' in coords: out.extra[0].y=out.x[0]
       if 'y' in coords: out.extra[0].x=out.y[0]
       out.extra[0].v=-h
-      out.extra[0].config['1d.plot']='fill_between'
-      out.extra[0].config['1d.y0']=-h.max()-(h.max()-h.min())/20.
+      out.extra[0].config['d1.plot']='fill_between'
+      out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
       out.extra[0].alias='bottom'
 
     out.coordsReq=','.join(sorted(coords))
@@ -808,7 +832,7 @@ class His(Common,Derived):
 
     out.v=v
     out.info['v']['name']=varname
-    out.info['v']['slice']='k=%d'%ind
+    if self.hasz(varname): out.info['v']['slice']='k=%d'%ind
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
@@ -838,7 +862,7 @@ class His(Common,Derived):
          out.y=y/1000.
          out.info['y']=dict(name='Distance',units='km')
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
     if v.ndim==2:
       out.extra=[Data()]
@@ -906,7 +930,7 @@ class His(Common,Derived):
       out.z=ind+np.zeros(v.shape)
       out.info['z']=dict(name='Depth',units='m')
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
     if v.ndim==2:
       out.extra=[Data()]
@@ -927,15 +951,10 @@ class His(Common,Derived):
 
 
   def slicell(self,varname,X,Y,time=0,**opts):
-#    x,y,z,v,m=[[]]*5
-########    plot= opts.get('plot',False)
-#########    ax  = opts.get('ax',None)
     coords=opts.get('coords',self._default_coords('slicell')).split(',')
 
     data      = opts.get('data',False)
-#    dist      = opts.get('dist',False)
     extrap    = opts.get('extrap',False)
-#    varOnly   = opts.get('retv',False)
     maskLimit = opts.get('lmask',0.5) # points where interpolated mask are above
                                       # this value are considered as mask!
                                       # Most strict value is 0
@@ -949,19 +968,9 @@ class His(Common,Derived):
     if X.ndim>1: X=np.squeeze(X)
     if Y.ndim>1: Y=np.squeeze(X)
 
-#    if varname not in netcdf.varnames(self.name):
-#      print ':: variable %s not found' % varname
-#      return x,y,z,v,m
-#
-#    if time>=self.TIME:
-#      print 't = %d exceeds TIME dimension (%d)' % (time,self.TIME)
-#      return x,y,z,v,m
-
     x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
     if True: # extrat only portion of data needed:
-##      print 'start', x.shape,y.shape,X.shape
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
-##      print 'end'
       xi='%d:%d'%(i0,i1)
       eta='%d:%d'%(j0,j1)
 
@@ -983,6 +992,13 @@ class His(Common,Derived):
     elif V.ndim==2:
       v=calc.griddata(x,y,np.ma.masked_where(m==0,V),X,Y,extrap=extrap, keepMaskVal=maskLimit)
 
+    out.v=v
+    out.info['v']['name']=varname
+    out.info['v']['slice']='path npts=%d'%X.size
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
+    except: pass
+
+
     # coords:
     if 'z' in coords and V.ndim==3:
       out.z=self.path_s_levels(time,X,Y,rw=varname[0])
@@ -1000,48 +1016,10 @@ class His(Common,Derived):
       if v.ndim==2: Y=np.tile(Y,(v.shape[0],1))
       out.y=Y
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
-#    # X, Y, dist:
-#    if dist:
-#      Dist=calc.distance(X,Y)
-#      if v.ndim==3:
-#        Dist=np.tile(Dist,(v.shape[0],1))
-#    else:
-#      if v.ndim==3:
-#        X=np.tile(X,(v.shape[0],1))
-#        Y=np.tile(Y,(v.shape[0],1))
-#
-#    if dist:
-#      return Dist,Z,V
-#    else:
-#      return X,Y,Z,V
-#
-#    if plot:
-#      if not ax: ax=pl.gca()
-#      if v.ndim==2:
-#        if 'x' in coords:
-#          p=ax.pcolormesh(out.x,out.z,v)
-###          ax.plot(aux.x[0],-h)
-#        elif 'y' in coords:
-#          p=ax.pcolormesh(out.y,out.z,v)
-###          ax.plot(aux.y[0],-h)
-#        else:
-#          p=ax.pcolormesh(out.d,out.z,v)
-####          ax.plot(aux.d[0],-h)
-##
-#        pl.colorbar(p,shrink=.7)
-##      elif  v.ndim==1:
-#        if 'x' in coords:
-#          ax.plot(out.x,v)
-#        elif 'y' in coords:
-#          ax.plot(out.y,v)
-#        else:
-#          ax.plot(out.d,v)
-#
-    out.v=v
     out.coordsReq=','.join(sorted(coords))
-    return out###v,aux
+    return out
 
 
   def sliceuv(self,ind,time=0,**opts):#plot=False,**opts):
@@ -1173,14 +1151,19 @@ class His(Common,Derived):
     v=rt.depthof(v,z,iso)
 
     out.v=v
-    out.info['v']['name']=varname
+    #out.info['v']['name']=varname
+    out.info['v']['name']='depth'
 
     if isinstance(iso,np.ndarray) and iso.ndim==2: siso='2d'
     else: siso=str(iso)
 
-    out.info['v']['slice']='iso=%s'%siso
-    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
-    except: pass
+    try:
+      out.info['v']['slice']='%s (%s) iso=%s'%(varname,netcdf.vatt(self.nc,varname,'units'),siso)
+    except:
+      out.info['v']['slice']='%s iso=%s'%(varname,siso)
+  
+    out.info['v']['units']='metre'
+
 
     # coords:
     if any([i in coords for i in 'xy']):
@@ -1206,7 +1189,7 @@ class His(Common,Derived):
       # makes no sense... v is the depth!
       coords.remove('z')
 
-    if 't' in coords: out.t=self.time[time]
+    if 't' in coords and self.hast(varname): out.t=self.time[time]
 
     if v.ndim==2:
       out.extra=[Data()]
@@ -1226,67 +1209,13 @@ class His(Common,Derived):
 
 
   def time_series(self,varname,x,y,times=None,depth=None,**opts):
-########    plot= opts.get('plot',False)
-########    ax  = opts.get('ax',None)
-    coords=opts.get('coords',self._default_coords('sliceiso')).split(',')
+    coords=opts.get('coords',self._default_coords('time_series')).split(',')
 
     if times is None: times=range(0,self.time.size)
 
     out=Data()
     out.msg=self.check_slice(varname,t=np.max(times),k=depth) 
-    if out.msg: return out###None,aux
-
-
-##    t,z,v=[[]]*3
-#
-#    RetVarOnly=False
-#    savename=False
-#    retMsg=False
-#    nearest=True  # UNIQUE case Currently
-#    plot=False
-#
-#    if 'retvar'   in opts.keys(): RetVarOnly = opts['retvar']
-#    if 'savename' in opts.keys(): savename   = opts['savename']
-#    if 'msg'      in opts.keys(): retMsg     = opts['msg']
-#    if 'nearest'  in opts.keys(): nearest    = opts['msg']
-#    if 'plot'     in opts.keys(): plot       = opts['msg']
-#
-#
-#    if varname not in netcdf.varnames(self.name):
-#      msg=':: variable %s not found' % varname
-#      if retMsg: return t,z,v,msg
-#      else:
-#        print msg
-#        return t,z,v
-#
-#    isW=varname=='w'
-#    hasZ=self.hasz(varname)
-#
-#    if not depth is False and hasZ :
-#      if isW and depth >= self.S_W:
-#        msg='k = %d exceeds S_W dimension (%d)' % (depth,self.S_W)
-#        if retMsg: return t,z,v,msg
-#        else:
-#          print msg
-#          return t,z,v
-#
-#      elif depth >= self.S_RHO:
-#        msg='k = %d exceeds S_RHO dimension (%d)' % (depth,self.S_RHO)
-#        if retMsg: return t,z,v,msg
-#        else:
-#          print msg
-#          return t,z,v
-#
-#    if times is False:
-#      times=0,len(self.tdays)
-#
-#    if self.hast(varname) and times[-1]>self.TIME:
-#      msg='t = %d exceeds TIME dimension (%d)' % (times[-1],self.TIME)
-#      if retMsg: return t,z,v,msg
-#      else:
-#        print msg
-#        return t,z,v
-#
+    if out.msg: return out
 
     # find nearest point:
     lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
@@ -1319,79 +1248,50 @@ class His(Common,Derived):
       else: # one time only
         v=np.interp(depth,z,v,left=np.nan,right=np.nan)
         v=np.ma.masked_where(np.isnan(v),v) 
+
+
+    out.v=v
+    out.info['v']['name']=varname
+    out.info['v']['slice']='time series'
+    try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
+    except: pass
      
     # coords
-    if 't' in coords:
+    if 't' in coords and self.hast(varname):
       if v.ndim==2:
         out.t=np.tile(self.time[times],(v.shape[0],1))
         from matplotlib.dates import date2num
         out.tnum=np.tile(date2num(self.time[times]),(v.shape[0],1))
       else: out.t=self.time[times]
+      out.info['t']['name']='Time'
+      out.info['tnum']=dict(name='Time',units=self.var_as['time']['units'])
 
     if 'z' in coords and self.hasz(varname):
       if not depth is None:
         if depth>=0: out.z=z[depth,...]
         else: out.z=depth+0*v
       else: out.z=z
+      out.info['z']=dict(name='Depth',units='m')
 
-    if 'x' in coords: out.x=lon[i,j]
-    if 'y' in coords: out.y=lat[i,j]
-   
-##    if plot and v.ndim:
-##      if not ax:
-##        ax=pl.gca()
-##        opts['ax']=ax
-##
-##      if v.ndim==2:
-##        p=ax.pcolormesh(out.tnum,out.z,v)
-##        #ax.xaxis_date()
-##        pl.colorbar(p,shrink=.7)
-##      elif v.size>1:
-##        if out.t.size>1: # time series:
-##          ax.plot(out.t,v)
-##        else: # vertical profile:
-##          ax.plot(v,out.z)
+    if 'x' in coords:
+      out.x=lon[i,j]
+      if self.grid.is_spherical:
+         out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+      else:
+        out.x=x/1000.
+        out.info['x']=dict(name='X-position',units='km')
 
-    out.v=v
+    if 'y' in coords:
+      out.y=lat[i,j]
+      if self.grid.is_spherical:
+        out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+      else:
+        out.y=y/1000.
+        out.info['y']=dict(name='Y-position',units='km')
+
+
     out.coordsReq=','.join(sorted(coords))
-    return out##v,aux
-
-###    t=self.tdays[range(times[0],times[-1])]
-###    t=t+0.*v
-#
-#    # depth:
-#    if self.hasz(varname):
-#      h=self.grid.h[i,j]
-#      zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=range(times[0],times[-1]))
-#      h=h+0*zeta
-#      z=rt.s_levels(h,zeta,self.s_params,rw=varname)
-#      z=np.squeeze(z)
-#
-#      if not depth is False:
-#        if depth>=0:
-#          t=t[0,:]
-#          z=z[depth,:]
-#          v=v[depth,:]
-#        else:
-#          t0,z0=t,z
-#          t=t[0,:]
-#          z=depth+0.*t
-#          v=calc.griddata(t0,z0,v,t,z,extrap=False,norm_xy=True)
-#
-#    else: # not hasZ
-#      z=0.*t
-#
-#
-#    if plot:
-#      pass # TODO
-#
-#
-#    if RetVarOnly:
-#      return v
-#    else:
-#      if retMsg: return t,z,v,''
-#      else: return t,z,v
-
+    return out
 
 
   def extrap_at_mask(self,vname,time,**opts): 

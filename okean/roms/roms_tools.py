@@ -456,7 +456,6 @@ def barotropic(var,zeta,h,sparams):
   must be provided zetau and hu
   '''
 
-  L,M=h.shape
   zr,zw=s_levels(h,zeta,sparams)
   dz=np.diff(zw,axis=0)
   return np.sum(var*dz,0)/np.sum(dz,0)

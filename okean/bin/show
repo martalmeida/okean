@@ -28,7 +28,7 @@ if len(argv)>=4:
   nc.close()
 
 elif len(argv)==3:
-  netcdf.showvar(argv[1],argv[2])
+  netcdf.show(argv[1],argv[2])
 elif len(argv)==2:
   netcdf.show(argv[1])
 else:
@@ -36,6 +36,4 @@ else:
   print 'usage: show filename [varname [<action>] [<scale> <offset>]]'
   print 'where action can be: lims, list, last or range'
   print ''
-  print 'mma dec 2009'
-
-print ''
+#  print 'mma dec 2009\n'

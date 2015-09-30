@@ -36,7 +36,7 @@ def convex_hull(x,y):
   ''' 
   return _connect(_hull(x,y,'convex'))
 
-def concave_hull(x,y):
+def concave_hull(x,y,alpha='auto'):
   '''Concave hull (alpha shape)
      Returns indices i of the closed path x[i],y[i]
      Based on Clarkson's hull code
@@ -44,7 +44,11 @@ def concave_hull(x,y):
 
      See convex_hull for additional help
   '''
-  return _connect(_hull(x,y,'concave'))
+  if alpha=='ret':
+    r,a=_hull(x,y,'concave',alpha)
+    return _connect(r),a
+  else:
+    return _connect(_hull(x,y,'concave',alpha))
 
 def _connect(ind):
   '''Connects the indices returned bu _hull'''
@@ -75,7 +79,61 @@ def _connect(ind):
   if not res: res=k # only one shape
   return res
 
+
 def _hull(x,y,what,alpha='auto'):
+    '''Runs Clarkson's hull
+    Based on:
+    http://stackoverflow.com/questions/6833243/how-can-i-find-the-alpha-shape-concave-hull-of-a-2d-point-cloud
+    '''
+    # Write points to tempfile
+    tmpfile = tempfile.NamedTemporaryFile(delete=False)
+    for point in np.vstack((x,y)).T.tolist():
+        tmpfile.write("%0.7f %0.7f\n" % tuple(point))
+    tmpfile.close()
+
+    return_alpha=False
+    if alpha=='ret':
+      return_alpha=True
+      alpha='auto'
+
+    # Run hull
+    if what=='concave':
+      fout=subprocess.PIPE
+      if alpha=='auto':
+        command = "%s -A -m1000000 -oN"%hull_exec
+      else:
+        command = "%s -aa%s -m1000000 -oN"%(hull_exec,str(alpha))
+
+    elif what=='convex':
+      command = "%s -m1000000"%hull_exec
+      fout=open('hout-alf','w')
+
+    fin=open(tmpfile.name)
+    p=subprocess.Popen(command.split(), stdout=fout,stdin=fin,stderr=subprocess.PIPE, close_fds=True)
+    p.wait()
+    retcode=p.returncode
+    o,e=p.communicate()
+
+    if retcode != 0:
+        print "Warning: bad retcode returned by hull.  Retcode value:",retcode
+    os.remove(tmpfile.name)
+
+    # Parse results
+    results_file = open("hout-alf")
+    results_file.next() # skip header
+    results_indices = [[int(i) for i in line.rstrip().split()] for line in results_file]
+
+    results_file.close()
+    os.remove(results_file.name)
+
+    if what=='concave' and return_alpha:
+      alf=e.strip().split('\n')[-1].split('=')[1]
+      alf=float(alf)
+      return results_indices,alf
+    else: return results_indices
+
+
+def _hull_old(x,y,what,alpha='auto'):
     '''Runs Clarkson's hull
     Based on:
     http://stackoverflow.com/questions/6833243/how-can-i-find-the-alpha-shape-concave-hull-of-a-2d-point-cloud
@@ -107,10 +165,8 @@ def _hull(x,y,what,alpha='auto'):
     results_indices = [[int(i) for i in line.rstrip().split()] for line in results_file]
     #print "results length = %d" % len(results_indices)
     results_file.close()
-    os.remove(results_file.name)
 
     return results_indices
-
 
 # several convex hull methods: (try them if convex_hull fails!!)
 # - using delaunay from mayplotlib
@@ -131,7 +187,7 @@ def convex_hull_mpl(x,y):
      y = np.random.rand(10)
      pl.figure()
      pl.plot(x, y, 'bo')
-     b=convex_hull_i(x,y)
+     b=convex_hull_mpl(x,y)
      pl.plot(x[b],y[b])
   '''
 
@@ -315,7 +371,3 @@ def simplify(x,y,lev=0):
   xy,ind=np.unique(xy,True)
 
   return xy.real,xy.imag,ind
-  
-
-
-

@@ -181,19 +181,16 @@ def use(filename,varname,interface='auto',**kargs):
   return res
 
 
-def show(filename,**kargs):
-  lmax      = False
-  Lmax      = 100
-  interface = 'auto'
+def showfile(filename,**kargs):
+  interface = kargs.get('interface','auto')
+  lmax      = kargs.get('lmax',False) # max len of attname of varname
+  Lmax      = kargs.get('Lmax',70) # max len of file att or lon_name/units
 
-  if 'lmax'      in kargs.keys(): lmax      = kargs['lmax']
-  if 'Lmax'      in kargs.keys(): Lmax      = kargs['Lmax']
-  if 'interface' in kargs.keys(): interface = kargs['interface']
-
-  nc=ncopen(filename,interface=interface)
+  nc,close=__open(filename,interface)
 
   print "\n# Contents of the NetCDF file"
-  print '   '+realpath(filename)
+  #print '   '+realpath(nc.filename)
+  print '   '+nc.filename
 
   print "\n:: Global Attributes:"
   at=nc.atts
@@ -207,7 +204,7 @@ def show(filename,**kargs):
     if lmax: l1=min(lmax,l1)
     if Lmax: l2=min(Lmax,l2)
 
-    format='   %-'+str(l1) + 's   %-'+str(l2)+'s'
+    format='   %-'+str(l1) + 's  %-'+str(l2)+'s'
     for k in at.keys():
        try: v=str(at[k].value)
        except: v=unicode(at[k].value)
@@ -220,18 +217,42 @@ def show(filename,**kargs):
   if di:
     l1=reduce(max,[len(x) for x in di.keys()])
     l2=reduce(max,[len(str(x)) for x in di.values()])
-    format='   %-'+str(l1) + 's   %'+str(l2)+'d'
+    format='   %-'+str(l1) + 's  %'+str(l2)+'d'
     for k in di.keys():
        print format % (k,di[k])
 
-  print "\n:: Variables:"
+  print '\n:: Variables:'
   va=nc.vars
   varnames = va.keys()
   if varnames:
+    # find max lens
+    # for vname:
     l1=reduce(max,[len(x) for x in varnames])
-    l2=40
-    if Lmax: l2=min(Lmax,l2)
-    format='   %-'+str(l1)+'s  %-'+str(l2)+'s  %-15.15s  %-20s'
+    # for long_name, units and shape:
+    l2=14 # min len for long_name
+    l3= 7 # min len for units
+    l4= 7 # min len for str(shape)
+    for v in varnames:
+      vv=va[v]
+      at=vv.atts
+
+      if 'long_name' in at.keys():
+        longn=at['long_name'].value
+        l2=max(l2,len(longn))
+      if 'units' in at.keys():
+        units=at['units'].value
+        l3=max(l3,len(units))
+
+      l4=max(len(str(vv.shape())),l4)
+
+    if Lmax:       
+      l2=min(l2,Lmax)
+      l3=min(l3,Lmax)
+      l4=min(l4,Lmax)
+
+    format='   %-'+str(l1)+'s | %-'+str(l2)+'s | %-'+str(l3)+'s | %-'+str(l4)+'s |'
+    format1='   %-'+str(l1)+'s   %-'+str(l2)+'s   %-'+str(l3)+'s   %-'+str(l4)+'s'
+    print format1 % ('','long_name'.center(l2),'units'.center(l3),'shape'.center(l4))
     for v in varnames:
       vv=va[v]
       at=vv.atts
@@ -242,23 +263,22 @@ def show(filename,**kargs):
 
       if 'units' in at.keys(): units=at['units'].value
       else: units=''
+      if len(units)>l3: units=units[:l3-1]+'+'
 
-      shape=vv.shape()
-      print format % (v,longn,units,str(shape))
+      shape=str(vv.shape())
+      if len(shape)>l4: shape=shape[:l4-1]+'+'
 
-  nc.close()
+      print format % (v,longn,units,shape)
+
+  if close: nc.close()
 
 
 def showvar(filename,varname,**kargs):
-  lmax      = False
-  Lmax      = 100
-  interface = 'auto'
+  interface = kargs.get('interface','auto')
+  lmax      = kargs.get('lmax',False)
+  Lmax      = kargs.get('Lmax',70)
 
-  if 'lmax'      in kargs.keys(): lmax      = kargs['lmax']
-  if 'Lmax'      in kargs.keys(): Lmax      = kargs['Lmax']
-  if 'interface' in kargs.keys(): interface = kargs['interface']
-
-  nc=ncopen(filename,interface=interface)
+  nc,close=__open(filename,interface)
   vv=nc.vars[varname]
   at=vv.atts
   di=vv.dims
@@ -292,10 +312,20 @@ def showvar(filename,varname,**kargs):
 
   print "\n:: Shape: %s" % str(vv.shape())
 
-  try: print "\n:: Range: %s" % str(vv.range())
-  except: pass
+  if vv.ndim()>0:
+    size=reduce(lambda x, y: x*y, vv.shape())
+    if size<1e4:
+      try: print "\n:: Range: %s" % str(vv.range())
+      except: pass
+  else:
+    print "\n:: Value: %s" % str(vv[:])
 
-  nc.close()
+  if close: nc.close()
+
+
+def show(filename,varname='',**kargs):
+  if not varname: showfile(filename,**kargs)
+  else: showvar(filename,varname,**kargs)
 
 
 def dict2nc(fname,vars,dims={},atts={},vatts={},**kargs):
@@ -327,10 +357,8 @@ def dict2nc(fname,vars,dims={},atts={},vatts={},**kargs):
   to overwrite a previous file, use karg perm='t'
   '''
 
-  perm='w'
-  ncversion=3
-  if 'perm'      in kargs.keys(): perm      = kargs['perm']
-  if 'ncversion' in kargs.keys(): ncversion = kargs['ncversion']
+  ncversion=kargs.get('ncversion','NETCDF4_CLASSIC')
+  perm=kargs.get('perm','w')
 
   nc=Pync(fname,perm,version=ncversion)
 
@@ -342,7 +370,12 @@ def dict2nc(fname,vars,dims={},atts={},vatts={},**kargs):
   # add vars:
   for vname in vars.keys():
     # find var dims:
-    sh=vars[vname].shape
+    try:
+      sh=vars[vname].shape
+    except:
+      vars[vname]=np.asarray(vars[vname])
+      sh=vars[vname].shape
+    #if not sh: sh=1,
     dimnames=[]
     for s in sh:
       if s in dims.values(): dimnames+=[dims.keys()[dims.values().index(s)]]
@@ -359,8 +392,11 @@ def dict2nc(fname,vars,dims={},atts={},vatts={},**kargs):
       fv=vatts[vname]['_FillValue']
     except: fv=None
 
-    #print 'adding ',vname, vars[vname].dtype
-    ncv=nc.add_var(vname,vars[vname].dtype,dimnames,ncver=ncversion,fill_value=fv)
+    try:
+      ncv=nc.add_var(vname,vars[vname].dtype,dimnames,ncver=ncversion,fill_value=fv)
+    except:
+      print '--> error creating variable %s of type %s (nc version = %s)'%(vname,vars[vname].dtype,str(ncversion))
+      return
 
     # add var atts:
     if vname in vatts.keys():

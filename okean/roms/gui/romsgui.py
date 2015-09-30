@@ -2063,6 +2063,7 @@ class rgui:
         if scaleL=='auto':
           grid_dist=calc.distance(np.array(lonlims),np.array(latlims))
           scaleL=ticks.nicenum(grid_dist[-1]/4000.,1)
+        else: scaleL=float(scaleL)
 
         dlon=lonlims[1]-lonlims[0]
         dlat=latlims[1]-latlims[0]

@@ -72,6 +72,7 @@ lu = Extension(name = 'lusolver',
 import glob
 ncview_cm=glob.glob('okean/data/ncview_cmaps/*')
 rgui_icons=glob.glob('okean/roms/gui/icons/*')
+okean_doc=glob.glob('okean/documentation/*')
 
 doclines = __doc__.split("\n")
 
@@ -99,8 +100,8 @@ if __name__ == '__main__':
                       'okean.roms.inputs',
                       'okean.roms.gui',
                       'okean.nc',
-                      'okean.datasets',
-                      'okean.data'],
+                      'okean.datasets'],
+#                      'okean.data'],
           license = 'EUPL',
           platforms = ["any"],
           ext_package='okean',
@@ -112,6 +113,8 @@ if __name__ == '__main__':
                                          'okean/data/cities_more.txt']),
                          ('okean/misc', ['okean/misc/hull_code.tar.gz']),
                          ('okean/data/ncview_cmaps/', ncview_cm),
+                         ('okean/documentation',okean_doc),
+                         ('','okean_documentation.ipynb'),
                          ('',['EUPL v.1.1 - licencia.pdf'])],
           classifiers = filter(None, classifiers.split("\n")),
           scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate','okean/bin/romsview'],

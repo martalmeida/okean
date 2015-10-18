@@ -220,6 +220,40 @@ class Grid(Common):
     if not hasattr(self,'ETA_V'): self.ETA_V=self.ETA_RHO-1
 
 
+  def border_multi_corner(self):
+    mc=self.use('maskc')
+    l,n=mc.shape
+    print 
+    m=np.zeros((l+2,n+2))
+    x=np.zeros((l+2,n+2))
+    y=np.zeros((l+2,n+2))
+
+    m[1:-1,1:-1]=mc
+    x[1:-1,1:-1]=self.lon
+    y[1:-1,1:-1]=self.lat
+
+    x[:,0]  = x[:,1]
+    x[:,-1] = x[:,-2]
+    x[0]    = x[1]
+    x[-1]   = x[-2]
+
+    y[:,0]  = y[:,1]
+    y[:,-1] = y[:,-2]
+    y[0]    = y[1]
+    y[-1]   = y[-2]
+
+    import pylab as pl
+    f=pl.figure()
+    f.set_visible(0)
+    ax=pl.axes()
+    cs=ax.contour(x,y,m,[.99999])
+    p = cs.collections[0].get_paths()[0]
+    v = p.vertices
+    pl.close(f)
+
+    return v[:,0],v[:,1]
+
+
   def border(self,type='r',margin=0,di=1,dj=1):
     if   type == 'r': lon,lat=self.lon, self.lat
     elif type == 'u': lon,lat=self.lonu,self.latu
@@ -904,7 +938,10 @@ class His(Common,Derived):
 
     out.v=v
     out.info['v']['name']=varname
-    out.info['v']['slice']='z=%d'%ind
+    if calc.isarray(ind):
+      out.info['v']['slice']='z= array %.2f to %.2f'%(ind.min(),ind.max())
+    else:
+      out.info['v']['slice']='z=%d'%ind
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
@@ -1213,8 +1250,20 @@ class His(Common,Derived):
 
     if times is None: times=range(0,self.time.size)
 
+    # depth or s_level: check is is float or if is negative!
+    isDepth=False
+    if not depth is None:
+       if calc.isiterable(depth): depth=np.asarray(depth)
+       if calc.isarray(depth):
+         isDepth=np.any(depth<0) or depth.kind!='i' 
+       else: isDepth=depth<0 or np.asarray(depth).dtype.kind!='i'
+
     out=Data()
-    out.msg=self.check_slice(varname,t=np.max(times),k=depth) 
+    if not depth is None and not isDepth:
+      out.msg=self.check_slice(varname,t=np.max(times),k=depth) 
+    else:
+      out.msg=self.check_slice(varname,t=np.max(times)) 
+
     if out.msg: return out
 
     # find nearest point:
@@ -1223,7 +1272,7 @@ class His(Common,Derived):
     i,j=np.where(dist==dist.min())
     i,j=i[0],j[0]
 
-    if depth>=0: arg={'s_SEARCH':depth}
+    if not depth is None and not isDepth: arg={'s_SEARCH':depth}
     else: arg={}
     v=self.use(varname,xiSEARCH=j,etaSEARCH=i,SEARCHtime=times,**arg).T
 
@@ -1236,14 +1285,28 @@ class His(Common,Derived):
       z=np.squeeze(z)
 
     # depth slice:
-    if not depth is None and self.hasz(varname) and depth<0:
+    if isDepth and self.hasz(varname):
       if v.ndim==2:
-        from matplotlib.dates import date2num
-        t=np.tile(date2num(self.time[times]),(v.shape[0],1))
-        v=calc.griddata(t,z,v,t[0],depth+np.zeros(t[0].shape),
-          extrap=opts.get('extrap',False),norm_xy=opts.get('norm_xy',False))
-          # norm_xy True may be needed!
-          # extrap also may be needed cos the 1st and last value may be masked!
+        # could use calc.griddata, but better use slicez cos data at
+        # different times may be independent!
+        if 0:
+          from matplotlib.dates import date2num
+          t=np.tile(date2num(self.time[times]),(v.shape[0],1))
+          v=calc.griddata(t,z,v,t[0],depth+np.zeros(t[0].shape),
+            extrap=opts.get('extrap',False),norm_xy=opts.get('norm_xy',False))
+            # norm_xy True may be needed!
+            # extrap also may be needed cos the 1st and last value may be masked!
+
+        else:
+          nt=len(times)
+          land_mask=np.ones((nt,1),dtype=v.dtype) # needed for slicez... not used here!        
+
+          v,vm=rt.slicez(v[...,np.newaxis],land_mask,
+               self.grid.h[i,j]*np.ones((nt,1),dtype=v.dtype), # bottom depth
+               zeta[:,np.newaxis],self.s_params,depth,spline=opts.get('spline',True))
+
+          v=np.ma.masked_where(vm,v)
+          v=v[...,0]
 
       else: # one time only
         v=np.interp(depth,z,v,left=np.nan,right=np.nan)
@@ -1268,7 +1331,7 @@ class His(Common,Derived):
 
     if 'z' in coords and self.hasz(varname):
       if not depth is None:
-        if depth>=0: out.z=z[depth,...]
+        if not isDepth: out.z=z[depth,...]
         else: out.z=depth+0*v
       else: out.z=z
       out.info['z']=dict(name='Depth',units='m')

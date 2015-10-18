@@ -37,17 +37,9 @@ def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
   tts,ttb,hc,Nr,vt,vs=sparams
 
   import rtools
-#  if vt==1 and vs==1:
-#    import rtools
-#  elif vt==2 and vs==1:
-#    import rtools_vs1vt2 as rtools
-#  elif vt==2 and vs==4:
-#    import rtools_vs4vt2 as rtools
-#  elif vt==2 and vs==2:
-#    import rtools_vs2vt2 as rtools
-#  else:
-#    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-#    return
+
+  try: level.shape==v.shape[1:]
+  except: level=np.ones(v.shape[1:],v.dtype)*level
 
   N,Ny,Nx=v.shape
   res=rtools.roms_slicez(v,h,zeta, tts,ttb,hc,Nr,vt,vs,

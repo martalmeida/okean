@@ -230,9 +230,10 @@ def griddata(x,y,v,xi,yi,**kargs):
 
 
   if norm_xy:
-    rxy=(x.max()-x.min())/(y.max()-y.min())
-    y=y*rxy
-    yi=yi*rxy
+    dx=1.*(x.max()-x.min())
+    dy=1.*(y.max()-y.min())
+    x=100*(x-x.min())/dx
+    y=100*(y-y.min())/dy
 
  
   # interp/extrap:
@@ -348,8 +349,10 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
       if extrap:
 
         # add corners:
-        xv=np.asarray([xi.min()-1,xi.max()+1,xi.max()+1,xi.min()-1])
-        yv=np.asarray([yi.min()-1,yi.min()-1,yi.max()+1,yi.max()+1])
+        dx=(xi.max()-xi.min())/(1.*xi.size)
+        dy=(yi.max()-yi.min())/(1.*yi.size)
+        xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
+        yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
         vv=np.zeros(4,v.dtype)
         mv=np.zeros(4,'bool')
 

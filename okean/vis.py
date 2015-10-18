@@ -63,7 +63,8 @@ if 1:
     default['field.clim']  = False
     default['field.cvals'] = False
     default['field.cmap']  = False
-    default['field.linecolors']  = False
+    default['field.linecolors']  = None
+    default['field.linewidths']  = None
 
     # about vector field:
     default['vfield.options']={'units':'x','scale':None}
@@ -240,6 +241,7 @@ class Vis(visCfg):
   def init_figure(self,**kargs):
     fig=kargs.get('fig',None) # use existing fig; create a new one if True
     ax=kargs.get('ax',None) # use existing axes
+    if ax: fig=ax.figure
 
     self.init_handles()
 
@@ -264,7 +266,6 @@ class Vis(visCfg):
 
       # figure:
       if openfig:
-#        print 'NEW FIG!'
         self.fig=pl.figure(figsize=self.config['figure.figsize'],
                            facecolor=self.config['figure.facecolor'],
                            edgecolor=self.config['figure.edgecolor'])
@@ -289,6 +290,14 @@ class Vis(visCfg):
       self.cbax.set(visible=False)
     else: self.cbax=False
 
+
+  def inherit(self,parent):
+    self.fig=parent.fig
+    self.ax=parent.ax
+    self.init_handles()
+    if hasattr(parent,'map'):
+       self.map=parent.map
+       self.map_info_copy(parent)
 
   def clear_figure(self):
     self.fig.clf()
@@ -488,6 +497,8 @@ class Vis(visCfg):
 
     if self.config['field.linecolors']:
       args['colors']=self.config['field.linecolors']
+    if self.config['field.linewidths']:
+      args['linewidths']=self.config['field.linewidths']
 
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
       self.handles['mappable']+=[meth(x,y,v,**args)]
@@ -637,6 +648,17 @@ class Data(Vis):
     print ' == msg == %s'%msg
 
   def plot(self,coords='auto',proj='auto',labels=True,extras=True,isExtra=0,**kargs):
+    ax=kargs.pop('ax',None)
+    if ax: self.ax=ax
+
+    parent=kargs.pop('inherit',0)
+    if parent:
+      self.inherit(parent)
+      isExtra=1
+
+    if isExtra: labels=False
+    
+
     debug_lev=kargs.pop('debug_level',0)
     self.set_param(**kargs)
 
@@ -678,15 +700,20 @@ class Data(Vis):
        np.all(x>=-360) and np.all(x<=360) and np.all(y>=-90) and np.all(y<=90): proj=True
     elif proj=='auto': proj=False
 
+
+
     if hasattr(self,'fig') and pl.fignum_exists(self.fig.number):
       if isExtra: pass
       else:
         if debug_lev==2: print ' -> will clear axes'
-###        self.init_clear()
         self.clear_axes()
     else:
-      if debug_lev==2: print ' -> will create new fig'
-      self.init_figure()
+      if hasattr(self,'ax'):
+        if debug_lev==2: print ' -> will use previous ax'
+        self.init_figure(ax=self.ax)
+      else:
+        if debug_lev==2: print ' -> will create new fig'
+        self.init_figure()
 
     if proj and not isExtra:
       if not hasattr(self,'map') or self.map_info_get()!=self.map_info_current:
@@ -719,7 +746,15 @@ class Data(Vis):
         self.draw_vector_field(x,y,self.v[0],self.v[1])
       else:
         self.draw_scalar_field(x,y,self.v)
-        if not isExtra: self.draw_colorbar()
+        if not isExtra:
+          lc =self.config['field.linecolors'] # check if only one color:
+          if isinstance(lc,basestring): oneColor=1
+          else:
+            try: oneColor=len(lc)==1
+            except: oneColor=0
+
+          if not (self.config['field.plot']=='contour'  and oneColor):
+            self.draw_colorbar()
 
       if labels:
         tit=vlab
@@ -755,14 +790,19 @@ class Data(Vis):
 
     if self.extra and extras:
       for e in self.extra:
-        e.fig=self.fig
-        e.ax=self.ax
-        if 0:
-          e.handles=self.handles # do I need this line!??
-        else: e.init_handles()
-        if hasattr(self,'map'):
-           e.map=self.map
-           e.map_info_copy(self)
-
+        e.inherit(self)
         if debug_lev==2: print ' -> will plot extras'
-        e.plot(labels=False,isExtra=1)
+        e.plot(isExtra=1,debug_level=debug_lev)
+
+#      for e in self.extra:
+#        e.fig=self.fig
+#        e.ax=self.ax
+#        if 0:
+#          e.handles=self.handles # do I need this line!??
+#        else: e.init_handles()
+#        if hasattr(self,'map'):
+#           e.map=self.map
+#           e.map_info_copy(self)
+#
+#        if debug_lev==2: print ' -> will plot extras'
+#        e.plot(labels=False,isExtra=1)

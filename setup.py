@@ -100,6 +100,7 @@ if __name__ == '__main__':
                       'okean.roms.inputs',
                       'okean.roms.gui',
                       'okean.nc',
+                      'okean.util',
                       'okean.datasets'],
 #                      'okean.data'],
           license = 'EUPL',

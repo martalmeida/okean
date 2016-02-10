@@ -63,7 +63,8 @@ if 1:
     default['field.clim']  = False
     default['field.cvals'] = False
     default['field.cmap']  = False
-    default['field.linecolors']  = None
+#    default['field.linecolors']  = None
+    default['field.extend']  = None
     default['field.linewidths']  = None
 
     # about vector field:
@@ -367,20 +368,21 @@ class Vis(visCfg):
     # proj options: 
     opts=self.config['proj.options']
     if self.config['proj.name'] in ('spstere','npstere'):
-      lon_0 = opts.get('lon_0',0)
+      opts['lon_0'] = opts.get('lon_0',0)
       if self.config['proj.name']=='spstere': 
-        blat  = opts.get('boundinglat',ylim[1])
+        opts['boundinglat'] = opts.get('boundinglat',ylim[1])
       else:
-        blat  = opts.get('boundinglat',ylim[0])
+        opts['boundinglat'] = opts.get('boundinglat',ylim[0])
 
-      opts['lon_0']       = lon_0
-      opts['boundinglat'] = blat
+    elif self.config['proj.name'] == 'stere':
+      opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+      opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+      opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
+      
     else:
-      lon_0=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
-      lat_0=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+      opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+      opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
 
-      opts['lon_0'] = lon_0
-      opts['lon_0'] = lat_0
 
     # load proj from cache or create new:
     self.map_info_current=self.map_info_get()
@@ -396,13 +398,21 @@ class Vis(visCfg):
       if self.config['proj.name'] in ('spstere','npstere'):
         m = Basemap(projection=self.config['proj.name'],
                   resolution=self.config['proj.resolution'],
-                  lon_0=lon_0,boundinglat=blat)
+#                  lon_0=lon_0,boundinglat=blat)
+                  **opts)
+      elif self.config['proj.name'] == 'stere':
+        m = Basemap(projection=self.config['proj.name'],
+                  resolution=self.config['proj.resolution'],
+                  urcrnrlon=xlim[1], urcrnrlat=ylim[1],
+                  llcrnrlon=xlim[0], llcrnrlat=ylim[0],
+                  **opts)
       else:
         m = Basemap(projection=self.config['proj.name'], lat_ts=0.0,
                   resolution=self.config['proj.resolution'],
                   urcrnrlon=xlim[1], urcrnrlat=ylim[1],
                   llcrnrlon=xlim[0], llcrnrlat=ylim[0],
-                  lon_0=lon_0,lat_0=lat_0)
+                  **opts)
+#                  lon_0=lon_0,lat_0=lat_0)
 
       cch.store(cacheLab,m,'localfile')
 
@@ -465,7 +475,7 @@ class Vis(visCfg):
         ylim=self.map.llcrnrlat,self.map.urcrnrlat
         ylim=self.map.latmin,self.map.latmax
         parallels=ticks.loose_label(ylim[0],ylim[1])
-      else: parllels=self.config['proj.parallels_vals']
+      else: parallels=self.config['proj.parallels_vals']
       self.map.drawparallels(parallels,ax=self.ax,**self.config['proj.parallels'])
 
 
@@ -483,9 +493,22 @@ class Vis(visCfg):
 
     args={}
     if self.config['field.cmap']:
-      if isinstance(self.config['field.cmap'],basestring): cmap=eval('pl.cm.'+self.config['field.cmap'])
+      # accepted cmap: cmapname; list of colors, or one color for contours
+
+      if isinstance(self.config['field.cmap'],basestring):
+        try:
+          # wont work for one color, like field.cmap='k'
+          cmap=eval('pl.cm.'+self.config['field.cmap'])
+        except:
+          cmap=[self.config['field.cmap']]
+
       else: cmap=self.config['field.cmap']
-      args['cmap']=cmap
+
+      try: # list of colors for contour of contourf
+        iter(cmap)
+        args['colors']=cmap
+      except:
+        args['cmap']=cmap
 
     x,y=self._convCoord(x,y)
     meth=eval('self.ax.'+self.config['field.plot'])
@@ -495,19 +518,21 @@ class Vis(visCfg):
       args['vmin']=vmin
       args['vmax']=vmax
 
-    if self.config['field.linecolors']:
-      args['colors']=self.config['field.linecolors']
+#    if self.config['field.linecolors']:
+#      args['colors']=self.config['field.linecolors']
     if self.config['field.linewidths']:
       args['linewidths']=self.config['field.linewidths']
+
+    if self.config['field.extend']:
+      args['extend']=self.config['field.extend']
 
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
       self.handles['mappable']+=[meth(x,y,v,**args)]
     elif self.config['field.plot'] in ('contour','contourf'):
-       if self.config['field.plot'].startswith('contour'):
-         # contour(f) does not like bad values in coordinates, even when masked
-         # so:
-         if np.ma.isMA(x): x[x.mask]=x.mean()
-         if np.ma.isMA(y): y[y.mask]=y.mean()
+       # contour(f) does not like bad values in coordinates, even when masked
+       # so:
+       if np.ma.isMA(x): x[x.mask]=x.mean()
+       if np.ma.isMA(y): y[y.mask]=y.mean()
 
        if self.config['field.cvals'] is False: vals=20
        else: vals=self.config['field.cvals']
@@ -556,10 +581,12 @@ class Vis(visCfg):
       opts=self.config['colorbar.options']
       w,h=self.config['colorbar.ax_position'][2:]
       if w>h: opts['orientation']='horizontal'
-      self.cb=pl.colorbar(self.handles['mappable'][-1],cax=self.cbax,**opts)
+      try:
+        self.cb=pl.colorbar(self.handles['mappable'][-1],cax=self.cbax,**opts)
+        if  self.cbbg: self.cbbg.set(visible=True)
+        if  self.cbax: self.cbax.set(visible=True)
+      except: pass # wont work if one contour
 
-    if  self.cbbg: self.cbbg.set(visible=True)
-    if  self.cbax: self.cbax.set(visible=True)
 
 
   def draw_1d(self,x=None,y=None):
@@ -657,10 +684,15 @@ class Data(Vis):
       isExtra=1
 
     if isExtra: labels=False
-    
 
     debug_lev=kargs.pop('debug_level',0)
     self.set_param(**kargs)
+
+    # make vfield vars 2d to simplify the process:
+    if isinstance(self.v,tuple) and self.v[0].ndim==1:
+      self.x=self.x[:,np.newaxis]
+      self.y=self.y[:,np.newaxis]
+      self.v=self.v[0][:,np.newaxis],self.v[1][:,np.newaxis]
 
     try:
       if isinstance(self.v,tuple):
@@ -708,7 +740,7 @@ class Data(Vis):
         if debug_lev==2: print ' -> will clear axes'
         self.clear_axes()
     else:
-      if hasattr(self,'ax'):
+      if hasattr(self,'ax') and pl.fignum_exists(self.ax.figure.number):
         if debug_lev==2: print ' -> will use previous ax'
         self.init_figure(ax=self.ax)
       else:
@@ -740,23 +772,25 @@ class Data(Vis):
     else: vlab = '%s (%s)'%(self.info['v']['name'],vunits)
 
 
-    if ndim==2:
-      if debug_lev==2: print ' -> will draw 2d'
-      if isinstance(self.v,tuple):
-        self.draw_vector_field(x,y,self.v[0],self.v[1])
-      else:
+    # vifield, 1d or 2d
+    if isinstance(self.v,tuple):
+      if debug_lev==2: print ' -> will draw vfield'
+      self.draw_vector_field(x,y,self.v[0],self.v[1])
+
+    # sclar:
+    else:
+      if ndim==2:
+        if debug_lev==2: print ' -> will draw 2d'
         self.draw_scalar_field(x,y,self.v)
-        if not isExtra:
-          lc =self.config['field.linecolors'] # check if only one color:
-          if isinstance(lc,basestring): oneColor=1
-          else:
-            try: oneColor=len(lc)==1
-            except: oneColor=0
+        if not isExtra: self.draw_colorbar()
 
-          if not (self.config['field.plot']=='contour'  and oneColor):
-            self.draw_colorbar()
+      elif ndim==1:
+        if debug_lev==2: print ' -> will draw 1d'
+        self.draw_1d(x,y)
 
-      if labels:
+    # add labels:
+    if labels:
+      if ndim==2:
         tit=vlab
         if not self.t is None:
           if isinstance(self.t,datetime.datetime):
@@ -772,16 +806,13 @@ class Data(Vis):
           if not xlab=='Unk': self.draw_label('xlabel',xlab)
           if not ylab=='Unk': self.draw_label('ylabel',ylab)
 
-
-    elif ndim==1:
-      if debug_lev==2: print ' -> will draw 1d'
-      self.draw_1d(x,y)
-      if labels:
+      elif ndim==1:
         if not xlab=='Unk': self.draw_label('xlabel',xlab)
         if yname=='v':
           if not vlab=='Unk': self.draw_label('title',vlab)
         else:
           if not ylab=='Unk': self.draw_label('ylabel',ylab)
+
 
     if proj and not isExtra:
       if debug_lev==2: print ' -> will draw projection', self.info['v']

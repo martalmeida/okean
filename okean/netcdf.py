@@ -85,6 +85,8 @@ def date2num(tdate,tunits,calendar='standard'):
 def nctime(filename,varname,interface='auto',**kargs):
   time=use(filename,varname,interface=interface,**kargs)
   units=vatt(filename,varname,'units')
+  try: cal=vatt(filename,varname,'calendar')
+  except: cal='standard'
 
   # dates like 2004-01-01T00:00:00Z not supported by old varsions of
   # netcdftime (older than 0.9.2, dont really know which version).
@@ -92,7 +94,7 @@ def nctime(filename,varname,interface='auto',**kargs):
 
   units=units.replace('T',' ').replace('Z',' ')
   units=' '.join(units.split())
-  return num2date(time,units)
+  return num2date(time,units,cal)
 
 
 def use(filename,varname,interface='auto',**kargs):

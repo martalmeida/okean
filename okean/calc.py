@@ -1150,6 +1150,9 @@ class Interp1_cub(InterpCommon):
 
 class Interp1_spl(InterpCommon):
   def __init__(self,x,y,m0=None,m1=None,im0=1,im1=1):
+    '''
+    x is assumed to be strictly increasing (see ext/pppack.f90)
+    '''
     tau=x
     n=x.size
     c=np.zeros((4,n),'f')
@@ -1188,4 +1191,14 @@ class Interp1_spl(InterpCommon):
       res[j]=pppack.ppvalu(self.tau, self.c[:,:-1],x[j],jderiv)
 
     return res
+
+def leggauss_ab(N,a=-1,b=1):
+  '''Gauss-Legendre quadrature from a to b
+  Based on numpy.polynomial.legendre.leggauss
+  '''
+  x,w=np.polynomial.legendre.leggauss(N)
+  # Linear map from -1,1 to a,b
+  x=(a*(1-x)+b*(1+x))/2.
+  w=w*(b-a)/2.
+  return x,w
 

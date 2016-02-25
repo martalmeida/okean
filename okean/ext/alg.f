@@ -1,9 +1,11 @@
       subroutine meetpoint(x1,y1,x2,y2,res,n1,n2,N)
-       integer n1, n2, i, j, N
-       real x1(n1), x2(n2), y1(n1), y2(n2)
-       real Xa,Ya,xa_,ya_,Xb,Yb,xb_,yb_,dx1,dy1,dx2,dy2
-       real x,y,m1,m2
-       real res(2,(n1-1)*(n2-1))
+       implicit none
+       integer :: n1, n2, i, j, N
+       integer, parameter :: r8=8
+       real (kind=r8) :: x1(n1), x2(n2), y1(n1), y2(n2)
+       real (kind=r8) :: Xa,Ya,xa_,ya_,Xb,Yb,xb_,yb_,dx1,dy1,dx2,dy2
+       real (kind=r8) :: x,y,m1,m2
+       real (kind=r8) :: res(2,(n1-1)*(n2-1))
        logical cond1,cond2
 
 Cf2py intent(out) res,N
@@ -38,8 +40,17 @@ Cf2py intent(in) :: n2=shape(x2,0)
                else
                   y = 1./(m1-m2) *
      &                ( m1*y2(j) - m2*y1(i) + m1*m2*(x1(i)-x2(j)))
+
+                  ! if some slope is zero, fix y (prev cals has some
+                  ! errors
+                  if (m1.eq.0.) then
+                    y=y1(i)
+                  elseif (m2.eq.0.) then
+                    y=y2(j)
+                  endif
+
                   if (m1.ne.0.) then
-                     x = (y-y1(i)+m1*x1(i))/m1
+                    x = (y-y1(i)+m1*x1(i))/m1
                   elseif (m2.ne.0.) then
                     x = (y-y2(j)+m2*x2(j))/m2
                   endif
@@ -58,7 +69,7 @@ Cf2py intent(in) :: n2=shape(x2,0)
              endif
 
              cond2=(x.ge.max(xa_,xb_)).and.(x.le.min(Xa,Xb)).and.
-     &            (y.ge.max(ya_,yb_)).and.(y.le.min(Ya,Yb))
+     &             (y.ge.max(ya_,yb_)).and.(y.le.min(Ya,Yb))
 
              if (cond1.and.cond2) then
                N=N+1

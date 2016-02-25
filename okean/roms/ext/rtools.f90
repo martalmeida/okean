@@ -107,7 +107,11 @@ Cf2py intent(out) s
      & Vstretching)
       implicit none
       integer :: N,k,Vstretching
-      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+c      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+c      not a good idea ... check:
+c      https://sysbio.ioc.ee/projects/f2py2e/FAQ.html#q-what-if-fortran-90-code-uses-type-spec-kind-kind
+c      thus:
+      integer, parameter :: r8 = 8
       real (kind=r8) :: theta_s,theta_b,sc_r(N),Cs_r(N),sc_w(0:N),
      & Cs_w(0:N)
       real (kind=r8) :: cff1,cff2,ds,sc__w,sc__r
@@ -262,9 +266,10 @@ Cf2py intent(out) Cs_w
 
       subroutine s_levels(h,zeta,theta_s,theta_b,hc,N,Ny,Nx,z_r,z_w,
      & Vtransform,Vstretching)
-      implicit None
+      implicit none
       integer :: N,Ny,Nx, k,j,i, Vtransform,Vstretching
-      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+c      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+      integer, parameter :: r8 = 8
       real (kind=r8) :: h(Ny,Nx),zeta(Ny,Nx),hc, theta_s, theta_b
       real (kind=r8) :: z_r(N,Ny,Nx), z_w(0:N,Ny,Nx)
 

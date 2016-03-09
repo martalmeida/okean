@@ -81,9 +81,9 @@ Cf2py intent(out) s
 
             if (z_w(0,i,j).gt.lev(i,j)) then
               s(i,j)=-99.
-            elseif (z_w(N,i,j).lt.lev(i,j)) then
+            elseif (z_w(Nr,i,j).lt.lev(i,j)) then
               if (SN) then
-                s(j,i)=-99.
+                s(i,j)=-99.
               else
                 s(i,j)=v(N,i,j)
               endif

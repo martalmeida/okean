@@ -933,10 +933,8 @@ class His(Common,Derived):
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
-    v,mask=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans,spline)
-    v=np.ma.masked_where(mask,v)
+    out.v=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans,spline)
 
-    out.v=v
     out.info['v']['name']=varname
     if calc.isarray(ind):
       out.info['v']['slice']='z= array %.2f to %.2f'%(ind.min(),ind.max())

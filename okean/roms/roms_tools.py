@@ -47,7 +47,8 @@ def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
                          N,Ny,Nx)
 
   mask=np.where(res==-99.,0,1)*maskv==0
-  return res, mask
+  res=np.ma.masked_where(mask,res)
+  return res
 
 
 def s_levels(h,zeta,sparams,rw=False):

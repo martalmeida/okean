@@ -702,14 +702,7 @@ def meetpoint(x1,y1,x2,y2):
   from alg import meetpoint as meetp
   xy=[]
   xyi,N=meetp(x1,y1,x2,y2,len(x1),len(x2))
-  xi=xyi[0]
-  yi=xyi[1]
-  for i in range(N):
-    if  (xi[i],yi[i]) not in xy:
-       xy+=  [(xi[i],yi[i])]
-
-  ty=x1.dtype
-  return np.array([i for i,j in xy],ty),np.array([j for i,j in xy],ty)
+  return xyi[0,:N],xyi[1,:N]
 
 
 def matrix_paths(x,y):

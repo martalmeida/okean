@@ -34,6 +34,7 @@ if __name__=='__main__':
   except: pass
 
   ind=None
+  meth=None
   if not z is None:
     z=float(z)
     if z>=0 or z==-1: meth,ind='slicek', int(z)
@@ -61,6 +62,9 @@ if __name__=='__main__':
     meth='slicell'
 
   if not t is None: t=int(t)
+
+  if not meth: # let us assume slicek, for instance to plot grid variables!
+    meth='slicek'
 
   if coords is None: coords=roms.His._default_coords(meth)
   else: coords=','.join(sorted(coords.split(','))) 

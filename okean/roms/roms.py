@@ -962,7 +962,7 @@ class His(Common,Derived):
          out.info['y']=dict(name='Distance',units='km')
 
     if 'z' in coords:
-      out.z=ind+np.zeros(v.shape)
+      out.z=ind+np.zeros(out.v.shape)
       out.info['z']=dict(name='Depth',units='m')
 
     if 't' in coords and self.hast(varname): out.t=self.time[time]

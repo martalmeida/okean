@@ -443,6 +443,7 @@ class rgui:
 
     optmenu.add_separator()
     projs='merc','cyl','eqdc','mill','aeqd','poly','gnom','stere'
+    projs='merc','tmerc','lcc','cyl','eqdc','mill','aeqd','poly','gnom','stere'
     prj=add_sub(optmenu,'projection',projs,self.show,self.options['projection'])
 
 
@@ -1732,8 +1733,28 @@ class rgui:
     if self.swapp['last_proj']!=curr_proj:
       self.swapp['last_proj']=curr_proj
 
-      if True:#curr_proj['proj']=='merc':
-        map = Basemap(projection=curr_proj['proj'], lat_ts=0.0,
+      if curr_proj['proj'] in ['lcc','stere']:
+        # setup lambert conformal basemap.
+        # lat_1 is first standard parallel.
+        # lat_2 is second standard parallel (defaults to lat_1).
+        # lon_0,lat_0 is central point.
+        r10=6380e3*np.cos(latlims[0]*np.pi/180)
+        r11=6380e3*np.cos(latlims[1]*np.pi/180)
+        r1=np.max([r10,r11])
+        dx=(lonlims[1]-lonlims[0])*np.pi/180
+        dy=(latlims[1]-latlims[0])*np.pi/180
+        w=r1*dx
+        h=6380e3*dy*1.2
+        map = Basemap(projection=curr_proj['proj'],
+                      resolution=curr_proj['resolution'],
+                      lon_0=0.5*(lonlims[0]+lonlims[1]),
+                      lat_0=0.5*(latlims[0]+latlims[1]),
+                      lat_1=0.5*(latlims[0]+latlims[1]),
+                      width=w,
+                      height=h)
+
+      elif True:#curr_proj['proj']=='merc':
+        map = Basemap(projection=curr_proj['proj'], #lat_ts=0.0,
                       resolution=curr_proj['resolution'],
                       urcrnrlon=lonlims[1], urcrnrlat=latlims[1],
                       llcrnrlon=lonlims[0], llcrnrlat=latlims[0],

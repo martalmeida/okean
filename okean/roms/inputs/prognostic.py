@@ -219,39 +219,44 @@ def load_data(f,quiet=0,**kargs):
   # time:
   # file may have one or several times. If several, time dim must be given
   # with kargs inds!
-  if not quiet: print '  loading time...'
-  if t_units:
-    times=netcdf.use(ncTime,sett.time_name)
-    times=netcdf.num2date(times,t_units)
+  # but file may also have no time dim or time name !
+  if sett.time_name:
+    if not quiet: print '  loading time...'
+    if t_units:
+      times=netcdf.use(ncTime,sett.time_name)
+      times=netcdf.num2date(times,t_units)
+    else:
+      times=netcdf.nctime(ncTime,sett.time_name)
+
+    if inds.has_key(sett.tdim):
+      try: tind=dts.parse_date(inds[sett.tdim])
+      except: tind=inds[sett.tdim] # is an integer, for instance
+
+      if isinstance(tind,datetime.datetime):
+        tind,=np.where(times==tind)
+        if tind.size:
+          tind=tind[0]
+          inds[sett.tdim]=tind # update inds to extract other variables
+        else:
+          Msg='date not found'
+          msg+='\n'+Msg
+          return res,msg+' ERROR'
+
+      date=times[tind]
+      if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
+
+    elif times.size==1:
+      date=times[0]
+      if not quiet: print '    date= %s' % date.isoformat(' ')
+    else: # must provide tind as input!!
+      Msg='several dates in file... provice tind!'
+      msg+='\n'+Msg
+      return res,msg+' ERROR'
+
+    res['date'] = date
   else:
-    times=netcdf.nctime(ncTime,sett.time_name)
-
-  if inds.has_key(sett.tdim):
-    try: tind=dts.parse_date(inds[sett.tdim])
-    except: tind=inds[sett.tdim] # is an integer, for instance
-
-    if isinstance(tind,datetime.datetime):
-      tind,=np.where(times==tind)
-      if tind.size:
-        tind=tind[0]
-        inds[sett.tdim]=tind # update inds to extract other variables
-      else:
-        Msg='date not found'
-        msg+='\n'+Msg
-        return res,msg+' ERROR'
-
-    date=times[tind]
-    if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
-
-  elif times.size==1:
-    date=times[0]
-    if not quiet: print '    date= %s' % date.isoformat(' ')
-  else: # must provide tind as input!!
-    Msg='several dates in file... provice tind!'
-    msg+='\n'+Msg
-    return res,msg+' ERROR'
-
-  res['date'] = date
+    if not quiet: print '    warning: not using time !!'
+    res['date']=0
 
   empty3d=np.zeros([res['NZ'],res['NY'],res['NX']])
   empty2d=np.zeros([res['NY'],res['NX']])

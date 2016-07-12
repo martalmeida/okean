@@ -235,11 +235,11 @@ def griddata(x,y,v,xi,yi,**kargs):
     x=100*(x-x.min())/dx
     y=100*(y-y.min())/dy
 
- 
+
   # interp/extrap:
   res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
-  try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
-  except: res=xi*np.nan
+#  try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
+#  except: res=xi*np.nan
 
   # final extrap:
   if finalextrap:
@@ -252,7 +252,9 @@ def griddata(x,y,v,xi,yi,**kargs):
     imask=False
     # check if there is a mask!
     if mask2d is False:
-      if np.ma.isMA(v) and np.ma.count_masked(v)>0: imask=v.mask.astype('int8')
+      if np.ma.isMA(v) and np.ma.count_masked(v)>0:
+        if v.ndim==3: imask=v[-1].mask.astype('int8')
+        else: imask=v.mask.astype('int8')
     else: imask=mask2d.astype('int8')
 
     if not imask is False:
@@ -292,7 +294,7 @@ def _griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs):
     xi,yi=rot2d(xi,yi,np.pi/3.)
 
   if v.ndim==x.ndim+1:
-    tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d)
+    tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d,**kargs)
     res=np.zeros([v.shape[0]]+list(tmp.shape),dtype=v.dtype)
     res[0,...]=tmp
     for i in range(1,v.shape[0]):
@@ -345,8 +347,7 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
 
   else:
     import  matplotlib.tri as mtri
-    if not tri:
-      if extrap:
+    if extrap:
 
         # add corners:
         dx=(xi.max()-xi.min())/(1.*xi.size)
@@ -366,6 +367,7 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
         v=np.ma.hstack((v,vv))
         mask=np.hstack((mask,mv))
 
+    if not tri:
       tri=mtri.Triangulation(x[~mask],y[~mask])
 
     if tri_type=='cubic':

@@ -125,7 +125,7 @@ class Common:
 
     return False
 
-  def var_at(self,v,_3d=True):
+  def var_at(self,v):##,_3d=True):
     '''
     returns location of the variable in the 2d/3d grid
     Possible values are u,v,r(rho), p(psi)
@@ -133,13 +133,22 @@ class Common:
     '''
     dims=netcdf.vdim(self.nc,v).keys()
 
-    if _3d and 's_w' in dims: return 'w'
-    elif 'xi_u'   in dims or   'eta_u'   in dims: return 'u'
-    elif 'xi_v'   in dims or   'eta_v'   in dims: return 'v'
-    elif 'xi_psi' in dims and  'eta_psi' in dims: return 'p'
-    elif 'xi_rho' in dims and  'eta_rho' in dims: return 'r'
+    hLoc='r' # r,u,v
+    vLoc='r' # r,w
 
-    return False
+    if 's_w' in dims: vLoc='w'
+    if 'xi_u'     in dims or   'eta_u'   in dims: hLoc='u' # or instead of and cos of agrif ...
+    elif 'xi_v'   in dims or   'eta_v'   in dims: hLoc='v'
+    elif 'xi_psi' in dims and  'eta_psi' in dims: hLoc='p'
+    return hLoc,vLoc
+
+    #if _3d and 's_w' in dims: return 'w'
+    #elif 'xi_u'   in dims or   'eta_u'   in dims: return 'u'
+    #elif 'xi_v'   in dims or   'eta_v'   in dims: return 'v'
+    #elif 'xi_psi' in dims and  'eta_psi' in dims: return 'p'
+    #elif 'xi_rho' in dims and  'eta_rho' in dims: return 'r'
+    #
+    #return False
 
 
 class Grid(Common):
@@ -321,9 +330,11 @@ class Grid(Common):
 
     return x[j,i],y[j,i],h[j,i],m[j,i]
 
-  def s_levels(self,sparams,zeta=0,h=False,ruvpw='r',i=False,j=False,k=False):
-    ruvpw=ruvpw[0]
-    isW=ruvpw=='w'
+#####  def s_levels(self,sparams,zeta=0,h=False,ruvpw='r',i=False,j=False,k=False):
+  def s_levels(self,sparams,zeta=0,h=False,loc='rr',i=False,j=False,k=False):
+    hLoc,vLoc=loc
+####    ruvpw=ruvpw[0]
+####    isW=ruvpw=='w'
 
     if h is False:
       h=self.h
@@ -334,12 +345,14 @@ class Grid(Common):
       zeta=np.tile(zeta,h.shape).astype(h.dtype)
 
     if h.ndim==2:
-      h=rt.rho2uvp(h,ruvpw)
-      zeta=rt.rho2uvp(zeta,ruvpw)
+      h=rt.rho2uvp(h,hLoc)
+      zeta=rt.rho2uvp(zeta,hLoc)
 
-    zr,zw=rt.s_levels(h,zeta,sparams)
-    if isW:z=zw
-    else: z=zr
+    z=rt.s_levels(h,zeta,sparams,rw=vLoc)
+###    zr,zw=rt.s_levels(h,zeta,sparams)
+###    if isW:z=zw
+###    if vLoc=='w': z=zw
+###    else: z=zr
 
     if k is False: k=slice(None)
     if j is False: j=slice(None)
@@ -620,14 +633,27 @@ class His(Common,Derived):
     self.s_params=rt.s_params(self.nc)
 
 
-  def path_s_levels(self,time,x,y,rw='r'):
+  def path_s_levels(self,time,x,y,rw='r',**kargs):
+    inds=kargs.get('inds',None)
+
     xr,yr,h,m=self.grid.vars()
     zeta=self.use('zeta',SEARCHtime=time)
+
+    if inds:
+      i0,i1=inds['xi']
+      j0,j1=inds['eta']
+
+      xr=xr[j0:j1,i0:i1]
+      yr=yr[j0:j1,i0:i1]
+      h=h[j0:j1,i0:i1]
+      m=m[j0:j1,i0:i1]
+      zeta= zeta[j0:j1,i0:i1]
 
     if np.ma.isMA(zeta): h=np.ma.masked_where(zeta.mask,h)
     else:# probably a clm/ini file. Mask maskc point (pygridgen complex grid):
       if 'maskc' in netcdf.varnames(self.grid.nc):
         mc=self.grid.use('maskc')
+        if inds: mc=mc[j0:j1,i0:i1]
         h=np.ma.masked_where(mc==0,h)
         zeta=np.ma.masked_where(mc==0,zeta)
 
@@ -639,8 +665,10 @@ class His(Common,Derived):
     return np.ma.masked_where(np.isnan(z),z)
 
 
-  def s_levels(self,time,ruvpw='r',i=False,j=False,k=False,extrapZeta=False):
-    ruvpw=ruvpw[0]
+###  def s_levels(self,time,ruvpw='r',i=False,j=False,k=False,extrapZeta=False):
+  def s_levels(self,time,loc='rr',i=False,j=False,k=False,extrapZeta=False):
+##    ruvpw=ruvpw[0]
+    hLoc,vLoc=loc
 
     h=self.grid.h
     zeta=self.use('zeta',SEARCHtime=time)
@@ -649,10 +677,10 @@ class His(Common,Derived):
       if not calc.ismarray(zeta): zeta=np.ma.masked_where(self.grid.mask==0,zeta)
       zeta=calc.mask_extrap(self.grid.lon,self.grid.lat,zeta)
 
-    h=rt.rho2uvp(h,ruvpw)
-    zeta=rt.rho2uvp(zeta,ruvpw)
+    h=rt.rho2uvp(h,hLoc) ##########ruvpw)
+    zeta=rt.rho2uvp(zeta,hLoc) ###########ruvpw)
 
-    z=rt.s_levels(h,zeta,self.s_params,rw=ruvpw)
+    z=rt.s_levels(h,zeta,self.s_params,rw=vLoc) ##########ruvpw)
 
     if k is False: k=slice(None)
     if j is False: j=slice(None)
@@ -729,7 +757,7 @@ class His(Common,Derived):
 
     # add mask if not masked:
     if not np.ma.isMA(v):
-      m=self.grid.vars(ruvp=self.var_at(varname),i=ind)[-1]
+      m=self.grid.vars(ruvp=self.var_at(varname)[0],i=ind)[-1]
       if v.ndim==2: m=np.tile(m,(v.shape[0],1))
       v=np.ma.masked_where(m==0,v)
 
@@ -741,11 +769,12 @@ class His(Common,Derived):
 
     # coords:
     if 'z' in coords and v.ndim==2:
-      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),i=ind)
+#######   out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),i=ind)
+      out.z=self.s_levels(time=time,loc=self.var_at(varname),i=ind)
       out.info['z']=dict(name='Depth',units='m')
 
     if any([i in coords for i in 'xyd']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),i=ind)
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0],i=ind)
 
     if 'd' in coords:
       d=calc.distance(x,y)
@@ -795,7 +824,7 @@ class His(Common,Derived):
 
     # add mask if not masked:
     if not np.ma.isMA(v):
-      m=self.grid.vars(ruvp=self.var_at(varname),j=ind)[-1]
+      m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)[-1]
       if v.ndim==2: m=np.tile(m,(v.shape[0],1))
       v=np.ma.masked_where(m==0,v)
 
@@ -807,11 +836,12 @@ class His(Common,Derived):
 
     # coords:
     if 'z' in coords and v.ndim==2:
-      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),j=ind)
+######      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),j=ind)
+      out.z=self.s_levels(time=time,loc=self.var_at(varname),j=ind)
       out.info['z']=dict(name='Depth',units='m')
 
     if any([i in coords for i in 'xyd']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),j=ind)
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)
 
     if 'd' in coords:
       d=calc.distance(x,y)
@@ -861,7 +891,7 @@ class His(Common,Derived):
 
     # add mask if not masked:
     if not np.ma.isMA(v): 
-      m=self.grid.vars(ruvp=self.var_at(varname))[-1]
+      m=self.grid.vars(ruvp=self.var_at(varname)[0])[-1]
       v=np.ma.masked_where(m==0,v)
 
     out.v=v
@@ -873,12 +903,13 @@ class His(Common,Derived):
 
     # coords:
     if 'z' in coords and self.hasz(varname):
-      out.z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
+#####      out.z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
+      out.z=self.s_levels(time,k=ind,loc=self.var_at(varname))
       out.info['z']=dict(name='Depth',units='m')
 
 
     if any([i in coords for i in 'xy']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
+      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
 
     if 'x' in coords:
        if self.grid.is_spherical:
@@ -929,7 +960,7 @@ class His(Common,Derived):
     if out.msg: return out##None,au
 
     v=self.use(varname,SEARCHtime=time)
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
+    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
@@ -1003,7 +1034,7 @@ class His(Common,Derived):
     if X.ndim>1: X=np.squeeze(X)
     if Y.ndim>1: Y=np.squeeze(X)
 
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname))
+    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
     if True: # extrat only portion of data needed:
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
       xi='%d:%d'%(i0,i1)
@@ -1014,13 +1045,12 @@ class His(Common,Derived):
 
       x=x[j0:j1,i0:i1]
       y=y[j0:j1,i0:i1]
-      h=h[j0:j1,i0:i1]
+      #h=h[j0:j1,i0:i1] # not used
       m=m[j0:j1,i0:i1]
 
     else:
       if data is False: V=self.use(varname,SEARCHtime=time)
       else: v=data
-
 
     if V.ndim==3:
       v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
@@ -1036,7 +1066,9 @@ class His(Common,Derived):
 
     # coords:
     if 'z' in coords and V.ndim==3:
-      out.z=self.path_s_levels(time,X,Y,rw=varname[0])
+      inds=dict(xi=(i0,i1),eta=(j0,j1))
+#########      out.z=self.path_s_levels(time,X,Y,rw=varname[0],inds=inds)
+      out.z=self.path_s_levels(time,X,Y,rw=self.var_at(varname)[1],inds=inds)
 
     if 'd' in coords:
       d=calc.distance(X,Y)
@@ -1182,7 +1214,8 @@ class His(Common,Derived):
       return out
 
     v=self.use(varname,SEARCHtime=time)
-    z=self.s_levels(time=time,ruvpw=self.var_at(varname))
+####    z=self.s_levels(time=time,ruvpw=self.var_at(varname))
+    z=self.s_levels(time=time,loc=self.var_at(varname))
     v=rt.depthof(v,z,iso)
 
     out.v=v
@@ -1279,7 +1312,8 @@ class His(Common,Derived):
       h=self.grid.h[i,j]
       zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=times)
       h=h+0*zeta
-      z=rt.s_levels(h,zeta,self.s_params,rw=varname)
+####      z=rt.s_levels(h,zeta,self.s_params,rw=varname)
+      z=rt.s_levels(h,zeta,self.s_params,rw=self.var_at(varname)[1])
       z=np.squeeze(z)
 
     # depth slice:

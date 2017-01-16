@@ -342,7 +342,7 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
       if not tri:
         tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
 
-      if extrap: u=tri.nn_extrapolator(v[~mask][ii])(xi,yi)
+      if extrap: u=tri.nn_extrapolator(v[~mask][ii].data)(xi,yi)
       else:      u=tri.nn_interpolator(v[~mask][ii])(xi,yi)
 
   else:
@@ -350,8 +350,13 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
     if extrap:
 
         # add corners:
-        dx=(xi.max()-xi.min())/(1.*xi.size)
-        dy=(yi.max()-yi.min())/(1.*yi.size)
+        if 0:
+          dx=(xi.max()-xi.min())/(1.*xi.size)
+          dy=(yi.max()-yi.min())/(1.*yi.size)
+        else: # higher distance from domain:
+          dx=(xi.max()-xi.min())
+          dy=(yi.max()-yi.min())
+
         xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
         yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
         vv=np.zeros(4,v.dtype)

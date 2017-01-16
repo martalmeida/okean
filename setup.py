@@ -118,7 +118,8 @@ if __name__ == '__main__':
                          ('',['okean_documentation.ipynb']),
                          ('',['EUPL v.1.1 - licencia.pdf'])],
           classifiers = filter(None, classifiers.split("\n")),
-          scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate','okean/bin/romsview'],
+          scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate',
+                   'okean/bin/romsview','okean/bin/disp'],
           cmdclass={'install': my_install},
           )
 

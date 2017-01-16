@@ -1,0 +1,183 @@
+#!/usr/bin/python
+from PIL import Image, ImageTk
+import Tkinter as tk
+import glob
+import os
+import imghdr
+
+class Display:
+  def __init__(self,files=None):
+    self.r=tk.Tk()
+    self.screen=dict(width=self.r.winfo_screenwidth(),height=self.r.winfo_screenheight())
+
+
+    fr=tk.Frame(self.r,bg='black')
+    self.label = tk.Label(fr)
+
+    fr2=tk.Frame(self.r,height=80)
+    self.infoLab=tk.StringVar()
+    labelb = tk.Label(fr2,textvariable=self.infoLab,height=5,anchor=tk.W, justify=tk.LEFT)
+
+    labelc = tk.Label(fr2,anchor=tk.W, justify=tk.LEFT)
+    rot=tk.Button(labelc,text='rot',command=self.rotate)
+    zm=tk.Button(labelc,text='- zoom',command=self.resize_m)
+    zM=tk.Button(labelc,text='zoom +',command=self.resize_M)
+    nxt=tk.Button(labelc,text='next',command=self.next)
+    prv=tk.Button(labelc,text='prev',command=self.prev)
+
+    self.zoomLab=tk.StringVar()
+    z0=tk.Label(labelc,textvariable=self.zoomLab)
+    self.zoomLab.set('100%')
+
+    self.numLab=tk.StringVar()
+    num=tk.Label(labelc,textvariable=self.numLab)
+    self.numLab.set('0')
+
+    fr.pack(expand=2)
+    fr2.pack(fill=tk.X,expand=2,anchor=tk.S)
+    self.label.pack(fill=tk.BOTH, expand=2, padx=1, pady=1)
+    labelb.place(rely=1.0, relx=0.0, x=0, y=0, anchor=tk.SW)
+    labelc.place(rely=1.0, relx=1.0, x=0, y=0, anchor=tk.SE)
+
+    rot.grid(row=0,column=0)
+    zm.grid(row=0,column=1)
+    z0.grid(row=0,column=2)
+    zM.grid(row=0,column=3)
+    prv.grid(row=1,column=1)
+    num.grid(row=1,column=2)
+    nxt.grid(row=1,column=3)
+
+    self.widgets={}
+    self.widgets['next']=nxt
+    self.widgets['prev']=prv
+
+    # -----------------------------------
+
+    if not files: files=['./']
+    if os.path.isdir(files[0]):
+      files=self.find_images(glob.glob(files[0]+'*'))
+
+    files.sort()
+    self.files=files
+    self.i=0
+    self.ang=0
+    self.zoom=1
+    self.load_image()
+
+    self.widgets['prev'].configure(state=tk.DISABLED)
+    if len(self.files)==1:
+        self.widgets['next'].configure(state=tk.DISABLED)
+
+    self.r.mainloop()
+
+
+  def find_images(self,files):
+    F=[]
+    for f in files:
+      if os.path.isfile(f) and imghdr.what(f): F+=[f]
+    return F
+
+
+  def load_image(self):
+    self.zoomLab.set('100%')
+
+    fname=self.files[self.i]
+    self.image = Image.open(fname)
+
+    if self.ang: self.image=self.image.rotate(self.ang,expand=1)
+
+    if self.zoom!=1:
+      size=int(self.image.size[0]*self.zoom),int(self.image.size[1]*self.zoom)
+      self.image=self.image.resize(size)
+
+
+    self.current_size=self.image.size
+    photo = ImageTk.PhotoImage(self.image)
+    self.label.configure(image=photo)
+    self.label.image = photo # keep a reference!
+
+    s='info:\n  - size: %dx%d\n  - format: %s\n  - mode: %s\n  - info: %s'%\
+    (self.image.size+(self.image.format,)+(self.image.mode,)+(str(self.image.info)[:50],))
+    self.infoLab.set(s)
+
+    self.r.wm_title(fname)
+    self.numLab.set('%d/%d'%(self.i+1,len(self.files)))
+    self.zoomLab.set(str(self.zoom*100)+'%')
+
+    while self.over_size():
+      self.resize_m()
+
+
+  def over_size(self,size=None):
+      self.margin=50,150
+      if not size: size=self.current_size
+      return size[0]+self.margin[0]>self.screen['width'] or size[1]+self.margin[1]>self.screen['height']
+
+
+  def rotate(self):
+    self.ang+=90
+    self.zoom=1
+    self.load_image()
+
+
+  def resize_M(self):
+      zm0=self.zoom
+      if self.zoom<0.2:
+        self.zoom+=0.01
+      else:
+        self.zoom+=0.2
+
+      size=int(self.image.size[0]*self.zoom),int(self.image.size[1]*self.zoom)
+      if self.over_size(size):
+        self.zoom=zm0
+        return
+
+      self.load_image()
+
+
+  def resize_m(self):
+      if self.zoom<0.2+1.e-10:
+        self.zoom-=0.01
+      else:
+        self.zoom-=0.2
+
+      if self.zoom<0.01:
+        self.zoom=0.01
+        return
+
+      self.load_image()
+
+
+  def next(self):
+    if self.i<len(self.files)-1:
+      self.ang=0
+      self.zoom=1
+      self.i+=1
+      self.load_image()
+
+      self.widgets['prev'].configure(state=tk.NORMAL)
+      if self.i==len(self.files)-1:
+        self.widgets['next'].configure(state=tk.DISABLED)
+
+
+  def prev(self):
+    if self.i>0:
+      self.i-=1
+      self.ang=0
+      self.zoom=1
+      self.load_image()
+
+      self.widgets['next'].configure(state=tk.NORMAL)
+      if self.i==0:
+        self.widgets['prev'].configure(state=tk.DISABLED)
+
+
+if __name__=='__main__':
+  import sys
+  if len(sys.argv)>1 and sys.argv[1] in ('-h','--h','--help'):
+    print 'Usage: disp.py image or folder (defaul is ./)'
+    sys.exit()
+  if len(sys.argv)>1:
+    Display(sys.argv[1:])
+  else:
+    Display()

@@ -332,7 +332,11 @@ class Grid(Common):
 
 #####  def s_levels(self,sparams,zeta=0,h=False,ruvpw='r',i=False,j=False,k=False):
   def s_levels(self,sparams,zeta=0,h=False,loc='rr',i=False,j=False,k=False):
-    hLoc,vLoc=loc
+    try:
+      hLoc,vLoc=loc
+    except:
+      hLoc,vLoc=loc,'r'
+
 ####    ruvpw=ruvpw[0]
 ####    isW=ruvpw=='w'
 
@@ -668,7 +672,11 @@ class His(Common,Derived):
 ###  def s_levels(self,time,ruvpw='r',i=False,j=False,k=False,extrapZeta=False):
   def s_levels(self,time,loc='rr',i=False,j=False,k=False,extrapZeta=False):
 ##    ruvpw=ruvpw[0]
-    hLoc,vLoc=loc
+    try:
+      hLoc,vLoc=loc
+    except:
+      hLoc,vLoc=loc,'r'
+      
 
     h=self.grid.h
     zeta=self.use('zeta',SEARCHtime=time)

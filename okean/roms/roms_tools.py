@@ -57,6 +57,10 @@ def s_levels(h,zeta,sparams,rw=False):
   '''
   tts,ttb,hc,n,vt,vs=sparams
 
+  # to deal with WET_DRY (See Nonlinear/set_depth.F)
+  # h cannot be zero, at least with vt==1
+  h=np.where(h==0.,1e-14,h)
+
   import rtools
   zr,zw=rtools.s_levels(h,zeta,tts,ttb,hc,n,vt,vs)
 
@@ -282,7 +286,8 @@ def s_params(nc,show=0):
 
 
       if hmin and Tcline:
-        hc=np.min([hmin,Tcline])
+        #hc=np.min([hmin,Tcline])
+        hc=np.min([np.max([hmin,0]),Tcline]) # to deal with WET_DRY (see Utility/set_scoord.F)
         hc_source = 'min of hmin and Tcline';
       else:
         hc='not found'

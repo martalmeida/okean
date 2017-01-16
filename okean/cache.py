@@ -24,7 +24,7 @@ class Cache:
       self.r=memcache.Client([kargs['client']])
       return self.r.has_key(label)
     elif type=='localmem':
-      return self.data.has_key()
+      return self.data.has_key(label)
     elif type=='localfile':
       f=self.local_fname(label)
       return os.path.isfile(f)

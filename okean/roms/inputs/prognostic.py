@@ -501,7 +501,7 @@ def data2roms(data,grd,sparams,**kargs):
        lonc=(xr.max()+xr.min())/2.
        latc=(yr.max()+yr.min())/2.
        from mpl_toolkits.basemap import Basemap
-       proj=Basemap(projection=proj,width=0,height=0,resolution=None,
+       proj=Basemap(projection=proj,width=1,height=1,resolution=None,
                     lon_0=lonc,lat_0=latc, lat_1=latc)
 
     xr,yr=proj(xr,yr)

@@ -507,14 +507,15 @@ def data2roms(data,grd,sparams,**kargs):
     xr,yr=proj(xr,yr)
     xu,yu=proj(xu,yu)
     xv,yv=proj(xv,yv)
-    data['lon'],data['lat']=proj(data['lon'],data['lat'])
+    dlon,dlat=proj(data['lon'],data['lat'])
     Rdz=1/100. # distance to depth ratio (300km vs 3000m)
     distance=lambda x,y: np.append(0.,np.sqrt(np.diff(x)**2+np.diff(y)**2).cumsum())
   else:
+    dlon,dlat=data['lon'],data['lat']
     distance=calc.distance
 
   # needed for s_levels and for rep_surf!
-  sshr=calc.griddata(data['lon'],data['lat'],data['ssh'],xr,yr,extrap=True,**interp_opts)
+  sshr=calc.griddata(dlon,dlat,data['ssh'],xr,yr,extrap=True,**interp_opts)
 
   # repeat surface:
   if rep_surf:
@@ -559,16 +560,16 @@ def data2roms(data,grd,sparams,**kargs):
       #pylab.figure()
       #pylab.pcolormesh(data['lon'],data['lat'],data['temp'][i,...])
 
-      try: TEMP[i,...] = calc.griddata(data['lon'],data['lat'],data['temp'][i,...],xr,yr,extrap=True,**interp_opts)
+      try: TEMP[i,...] = calc.griddata(dlon,dlat,data['temp'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: SALT[i,...] = calc.griddata(data['lon'],data['lat'],data['salt'][i,...],xr,yr,extrap=True,**interp_opts)
+      try: SALT[i,...] = calc.griddata(dlon,dlat,data['salt'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: U[i,...] = calc.griddata(data['lon'],data['lat'],data['u'][i,...],xr,yr,extrap=True,**interp_opts)
+      try: U[i,...] = calc.griddata(dlon,dlat,data['u'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: V[i,...] = calc.griddata(data['lon'],data['lat'],data['v'][i,...],xr,yr,extrap=True,**interp_opts)
+      try: V[i,...] = calc.griddata(dlon,dlat,data['v'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
     # rotate U,V:
@@ -713,8 +714,8 @@ def data2roms(data,grd,sparams,**kargs):
   if useInd is False:
     ubar,vbar=rt.uvbar(Uvel,Vvel,sshr,hr,sparams)
   else: #>------------------------------------------------------------
-    sshu=calc.griddata(data['lon'],data['lat'],data['ssh'],xu,yu,extrap=True,**interp_opts)
-    sshv=calc.griddata(data['lon'],data['lat'],data['ssh'],xv,yv,extrap=True,**interp_opts)
+    sshu=calc.griddata(dlon,dlat,data['ssh'],xu,yu,extrap=True,**interp_opts)
+    sshv=calc.griddata(dlon,dlat,data['ssh'],xv,yv,extrap=True,**interp_opts)
 
     if ij=='j':
       sshu=sshu[ij_ind,:]

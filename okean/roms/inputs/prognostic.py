@@ -519,6 +519,9 @@ def data2roms(data,grd,sparams,**kargs):
 
   # repeat surface:
   if rep_surf:
+    # copy data cos dont want to change the original dataset:
+    import copy
+    data=copy.deepcopy(data)
     for vname in ['temp','salt','u','v','depth']:
       if data[vname].ndim==1: # depth !
         if np.ma.isMA(data[vname]): vstack=np.ma.hstack

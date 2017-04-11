@@ -26,9 +26,3 @@ rtools:
 
 rtools_test:
 	f2py -c rtools_test.f -m rtools_test --fcompiler=$(FCname)
-
-rtools_22:
-	f2py -c rtools_vs2vt2.f  -m rtools_vs2vt2 --fcompiler=$(FCname)
-
-rtools_42:
-	f2py -c rtools_vs4vt2.f  -m rtools_vs4vt2 --fcompiler=$(FCname)

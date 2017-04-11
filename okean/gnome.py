@@ -6,7 +6,6 @@ Martinho MA
 '''
 
 import numpy as np
-import netcdftime
 import datetime
 from okean import netcdf, calc
 
@@ -162,7 +161,7 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
   time=netcdf.nctime(nc0,'ocean_time')
   # for roms agrif:
   #t=netcdf.use(nc0,'scrum_time')
-  #time=netcdftime.num2date(t,'seconds since %d-01-01' % year0)
+  #time=netcdf.num2date(t,'seconds since %d-01-01' % year0)
 
   x0=netcdf.use(grd,'lon_rho')
   y0=netcdf.use(grd,'lat_rho')
@@ -234,7 +233,7 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
     U=np.zeros((eta0,xi0),'f')
     V=np.zeros((eta0,xi0),'f')
 
-    nc.vars['time'][n]=netcdftime.date2num(time[it],tunits)
+    nc.vars['time'][n]=netcdf.date2num(time[it],tunits)
 
     # for roms agrif:
     #u=netcdf.use(nc0,'u',time=it,s_rho=-1)
@@ -328,9 +327,9 @@ def frc2gnome(fname,frc,grd,xylim=False,dates=False,ij=(1,1),**kargs):
    t=netcdf.nctime(nc0,tvar)
   except:
     t=netcdf.use(nc0,tvar)
-    t=netcdftime.num2date(t,'days since %d-01-01' % year0)
+    t=netcdf.num2date(t,'days since %d-01-01' % year0)
 
-  time=netcdftime.date2num(t,tunits)
+  time=netcdf.date2num(t,tunits)
 
   x0=netcdf.use(grd,xvar)
   y0=netcdf.use(grd,yvar)

@@ -130,8 +130,11 @@ def get_colormaps():
   for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
     res['ncview']+=[' '+k]
 
-  try:    names=pylab.cm._cmapnames
-  except: names=pylab.cm.cmapnames
+  try:names=pylab.cm._cmapnames
+  except AttributeError:
+    try: names=pylab.cm.cmapnames
+    except AttributeError: names=pylab.cm.cmap_d.keys()
+
   for n in names:
     for k in colorbrewer.keys():
       if n in colorbrewer[k]:
@@ -440,6 +443,7 @@ class rgui:
 
     optmenu.add_separator()
     projs='merc','cyl','eqdc','mill','aeqd','poly','gnom','stere'
+    projs='merc','tmerc','lcc','cyl','eqdc','mill','aeqd','poly','gnom','stere'
     prj=add_sub(optmenu,'projection',projs,self.show,self.options['projection'])
 
 
@@ -792,6 +796,18 @@ class rgui:
     # zlev label:
     zlevLab=tk.Label(self.widgets['fright'],text='s or z',bg=self.bg,fg=self.fg)
     zlevLab.place(relx=x,y=y+3*h,relwidth=relw,height=h)
+
+# NEW
+    y=10*h
+    import gui_tools
+    gtools=gui_tools.rgui_tools(self.widgets['fright'])
+    gtools['base'].place(relx=relw/2,y=y,anchor='n')#,relwidth=relw,height=h
+
+    gtools['nozoom'].command=self.reset_lims
+    gtools['zoom'].command=self.interactive_zoom
+    gtools['path'].command=self.interactive_vslice
+    self.gtools=gtools
+# NEW
 
 
     # reset lims:
@@ -1281,7 +1297,7 @@ class rgui:
        self.reset_file('his')
        self.widgets['ttime'].config(text=self.files['His'].TIME-1)
 
-  def reset_lims(self):  self.__set_grid_lims(show=True)
+  def reset_lims(self,*e):  self.__set_grid_lims(show=True)
 
   def __set_grid_lims(self,show=False,lims=False):
     if lims is False:
@@ -1435,7 +1451,8 @@ class rgui:
 
     Vars=[]
     self.variables={}
-    vars,nc=netcdf.var(self.files[type])
+    nc=netcdf.ncopen(self.files[type])
+    vars=netcdf.var(nc)
     for k in vars.keys():
       if vars[k].ndim()>=2:
         Vars+=[k]
@@ -1443,7 +1460,8 @@ class rgui:
     nc.close()
 
     if type!='grid' and show_grid_vars:
-      vars,nc=netcdf.var(self.files['grid'])
+      nc=netcdf.ncopen(self.files['grid'])
+      vars=netcdf.var(nc)
       for k in vars.keys():
         if vars[k].ndim()>=2 and k not in Vars:
           Vars+=[k]
@@ -1715,8 +1733,28 @@ class rgui:
     if self.swapp['last_proj']!=curr_proj:
       self.swapp['last_proj']=curr_proj
 
-      if True:#curr_proj['proj']=='merc':
-        map = Basemap(projection=curr_proj['proj'], lat_ts=0.0,
+      if curr_proj['proj'] in ['lcc','stere']:
+        # setup lambert conformal basemap.
+        # lat_1 is first standard parallel.
+        # lat_2 is second standard parallel (defaults to lat_1).
+        # lon_0,lat_0 is central point.
+        r10=6380e3*np.cos(latlims[0]*np.pi/180)
+        r11=6380e3*np.cos(latlims[1]*np.pi/180)
+        r1=np.max([r10,r11])
+        dx=(lonlims[1]-lonlims[0])*np.pi/180
+        dy=(latlims[1]-latlims[0])*np.pi/180
+        w=r1*dx
+        h=6380e3*dy*1.2
+        map = Basemap(projection=curr_proj['proj'],
+                      resolution=curr_proj['resolution'],
+                      lon_0=0.5*(lonlims[0]+lonlims[1]),
+                      lat_0=0.5*(latlims[0]+latlims[1]),
+                      lat_1=0.5*(latlims[0]+latlims[1]),
+                      width=w,
+                      height=h)
+
+      elif True:#curr_proj['proj']=='merc':
+        map = Basemap(projection=curr_proj['proj'], #lat_ts=0.0,
                       resolution=curr_proj['resolution'],
                       urcrnrlon=lonlims[1], urcrnrlat=latlims[1],
                       llcrnrlon=lonlims[0], llcrnrlat=latlims[0],
@@ -1740,25 +1778,30 @@ class rgui:
          print 'USING SWAPP...'
          return self.swapp['last_slices_data'][i]
 
-    # spherical:
-    if romsobj.grid.use('spherical') in (0,'F'): spherical=False
-    else: spherical=True
+    spherical=romsobj.grid.is_spherical
 
     # slice:
+    if zlev>=0: zlev=int(zlev)
     if varname[0]=='*':
-      x,y,z,v=romsobj.slice_derived(varname[1:],zlev,time)
-      msg=''
+      #x,y,z,v,msg=romsobj.slice_derived(varname[1:],zlev,time,msg=True,surf_nans=surf_nans)
+      data=romsobj.slice_derived(varname[1:],zlev,time,surf_nans=surf_nans)
+      x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
     else:
       if zlev>=0:
-        zlev=int(zlev)
-        x,y,z,v,msg=romsobj.slicek(varname,zlev,time,msg=True)
+        #x,y,z,v,msg=romsobj.slicek(varname,zlev,time,msg=True)
+        data=romsobj.slicek(varname,zlev,time,msg=True)
+        x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
       else:
-        x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        #x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
 
     if currents:
       if varname in ('zeta','ubar','vbar'): vel_zlev='bar'
       else: vel_zlev=zlev
-      x_vel,y_vel,z_vel,u_vel,v_vel=romsobj.sliceuv(vel_zlev,time)
+      #x_vel,y_vel,z_vel,u_vel,v_vel=romsobj.sliceuv(vel_zlev,time)
+      data_vel=romsobj.sliceuv(vel_zlev,time)
+      x_vel,y_vel,z_vel,u_vel,v_vel=data_vel.x,data_vel.y,data_vel.z,data_vel.v[0],data_vel.v[1]
 
       if spherical:
         # rotate to proj angles:
@@ -1788,7 +1831,9 @@ class rgui:
     z_title=''
     t_title=''
     v_title=''
-    if varname[0]=='*':  return '' # derived var
+
+    if varname[0]=='*': isDerived=True
+    else: isDerived=False
 
     # about var and currents:
     v_title=varname
@@ -1797,18 +1842,18 @@ class rgui:
       else: v_title+='+currents'
 
     # about depth:
-    if romsobj.hasz(varname):
+    if isDerived or romsobj.hasz(varname):
       if zlev>=0: z_title=' k='+str(zlev)+' '
       else: z_title=' z='+str(zlev)+'m '
 
     # about date:
-    if romsobj.hast(varname):
-      if not romsobj.datetime is False:
+    if isDerived or romsobj.hast(varname):
+      if not romsobj.time is False:
         try:
-          t_title=' '+romsobj.datetime[time].isoformat(' ')
+          t_title=' '+romsobj.time[time].isoformat(' ')
         except:
            # some old dates have not isoformat !!!
-           t_title=' '+str(romsobj.datetime[time])
+           t_title=' '+str(romsobj.time[time])
       else:
         try: yorig=int(self.widgets['yorig'].get())
         except: yorig=1
@@ -2002,7 +2047,8 @@ class rgui:
 
     print 'here 0'
     # use projection:
-    spherical=not self.files['Grid'].use('spherical') in (0,'F')
+    
+    spherical=self.files['Grid'].is_spherical
 
     if spherical:
       self.__start_proj()
@@ -2013,7 +2059,9 @@ class rgui:
       t0=pytime.time()
 
       if self.options['coastline_res'].get()!='none':
-        self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
+        try:
+          self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
+        except: pass
 
       if self.options['draw_rivers'].get():
         self.map.drawrivers(linewidth=.5,color='blue',ax=ax)
@@ -2036,6 +2084,7 @@ class rgui:
         if scaleL=='auto':
           grid_dist=calc.distance(np.array(lonlims),np.array(latlims))
           scaleL=ticks.nicenum(grid_dist[-1]/4000.,1)
+        else: scaleL=float(scaleL)
 
         dlon=lonlims[1]-lonlims[0]
         dlat=latlims[1]-latlims[0]
@@ -2060,10 +2109,14 @@ class rgui:
                               fontsize=7)
 
       meridians,paralels=self.__calc_xyticks()
-      self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
+      try:
+        self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
                         color='#4d4d4d',ax=ax,dashes=[1,4])
-      self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
+      except: pass
+      try:
+        self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
                         color='#4d4d4d',ax=ax,dashes=[1,4])
+      except: pass
 
 
     print '6===',pytime.time()-t0
@@ -2449,18 +2502,20 @@ class rgui:
     '''
 #####    if not self.files.has_key('His'): return
 
-    ob=self.widgets['zoom']
-    relief=ob['relief']
+#    ob=self.widgets['zoom']
+#    relief=ob['relief']
+    ob=self.gtools['zoom']
 
-    if chstate and relief=='sunken':
-      ob.config(relief='raised')
+#    if chstate and relief=='sunken':
+    if chstate and ob.state==0:
+#      ob.config(relief='raised')
       self.active_tool=None
       self.zoom.cmd=False
       self.zoom.stop(False) # stop the zoom events that may be active
       self.__set_cursor()
 
     else:
-      ob.config(relief='sunken')
+#      ob.config(relief='sunken')
 
       self.__set_cursor('tcross')
 
@@ -2588,11 +2643,15 @@ class rgui:
       y=y[0]
 
     if type=='profile':
-        x,y,z,v=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        #x,y,z,v=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        data=q.slicell(var,np.array(x),np.array(y),itime,dist=0)
+        x,y,z,v=data.x,data.y,data.z,data.v
     elif type=='time_series':
         zlev    = self.__get_zlevel()
         print var,x,y,zlev
-        t,z,v=q.time_series(var,x,y,depth=zlev)
+        #t,z,v=q.time_series(var,x,y,depth=zlev)
+        data=q.time_series(var,x,y,depth=zlev)
+        t,z,v=data.t,data.z,data.v
 
 
     # draw:
@@ -2719,9 +2778,13 @@ class rgui:
     # slicell:
     try:
       self.map.xmin
-      d,z,v=q.slicell(var,X,Y,itime,dist=True)
+      #d,z,v=q.slicell(var,X,Y,itime,dist=True)
+      data=q.slicell(var,X,Y,itime,dist=True)
+      d,z,v=data.d,data.z,data.v
     except:
-      x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+      #x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+      data=q.slicell(var,X,Y,itime,dist=False)
+      x,y,z,v=data.x,data.y,data.z,data.v
       x=x[0,...]
       y=y[0,...]
       #print x.shape, y.shape

@@ -1,27 +1,19 @@
 import numpy as np
-from matplotlib import delaunay
+
 
 
 def isarray(v,nomask=False):
-  '''
-  True for numpy arrays or numpy masked arrays (if nomask is False)
-  '''
-
+  'True for numpy arrays or numpy masked arrays (if nomask is False)'
   if nomask: return isinstance(v,np.ndarray)
   else: return isinstance(v,np.ndarray) or np.ma.isMA(v)
 
 def ismarray(v):
-  '''
-  True for numpy numpy masked arrays
-  '''
+  'True for numpy numpy masked arrays'
   return np.ma.isMA(v)
 
 
 def isiterable(*args):
-  '''
-  True for sequences
-  '''
-
+  'True for sequences'
   try:
     for a in args: iter(a)
     return True
@@ -177,16 +169,17 @@ def griddata(x,y,v,xi,yi,**kargs):
   mma  2010
   '''
 
-  mask2d = False
+  mask2d=kargs.pop('mask2d',False)
   # When v.ndim>2 and the same mask is used for all the dim 0 levels
   # setting mask2d is mutch fater since the triangulation is done only
   # once
 
-  extrap=False
+  extrap=kargs.pop('extrap',False)
   # extrapolate outside data points convex hull and in masked region
 
   # keepMask    = not extrap
-  keepMaskVal = 0.5
+  #
+  keepMaskVal=kargs.pop('keepMaskVal',0.5)
   # Notice  that even without extrap, the convex hull of the
   # non masked data may include masked points. In that case
   # interpolation is also done for such points!!
@@ -216,14 +209,11 @@ def griddata(x,y,v,xi,yi,**kargs):
   # and thus extrapolation is not done
   # finalextrap only makes sense when extrap is True
 
-  norm_xy=True
-  norm_xy=False
-  # delaunay may give VERY VERY BAD bad results when x and y data range
-  # differ by orders of magnitude. In such case the solution is to normalize
-  # the coordinates
+  norm_xy=kargs.pop('norm_xy',False)
+  # matplotlib.delaunay may give VERY VERY BAD bad results when x and y data
+  # range differ by orders of magnitude. In such case the solution is to
+  # normalize the coordinates
 
-  if 'mask2d'        in kargs.keys(): mask2d        = kargs['mask2d']
-  if 'extrap'        in kargs.keys(): extrap        = kargs['extrap']
 
   if extrap:
     keepMask      = False
@@ -234,26 +224,26 @@ def griddata(x,y,v,xi,yi,**kargs):
     forceBoundary = True
     finalextrap   = False
 
-  if 'keepMask'      in kargs.keys(): keepMask      = kargs['keepMask']
-  if 'keepMaskVal'   in kargs.keys(): keepMaskVal   = kargs['keepMaskVal']
-  if 'forceBoundary' in kargs.keys(): forceBoundary = kargs['forceBoundary']
-  if 'finalextrap'   in kargs.keys(): finalextrap   = kargs['finalextrap']
+  keepMask      = kargs.pop('keepMask',      keepMask)
+  forceBoundary = kargs.pop('forceBoundary', forceBoundary)
+  finalextrap   = kargs.pop('finalextrap',   finalextrap)
 
-  if 'norm_xy' in kargs.keys(): norm_xy=kargs['norm_xy']
 
   if norm_xy:
-    rxy=(x.max()-x.min())/(y.max()-y.min())
-    y=y*rxy
-    yi=yi*rxy
+    dx=1.*(x.max()-x.min())
+    dy=1.*(y.max()-y.min())
+    x=100*(x-x.min())/dx
+    y=100*(y-y.min())/dy
+
 
   # interp/extrap:
-  try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap)
-  except: res=xi*np.nan
+  res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
+#  try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
+#  except: res=xi*np.nan
 
   # final extrap:
   if finalextrap:
-    try: mask_extrap(xi,yi,np.ma.masked_where(np.isnan(res),res),
-           inplace=True,norm_xy=norm_xy)
+    try: mask_extrap(xi,yi,np.ma.masked_where(np.isnan(res),res),inplace=True,**kargs)
     except: pass
 
   maskCond=np.isnan(res)
@@ -262,12 +252,16 @@ def griddata(x,y,v,xi,yi,**kargs):
     imask=False
     # check if there is a mask!
     if mask2d is False:
-      if np.ma.isMA(v) and np.ma.count_masked(v)>0: imask=v.mask.astype('int8')
+      if np.ma.isMA(v) and np.ma.count_masked(v)>0:
+        if v.ndim==3: imask=v[-1].mask.astype('int8')
+        else: imask=v.mask.astype('int8')
     else: imask=mask2d.astype('int8')
 
     if not imask is False:
-      km=_griddata(x,y,imask,xi,yi,extrap=False)[0]
-      km=np.where(np.isnan(km),np.nan,km)
+      #print 'griddata for mask:'
+      km=_griddata(x,y,imask,xi,yi,extrap=False,**kargs)[0]
+      km=np.where(np.isnan(km),1,km)
+      # note that km ndim may be lower than maskCond if v is 3d!
       maskCond=maskCond | (km>keepMaskVal)
 
   # force original boundary:
@@ -285,58 +279,112 @@ def griddata(x,y,v,xi,yi,**kargs):
   return np.ma.masked_where(maskCond,res)
 
 
-def _griddataz(x,y,v,xi,yi,mask2d,extrap):
+def _griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs):
   '''
   Use griddata instead
   '''
 
-  # nn_extrapolator/nn_interpolator may have problems dealing with
-  # regular grids, nans may be obtained. One simple solution is to
-  # rotate the domains!
-  x,y=rot2d(x,y,np.pi/3.)
-  xi,yi=rot2d(xi,yi,np.pi/3.)
+  mpl_tri=kargs.get('mpl_tri',True)
+
+  if not mpl_tri:
+    # nn_extrapolator/nn_interpolator may have problems dealing with
+    # regular grids, nans may be obtained. One simple solution is to
+    # rotate the domains!
+    x,y=rot2d(np.squeeze(x),np.squeeze(y),np.pi/3.)
+    xi,yi=rot2d(xi,yi,np.pi/3.)
 
   if v.ndim==x.ndim+1:
-    tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d)
+    tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d,**kargs)
     res=np.zeros([v.shape[0]]+list(tmp.shape),dtype=v.dtype)
     res[0,...]=tmp
     for i in range(1,v.shape[0]):
-      res[i,...]=_griddata(x,y,v[i,...],xi,yi,extrap,tri,mask=mask2d)[0]
+      res[i,...]=_griddata(x,y,v[i,...],xi,yi,extrap,tri,mask=mask2d,**kargs)[0]
   else:
-    res=_griddata(x,y,v,xi,yi,extrap,mask=mask2d)[0]
+    res=_griddata(x,y,v,xi,yi,extrap,mask=mask2d,**kargs)[0]
 
   return res
 
 
-def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False):
+def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
   '''
   Use griddata instead
   '''
+
+  mpl_tri=kargs.get('mpl_tri',True)
+  tri_type=kargs.get('tri_type','cubic') # cubic or linear
+  tri_kind=kargs.get('tri_kind','geom') # min_E or geom (for type cubic only)
+
+
+  # warning, if x.shape=n,1  x[~mask] will also have 2 dims!! Thus better just use ravel...
+  if x.shape!=x.size or y.shape!=y.size or v.shape!=v.size:
+    x=x.ravel()
+    y=y.ravel()
+    v=v.ravel()
+    if not mask is False: mask=mask.ravel()
 
   if mask is False:
     if np.ma.isMA(v) and np.ma.count_masked(v)>0: mask=v.mask
     else: mask=np.zeros(v.shape,'bool')
 
-  if 0:
-    if not tri:
-      tri=delaunay.Triangulation(x[~mask],y[~mask])
 
-    if extrap: u=tri.nn_extrapolator(v[~mask])(xi,yi)
-    else:      u=tri.nn_interpolator(v[~mask])(xi,yi)
+  if not mpl_tri:
+    from matplotlib import delaunay # deprecated in version 1.4
+    if 0:
+      if not tri:
+        tri=delaunay.Triangulation(x[~mask],y[~mask])
+
+      if extrap: u=tri.nn_extrapolator(v[~mask])(xi,yi)
+      else:      u=tri.nn_interpolator(v[~mask])(xi,yi)
+    else:
+      # deal with repeated pairs (problem for nn_extrapolator)
+      xy=x[~mask]+1j*y[~mask]
+      xy,ii=np.unique(xy,1)
+      if not tri:
+        tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
+
+      if extrap: u=tri.nn_extrapolator(v[~mask][ii].data)(xi,yi)
+      else:      u=tri.nn_interpolator(v[~mask][ii])(xi,yi)
+
   else:
-    # deal with repeated pairs (problem for nn_extrapolator)
-    xy=x[~mask]+1j*y[~mask]
-    xy,ii=np.unique(xy,1)
-    if not tri:
-      tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
+    import  matplotlib.tri as mtri
+    if extrap:
 
-    if extrap: u=tri.nn_extrapolator(v[~mask][ii])(xi,yi)
-    else:      u=tri.nn_interpolator(v[~mask][ii])(xi,yi)
+        # add corners:
+        if 0:
+          dx=(xi.max()-xi.min())/(1.*xi.size)
+          dy=(yi.max()-yi.min())/(1.*yi.size)
+        else: # higher distance from domain:
+          dx=(xi.max()-xi.min())
+          dy=(yi.max()-yi.min())
+
+        xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
+        yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
+        vv=np.zeros(4,v.dtype)
+        mv=np.zeros(4,'bool')
+
+        for i in range(4):
+          d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
+          j=np.where(d==d.min())[0][0]
+          vv[i]=v[~mask][j]
+
+        x=np.ma.hstack((x,xv))
+        y=np.ma.hstack((y,yv))
+        v=np.ma.hstack((v,vv))
+        mask=np.hstack((mask,mv))
+
+    if not tri:
+      tri=mtri.Triangulation(x[~mask],y[~mask])
+
+    if tri_type=='cubic':
+      u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)
+    elif tri_type=='linear':
+      u = mtri.LinearTriInterpolator(tri, v[~mask])(xi,yi)
+
 
   return u, tri
 
 
-def mask_extrap(x,y,v,inplace=False,norm_xy=False):
+def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
   '''
   Extrapolate numpy array at masked points.
   Based on delaunay triangulation provided by matplotlib.
@@ -345,6 +393,12 @@ def mask_extrap(x,y,v,inplace=False,norm_xy=False):
   if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
   else: return v
 
+  sh=v.shape
+  x=x.ravel()
+  y=y.ravel()
+  v=v.ravel()
+  mask=mask.ravel()
+
   if inplace: u=v
   else: u=v.copy()
 
@@ -352,26 +406,60 @@ def mask_extrap(x,y,v,inplace=False,norm_xy=False):
     rxy=(x.max()-x.min())/(y.max()-y.min())
     y=y*rxy
 
-  # nn_extrapolator may have problems dealing with regular grids,
-  # nans may be obtained. One simple solution is to rotate the domain!
-  x,y=rot2d(x,y,np.pi/3.)
+  if not mpl_tri:
+    from matplotlib import delaunay # deprecated in version 1.4
 
-  if 0:
-    tri=delaunay.Triangulation(x[~mask],y[~mask])
-    u[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
+    # nn_extrapolator may have problems dealing with regular grids,
+    # nans may be obtained. One simple solution is to rotate the domain!
+    x,y=rot2d(x,y,np.pi/3.)
+
+    if 0:
+      tri=delaunay.Triangulation(x[~mask],y[~mask])
+      u[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
+    else:
+      # deal with repeated pairs (problem for nn_extrapolator)
+      xy=x[~mask]+1j*y[~mask]
+      xy,ii=np.unique(xy,1)
+
+      tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
+      u[mask]=tri.nn_extrapolator(u[~mask][ii])(x[mask],y[mask])
+
+    if np.any(np.isnan(u)):
+      mask=np.isnan(u)
+      tri=delaunay.Triangulation(x[~mask],y[~mask])
+      u[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
+
   else:
-    # deal with repeated pairs (problem for nn_extrapolator)
-    xy=x[~mask]+1j*y[~mask]
-    xy,ii=np.unique(xy,1)
+    import  matplotlib.tri as mtri
 
-    tri=delaunay.Triangulation(x[~mask][ii],y[~mask][ii])
-    u[mask]=tri.nn_extrapolator(u[~mask][ii])(x[mask],y[mask])
+    # add corners:
+    xv=np.asarray([x.min()-1,x.max()+1,x.max()+1,x.min()-1])
+    yv=np.asarray([y.min()-1,y.min()-1,y.max()+1,y.max()+1])
+    vv=np.zeros(4,v.dtype)
+    mv=np.zeros(4,'bool')
 
-  if np.any(np.isnan(u)):
-    mask=np.isnan(u)
-    tri=delaunay.Triangulation(x[~mask],y[~mask])
-    v[mask]=tri.nn_extrapolator(u[~mask])(x[mask],y[mask])
+    for i in range(4):
+      d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
+      j=np.where(d==d.min())[0][0]
+      vv[i]=u[~mask][j]
 
+    #x=np.ma.hstack((x.flat,xv)) # use ravel at top instead!
+    x=np.ma.hstack((x,xv))
+    y=np.ma.hstack((y,yv))
+    u=np.ma.hstack((u,vv))
+    mask=np.hstack((mask,mv))
+
+    tri=mtri.Triangulation(x[~mask],y[~mask])
+    print u.shape,x.shape,y.shape,mask.shape
+    u[mask] = mtri.CubicTriInterpolator(tri, u[~mask])(x[mask],y[mask])
+    if np.any(np.isnan(u)):
+      mask=np.isnan(u)
+      tri=mtri.Triangulation(x[~mask],y[~mask])
+      u[mask]=mtri.CubicTriInterpolator(tri,u[~mask])(x[mask],y[mask])
+
+    u=u[:-4]
+
+  u.shape=sh
   if not inplace: return u
 
 
@@ -621,14 +709,7 @@ def meetpoint(x1,y1,x2,y2):
   from alg import meetpoint as meetp
   xy=[]
   xyi,N=meetp(x1,y1,x2,y2,len(x1),len(x2))
-  xi=xyi[0]
-  yi=xyi[1]
-  for i in range(N):
-    if  (xi[i],yi[i]) not in xy:
-       xy+=  [(xi[i],yi[i])]
-
-  ty=x1.dtype
-  return np.array([i for i,j in xy],ty),np.array([j for i,j in xy],ty)
+  return xyi[0,:N],xyi[1,:N]
 
 
 def matrix_paths(x,y):
@@ -726,13 +807,25 @@ def mcross_points(xm,ym,xl,yl,addl=False,plt=False):
 
   return xx,yy
 
+
 def ij_limits(x,y,xlim,ylim,margin=0):
   '''
   ij limits of xy so that xlim and ylim box is inside xy[ij]
   Returns i0,i1,j0,j1, so for 1D x[i0:i1], y[j0:j1], and for 2D
   x[j0:j1,i0:i1], y[j0:j1,i0:i1] include xlim and ylim by margin+1
   lines/columns
+
+  Ex:
+  x,y=np.meshgrid(np.arange(10),np.arange(8))
+  xl=2.5,5.5
+  yl=2.5,4.5
+  i0,i1,j0,j1=calc.ij_limits(x,y,xl,yl)
+
+  pl.plot(x,y,'bo');
+  pl.plot(xl,yl,'r*')
+  pl.plot(x[j0:j1,i0:i1],y[j0:j1,i0:i1],'rs')
   '''
+
   if x.ndim==1:
     L=y.size
     M=x.size
@@ -741,7 +834,7 @@ def ij_limits(x,y,xlim,ylim,margin=0):
     else: i1=0
 
     i2,=np.where(x>xlim[1])
-    if len(i2): i2=i2[0]+1
+    if len(i2): i2=i2[0]
     else: i2=M
 
     j1,=np.where(y<ylim[0])
@@ -749,7 +842,7 @@ def ij_limits(x,y,xlim,ylim,margin=0):
     else: j1=0
 
     j2,=np.where(y>ylim[1])
-    if len(j2): j2=j2[0]+1
+    if len(j2): j2=j2[0]
     else: j2=L
 
   elif x.ndim==2:
@@ -769,10 +862,10 @@ def ij_limits(x,y,xlim,ylim,margin=0):
 
   i1=max(0,i1-margin)
   j1=max(0,j1-margin)
-  i2=min(M,i2+margin)
-  j2=min(L,j2+margin)
+  i2=min(M-1,i2+margin)
+  j2=min(L-1,j2+margin)
 
-  return i1,i2,j1,j2
+  return i1,i2+1,j1,j2+1
 
 
 def angle_point_line(x,y,xp,yp,n=1):
@@ -912,3 +1005,200 @@ class Bilin():
     self.coefs=bilin_coefs(x,y,xi,yi,mask)
   def __call__(self,v,**kargs):
     return bilin_fast(v,self.coefs,**kargs)
+
+
+class InterpCommon:
+  def solve(self,M,B):
+    if 0:
+      import lusolver
+      lusolver.solve(M,B)
+      return B
+    else:
+      return np.linalg.solve(M,B)
+
+  def interp(self,x):
+    try: iter(x)
+    except: x=np.asarray([x])
+
+    res=np.zeros(x.size)
+    for j in range(x.size):
+      i=np.where(self.x>x[j])[0]
+      if i.size:
+        i=i[0]-1
+        if i<0: i+=1
+      else:
+        i=-1
+
+      if self.C.shape[1]==3:
+        a,b,c=self.C[i]
+        res[j]=a*x[j]**2+b*x[j]+c
+      elif self.C.shape[1]==4:
+        a,b,c,d=self.C[i]
+        res[j]=a*x[j]**3+b*x[j]**2+c*x[j]+d
+
+    return res
+
+  def __call__(self,x): return self.interp(x)
+
+
+class Interp1_quad(InterpCommon):
+  def __init__(self,x,y,m0='auto'):
+    # calc coefs:
+    nseg=x.size-1
+    C=np.zeros((nseg,3),'f')
+    for i in range(nseg):
+      if i==0:
+        if m0=='auto': C[i]=self.__coefs0(x[i:i+3],y[i:i+3])
+        else: C[i]=self.__coefs(x[i:i+2],y[i:i+2],m0)
+      else: C[i]=self.__coefs(x[i:i+2],y[i:i+2],2*C[i-1][0]*x[i]+C[i-1][1])
+
+    self.x=x
+    self.y=y
+    self.m0=m0
+    self.C=C
+
+
+  def __coefs0(self,X,Y):
+    if 0:
+      # using 2 points and derivate in 2nd (X[1])
+      M=np.asarray([
+       [X[0]**2,   X[0], 1.],
+       [X[1]**2,   X[1], 1.],
+       [ 2*X[1],     1., 0.]])
+      ym=(Y[2]-Y[0])/(X[2]-X[0])
+      B=np.asarray([Y[0],Y[1],ym])
+    else:
+      # using 3 points:
+      M=np.asarray([
+       [X[0]**2,   X[0], 1.],
+       [X[1]**2,   X[1], 1.],
+       [X[2]**2,   X[2], 1.]])
+      B=Y[:3]
+
+    return self.solve(M,B)
+
+
+  def __coefs(self,X,Y,ym):
+    M=np.asarray([
+       [X[0]**2,   X[0], 1.],
+       [X[1]**2,   X[1], 1.],
+       [ 2*X[0],     1., 0.]])
+    B=np.asarray([Y[0],Y[1],ym])
+    return self.solve(M,B)
+
+
+class Interp1_cub(InterpCommon):
+  def __init__(self,x,y,m0='auto',seg3=True):
+    # calc coefs:
+    nseg=x.size-1
+    C=np.zeros((nseg,4),'f')
+    for i in range(nseg):
+      if seg3 and i%2==1:
+        C[i]=C[i-1]
+        continue
+
+      if i==0:
+        if m0=='auto': C[i]=self.__coefs0(x[i:i+4],y[i:i+4])
+        else: C[i]=self.__coefs(x[i:i+3],y[i:i+3],m0)
+      else:
+        if i==nseg-1:
+          if seg3:
+            ym=3*C[i-1][0]*x[i]**2+2*C[i-1][1]*x[i]+C[i-1][2]
+            C[i]=self.__coefs(x[i-1:i+2],y[i-1:i+2],ym,1)
+          else:
+            C[i]=C[i-1]
+
+        else:
+          ym=3*C[i-1][0]*x[i]**2+2*C[i-1][1]*x[i]+C[i-1][2]
+          C[i]=self.__coefs(x[i:i+3],y[i:i+3],ym)
+
+    self.x=x
+    self.y=y
+    self.m0=m0
+    self.C=C
+
+
+  def __coefs0(self,X,Y):
+    M=np.asarray([
+      [X[0]**3,  X[0]**2,  X[0], 1.],
+      [X[1]**3,  X[1]**2,  X[1], 1.],
+      [X[2]**3,  X[2]**2,  X[2], 1.],
+      [X[3]**3,  X[3]**2,  X[3], 1.]])
+    B=Y[:4]
+    return self.solve(M,B)
+
+  def __coefs(self,X,Y,ym,iym=0):#,ym2):
+    if 0:
+      # using 1st and 2nd derivative: 
+      M=np.asarray([
+        [  X[0]**3,  X[0]**2, X[0],  1.],
+        [  X[1]**3,  X[1]**2, X[1],  1.],
+        [3*X[iym]**2,   2*X[iym],   1.,  0.],
+        [   6*X[0],       2.,   0.,  0.]])
+      B=np.asarray([Y[0],Y[1],ym,ym2])
+    else:
+      # using 3 points and derivative in point iym
+      M=np.asarray([
+        [  X[0]**3,  X[0]**2, X[0], 1.],
+        [  X[1]**3,  X[1]**2, X[1], 1.],
+        [  X[2]**3,  X[2]**2, X[2], 1.],
+        [3*X[0]**2,   2*X[0],   1., 0.]])
+      B=np.asarray([Y[0],Y[1],Y[2],ym])
+
+    return self.solve(M,B)
+
+
+class Interp1_spl(InterpCommon):
+  def __init__(self,x,y,m0=None,m1=None,im0=1,im1=1):
+    '''
+    x is assumed to be strictly increasing (see ext/pppack.f90)
+    '''
+    tau=x
+    n=x.size
+    c=np.zeros((4,n),'f')
+    c[0]=y
+
+    ibcbeg=0
+    ibcend=0
+    if not m0 is None:
+      ibcbeg=im0
+      c[1,0]=m0
+    if not m1 is None:
+      ibcbeg=im1
+      c[1,-1]=m1
+
+    import pppack
+
+
+    pppack.cubspl ( tau, c, ibcbeg, ibcend )
+
+    self.x=x
+    self.y=y
+    self.tau=tau
+    self.c=c
+
+  def interp(self,x,jderiv=0):
+    try: iter(x)
+    except: x=np.asarray([x])
+    m=x.size
+
+    #L=n-1
+    #K=4 # signifying a piecewise cubic polynomial
+
+    res=np.zeros(m)
+    import pppack
+    for j in range(m):
+      res[j]=pppack.ppvalu(self.tau, self.c[:,:-1],x[j],jderiv)
+
+    return res
+
+def leggauss_ab(N,a=-1,b=1):
+  '''Gauss-Legendre quadrature from a to b
+  Based on numpy.polynomial.legendre.leggauss
+  '''
+  x,w=np.polynomial.legendre.leggauss(N)
+  # Linear map from -1,1 to a,b
+  x=(a*(1-x)+b*(1+x))/2.
+  w=w*(b-a)/2.
+  return x,w
+

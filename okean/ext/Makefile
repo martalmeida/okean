@@ -18,3 +18,7 @@ alg:
 
 check:
 	f2py -c --help-fcompiler
+
+lusolver:
+	f2py -c lu.f90 -m lusolver $(FComp)
+

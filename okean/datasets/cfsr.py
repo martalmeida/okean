@@ -381,7 +381,7 @@ def cfsr_file_data(files,quiet=False):
   # other vars resolution:
   if out['rhum'].data.shape!=out['uwnd'].data.shape:
     from okean import calc
-    print 'rhum shape differs!! --> inter:'
+    print 'rhum shape differs!! --> interp:'
     nt,ny,nx=out['uwnd'].data.shape
     x,y=out['uwnd'].x,out['uwnd'].y
     rhum=np.zeros((nt,ny,nx), out['rhum'].data.dtype)

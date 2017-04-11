@@ -5,7 +5,6 @@ import os
 import numpy as np
 from okean import netcdf, roms, calc, dateu, cookbook as cb
 import datetime
-import netcdftime
 
 
 def source(date):
@@ -113,7 +112,7 @@ def fill_frc(fname,time,u,v):
   nc=netcdf.Pync(fname,'w')
 
   tunits=netcdf.vatt(nc,'wind_time','units')
-  time=netcdftime.date2num(time,tunits)
+  time=netcdf.date2num(time,tunits)
   tind=nc.dims['wind_time']
 
   nc.vars['wind_time'][tind]=time

@@ -1,14 +1,37 @@
-      subroutine meetpoint(x1,y1,x2,y2,res,n1,n2,N)
-       integer n1, n2, i, j, N
-       real x1(n1), x2(n2), y1(n1), y2(n2)
-       real Xa,Ya,xa_,ya_,Xb,Yb,xb_,yb_,dx1,dy1,dx2,dy2
-       real x,y,m1,m2
-       real res(2,(n1-1)*(n2-1))
-       logical cond1,cond2
+      subroutine meetpoint(x1,y1,x2,y2,resu,n1,n2,Nu)
+       implicit none
+       integer :: n1, n2, i, j, N,Nu !,Nf,k,ii, Nex
+       integer, parameter :: r8=8
+!       integer :: mask(0:(n1-1)*(n2-1)+1)
+       real (kind=r8) :: x1(n1), x2(n2), y1(n1), y2(n2), epsx, epsy
+       real (kind=r8) :: Xa,Ya,xa_,ya_,Xb,Yb,xb_,yb_,dx1,dy1,dx2,dy2
+       real (kind=r8) :: x,y,m1,m2, mx,my,mx1,my1,mx2,my2
+       real (kind=r8) :: res(2,n1*n2), resu(2,n1*n2)
+! , resex(2,n1*n2)
+!       real (kind=r8) :: resf(2,n1*n2)
+       logical cond1,cond2, found
 
-Cf2py intent(out) res,N
+! max size of res is n1*n2 and will only happen in n1=n2=2 and the two
+! segments are equal!
+
+Cf2py intent(out) resu,Nu
 Cf2py intent(in) :: n1=shape(x1,0)
 Cf2py intent(in) :: n2=shape(x2,0)
+
+       ! find a scaled epsilon:
+       ! mx=0.25*(maxval(x1)+minval(x1)+maxval(x2)+minval(x2))
+       ! my=0.25*(maxval(y1)+minval(y1)+maxval(y2)+minval(y2))
+       ! use max to avoid zero:
+       mx1=max(maxval(x1),maxval(-x1))
+       mx2=max(maxval(x2),maxval(-x2))
+       mx=max(mx1,mx2)
+
+       my1=max(maxval(y1),maxval(-y1))
+       my2=max(maxval(y2),maxval(-y2))
+       my=max(my1,my2)
+
+       epsx=mx*epsilon(mx)*10
+       epsy=my*epsilon(my)*10
 
        N=0
        do i=1,n1-1
@@ -19,57 +42,119 @@ Cf2py intent(in) :: n2=shape(x2,0)
          dx1=x1(i+1)-x1(i)
          dy1=y1(i+1)-y1(i)
          do j=1,n2-1
-           Xb=max(x2(j),x2(j+1))
-           Yb=max(y2(j),y2(j+1))
-           xb_=min(x2(j),x2(j+1))
-           yb_=min(y2(j),y2(j+1))
-           dx2=x2(j+1)-x2(j)
-           dy2=y2(j+1)-y2(j)
 
-           if ((Xa.ge.xb_).and.(xa_.le.Xb).and.
-     &         (Ya.ge.yb_).and.(ya_.le.Yb)) then
+           if ( ((x1(i).eq.x2(j)).and.(y1(i).eq.(y2(j)) )).or.
+     &          ((x1(i).eq.x2(j+1)).and.(y1(i).eq.(y2(j+1)) )) ) then
+             N=N+1
+             res(1,N)=x1(i)
+             res(2,N)=y1(i)
+           elseif ( ((x1(i+1).eq.x2(j)).and.(y1(i+1).eq.(y2(j)) )).or.
+     &         ((x1(i+1).eq.x2(j+1)).and.(y1(i+1).eq.(y2(j+1)) )) ) then
+             N=N+1
+             res(1,N)=x1(i+1)
+             res(2,N)=y1(i+1)
 
-             cond1=.true.
-             if ((dx1.ne.0.).and.(dx2.ne.0)) then
-               m1 = dy1/dx1
-               m2 = dy2/dx2
-               if (m1.eq.m2) then
-                 cond1=.false.
+           else
+             Xb=max(x2(j),x2(j+1))
+             Yb=max(y2(j),y2(j+1))
+             xb_=min(x2(j),x2(j+1))
+             yb_=min(y2(j),y2(j+1))
+             dx2=x2(j+1)-x2(j)
+             dy2=y2(j+1)-y2(j)
+
+             if ((Xa.ge.xb_).and.(xa_.le.Xb).and.
+     &           (Ya.ge.yb_).and.(ya_.le.Yb)) then
+
+               cond1=.true.
+               if ((dx1.ne.0.).and.(dx2.ne.0)) then
+                 m1 = dy1/dx1
+                 m2 = dy2/dx2
+!!!                 print*, i,j, m1, m2, m1.eq.m2, m1.eq.0.,m2.eq.0.
+                 if (m1.eq.m2) then
+                   cond1=.false.
+                 else
+                    y = 1./(m1-m2) *
+     &                  ( m1*y2(j) - m2*y1(i) + m1*m2*(x1(i)-x2(j)))
+
+                    ! if some slope is zero, fix y (prev calc has some
+                    ! errors
+                    if (m1.eq.0.) then
+                      y=y1(i)
+                    elseif (m2.eq.0.) then
+                      y=y2(j)
+                    endif
+
+                    if (m1.ne.0.) then
+                      x = (y-y1(i)+m1*x1(i))/m1
+                    elseif (m2.ne.0.) then
+                      x = (y-y2(j)+m2*x2(j))/m2
+                    endif
+                 endif
+
+               elseif ((dx1.eq.0.).and.(dx2.ne.0.)) then
+                 m2 = dy2/dx2
+                 x=x1(i)
+                 y = m2*(x-x2(j)) + y2(j)
+               elseif ((dx1.ne.0.).and.(dx2.eq.0.)) then
+                  m1 = dy1/dx1
+                  x = x2(j)
+                  y = m1*(x-x1(i)) + y1(i)
                else
-                  y = 1./(m1-m2) *
-     &                ( m1*y2(j) - m2*y1(i) + m1*m2*(x1(i)-x2(j)))
-                  if (m1.ne.0.) then
-                     x = (y-y1(i)+m1*x1(i))/m1
-                  elseif (m2.ne.0.) then
-                    x = (y-y2(j)+m2*x2(j))/m2
-                  endif
+                 cond1=.false.
                endif
 
-             elseif ((dx1.eq.0.).and.(dx2.ne.0.)) then
-               m2 = dy2/dx2
-               x=x1(i)
-               y = m2*(x-x2(j)) + y2(j)
-             elseif ((dx1.ne.0.).and.(dx2.eq.0.)) then
-                m1 = dy1/dx1
-                x = x2(j)
-                y = m1*(x-x1(i)) + y1(i)
-             else
-               cond1=.false.
+
+          !             cond2=(x.ge.max(xa_,xb_)).and.(x.le.min(Xa,Xb)).and.
+          !     &             (y.ge.max(ya_,yb_)).and.(y.le.min(Ya,Yb))
+          !
+          !
+          !             print*, x.ge.max(xa_,xb_), x.le.min(Xa,Xb),
+          !     &               y.ge.max(ya_,yb_), y.le.min(Ya,Yb)
+          !
+
+               cond2=(x.ge.(max(xa_,xb_)-epsx)).and.
+     &               (x.le.(min(Xa,Xb)+epsx)).and.
+     &               (y.ge.(max(ya_,yb_)-epsy)).and.
+     &               (y.le.(min(Ya,Yb)+epsy))
+
+
+               if (cond1.and.cond2) then
+                 N=N+1
+                 res(1,N)=x
+                 res(2,N)=y
+               endif
+
              endif
-
-             cond2=(x.ge.max(xa_,xb_)).and.(x.le.min(Xa,Xb)).and.
-     &            (y.ge.max(ya_,yb_)).and.(y.le.min(Ya,Yb))
-
-             if (cond1.and.cond2) then
-               N=N+1
-               res(1,N)=x
-               res(2,N)=y
-             endif
-
            endif
 
          enddo
        enddo
+
+       ! eliminate repeated points -------------------:
+       Nu=0
+       if (N.ge.1) then
+         resu(1,1)=res(1,1)
+         resu(2,1)=res(2,1)
+         Nu=1
+
+         do j=2,N
+           do i=1,j-1
+             found=.false.
+             if ( (res(1,j).eq.res(1,i)).and.
+     &                  (res(2,j).eq.res(2,i)) ) then
+               found=.true.
+               exit
+             endif
+           enddo
+
+          if (.not.found) then
+            Nu=Nu+1
+            resu(1,Nu)=res(1,j)
+            resu(2,Nu)=res(2,j)
+          endif
+         enddo
+       endif
+
 
       end
 

@@ -9,6 +9,7 @@ from okean import netcdf, calc, dateu
 def depthof(v,z,val):
   '''
   Depths where variable, increasing/dec with depth, has some value
+  val can be 2d
 
   Output is masked where surface is higher/lower than value or where all
   water column is lower/higher than value
@@ -20,6 +21,9 @@ def depthof(v,z,val):
   A=A+zeta
   '''
 
+  try: val.shape==v.shape[1:]
+  except: val=np.ones(v.shape[1:],v.dtype)*val
+
   import rtools
   mask=(~v[0].mask).astype('i')
   zz=rtools.depthof(v,z,mask,val)
@@ -29,24 +33,22 @@ def depthof(v,z,val):
   return np.ma.masked_where((zz==999)|(zz==9999),zz)
 
 
-def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True):
+def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
   tts,ttb,hc,Nr,vt,vs=sparams
 
+  import rtools
 
-  if vt==1 and vs==1:
-    import rtools
-  elif vt==2 and vs==4:
-    import rtools_vs4vt2 as rtools
-  elif vt==2 and vs==2:
-    import rtools_vs2vt2 as rtools
-  else:
-    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-    return
+  try: level.shape==v.shape[1:]
+  except: level=np.ones(v.shape[1:],v.dtype)*level
 
-  N,M,L=v.shape
-  res=rtools.roms_slicez(v,h,zeta,hc,tts,ttb,level,surface_nans,Nr,N,M,L)
+  N,Ny,Nx=v.shape
+  res=rtools.roms_slicez(v,h,zeta, tts,ttb,hc,Nr,vt,vs,
+                         level,surface_nans,spline,
+                         N,Ny,Nx)
+
   mask=np.where(res==-99.,0,1)*maskv==0
-  return res, mask
+  res=np.ma.masked_where(mask,res)
+  return res
 
 
 def s_levels(h,zeta,sparams,rw=False):
@@ -55,18 +57,12 @@ def s_levels(h,zeta,sparams,rw=False):
   '''
   tts,ttb,hc,n,vt,vs=sparams
 
-  if vt==1 and vs==1:
-    import rtools
-  elif vt==2 and vs==4:
-    import rtools_vs4vt2 as rtools
-  elif vt==2 and vs==2:
-    import rtools_vs2vt2 as rtools
-  else:
-    print 's_levels not implemented yet for vt,vs=%d %d'%(vt,vs)
-    return
+  # to deal with WET_DRY (See Nonlinear/set_depth.F)
+  # h cannot be zero, at least with vt==1
+  h=np.where(h==0.,1e-14,h)
 
-
-  zr,zw=rtools.s_levels(h,zeta,hc,tts,ttb,n)
+  import rtools
+  zr,zw=rtools.s_levels(h,zeta,tts,ttb,hc,n,vt,vs)
 
   # add zeta mask to z levels:
   if np.ma.isMA(zeta):
@@ -183,7 +179,10 @@ def psi2uvr(vp,pt):
   elif  pt=='u': M_,L_=M+1,L
   elif  pt=='v': M_,L_=M,L+1
 
-  vr=np.zeros((M_,L_),vp.dtype)
+  if np.ma.isMA(vp):
+    vr=np.ma.zeros((M_,L_),vp.dtype)
+  else:
+    vr=np.zeros((M_,L_),vp.dtype)
 
   if pt[0]=='r':
     vr[1:-1,1:-1]=0.25*(vp[:-1,:-1]+vp[:-1,1:]+vp[1:,:-1]+vp[1:,1:])
@@ -287,7 +286,8 @@ def s_params(nc,show=0):
 
 
       if hmin and Tcline:
-        hc=np.min([hmin,Tcline])
+        #hc=np.min([hmin,Tcline])
+        hc=np.min([np.max([hmin,0]),Tcline]) # to deal with WET_DRY (see Utility/set_scoord.F)
         hc_source = 'min of hmin and Tcline';
       else:
         hc='not found'
@@ -454,9 +454,8 @@ def barotropic(var,zeta,h,sparams):
   must be provided zetau and hu
   '''
 
-  L,M=h.shape
   zr,zw=s_levels(h,zeta,sparams)
-  dz=np.diff(zw,axis=0)
+  dz=np.diff(np.squeeze(zw),axis=0)
   return np.sum(var*dz,0)/np.sum(dz,0)
 
 

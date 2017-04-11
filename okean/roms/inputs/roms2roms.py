@@ -145,6 +145,10 @@ def roms2roms(f0,grd,sparams,tind=0,**kargs):
     v[:,0,:]=data['v'][:,0,:]
     v[:,-1,:]=data['v'][:,-1,:]
 
+    print 'rot 2d from original grid'
+    for k in range(v.shape[0]):
+      u[k],v[k]=calc.rot2d(u[k],v[k],-g0.angle)
+
     data['u']=u
     data['v']=v
 

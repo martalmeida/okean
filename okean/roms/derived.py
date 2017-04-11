@@ -1,66 +1,133 @@
 import numpy as np
 import roms_tools as rt
-
-
-def speed(u,v): return np.sqrt(u**2+v**2)
-def ke(u,v): return 0.5*(u**2+v**2)
-
-def okubo(u,v,pm,pn):
-  '''
-  Compute the Okubo-Weiss parameter
-  '''
-
-  Mp,Lp=pm.shape
-  L=Lp-1
-  M=Mp-1
-  Lm=L-1
-  Mm=M-1
-  Dtype=u.dtype
-
-  uom = 2.*u/(pm[:,:L]+pm[:,1:Lp])
-  uon = 2.*u/(pn[:,:L]+pn[:,1:Lp])
-  von = 2.*v/(pn[0:M,:]+pn[1:Mp,:])
-  vom = 2.*v/(pm[0:M,:]+pm[1:Mp,:])
-
-  mn=pm*pn
-  mn_p=(mn[:M,:L]+mn[:M,1:Lp]+mn[1:Mp,1:Lp]+mn[1:Mp,:L])/4.
-
-  # relative vorticity:
-  xi=mn*rt.psi2rho(von[:,1:Lp]-von[:,:L]-uom[1:Mp,:]+uom[:M,:])
-
-  # Sigma_T:
-  ST=mn*rt.psi2rho(von[:,1:Lp]-von[:,:L]+uom[1:Mp,:]-uom[:M,:])
-
-  # Sigma_N:
-  SN=np.zeros((Mp,Lp),Dtype)
-  SN[1:-1,1:-1]=mn[1:-1,1:-1]*(uon[1:-1,1:]
-                              -uon[1:-1,:-1]
-                              -vom[1:,1:-1]
-                              +vom[:-1,1:-1])
-  return SN**2+ST**2-xi**2
+from okean import phys
+from okean.vis import Data
 
 
 class Derived:
   def slice_derived(self,var,ind,time,**opts):
-    if var in ('speed','ke','okubo'):
-      if not isinstance(ind,dict):
-        x,y,z,u,v=self.sliceuv(ind,time,**opts)
-        if   var=='speed': res=speed(u,v)
-        elif var=='ke':    res=ke(u,v)
-        elif var=='okubo':
-          res=okubo(rt.psi2uvr(u,'u'),rt.psi2uvr(v,'v'),self.grid.pm,self.grid.pn)
-          x,y=self.grid.lon,self.grid.lat
-        return x,y,z,res
-      else: # slice ll:
-        X=ind['x']
-        Y=ind['y']
-        dist,z,u=self.slicell('u',X,Y,time,dist=True,**opts)
-        dist,z,v=self.slicell('v',X,Y,time,dist=True,**opts)
+    plot= opts.get('plot',False)
+    ax  = opts.get('ax',None)
+    if not isinstance(ind,dict): # slicez,k
+      coords=opts.get('coords','x,y,t').split(',')
+    else: # slicell
+      coords=opts.get('coords','d,z,t').split(',')
 
-        if   var=='speed': res=speed(u,v)
-        elif var=='ke':    res=ke(u,v)
-        elif var=='okubo':
-          res=okubo(rt.psi2uvr(u,'u'),rt.psi2uvr(v,'v'),self.grid.pm,self.grid.pn)
-          x,y=self.grid.lon,self.grid.lat
+    out=Data()
+    out.msg=self.check_slice('u',t=time) # any time dependent var could be
+                                         # used here!
+    if out.msg: return out
 
-        return dist,z,res
+
+    if var in ('div','divergence','diverg'): var='hdiv'
+    if var in ('vort','vorticity','rel vort'): var='rvort'
+
+    if not isinstance(ind,dict): # horizontal slices, else, slicell
+      
+      if var in ('speed','ke'):
+        outuv=self.sliceuv(ind,time,**opts)
+        if outuv.msg: return outuv
+
+        if   var=='speed': res=phys.speed(*outuv.v)
+        elif var=='ke':    res=phys.ke(*outuv.v)
+
+
+        out=outuv
+        out.v=res
+        out.info['v']['name']=var
+        if var=='speed': out.info['v']['units']='metre second-1'
+        elif var=='ke':  out.info['v']['units']='metre2 second-2'
+     
+
+        return out
+
+      elif var in ('okubo','hdiv','rvort'):
+        if ind>=0: slc=self.slicek
+        else: slc=self.slicez
+
+
+        if ind=='bar': uname,vname,ind='ubar','vbar',0
+        else: uname,vname='u','v'
+
+        outu=slc(uname,ind,time,**opts)
+        outv=slc(vname,ind,time,**opts)
+
+        if   outu.msg: return outu
+        elif outv.msg: return outv
+
+        # coords at rho needed for okubo','hdiv','rvort,so:
+        if any([i in coords for i in 'xy']):
+          x,y,h,m=self.grid.vars(ruvp='r')
+
+        if 'x' in coords:
+          if self.grid.use('spherical') in (1,'T'):
+            out.x=x
+            out.info['x']=dict(name='Longitude',units=r'$\^o$E')
+          else:
+            out.x=x/1000.
+            out.info['x']=dict(name='Distance',units='km')
+
+        if 'y' in coords:
+          if self.grid.use('spherical') in (1,'T'):
+            out.y=y
+            out.info['y']=dict(name='Latitude',units=r'$\^o$N')
+          else:
+            out.y=y/1000.
+            out.info['y']=dict(name='Distance',units='km')
+
+        if 't' in coords: out.t=self.time[time]
+
+        if 'z' in coords and self.hasz(uname):
+          out.z=self.s_levels(time,k=ind,ruvpw='r')
+          out.info['z']=dict(name='Depth',units='m')
+
+
+        if var=='okubo':
+          res=phys.okubo(outu.v,outv.v,self.grid.pm,self.grid.pn)
+
+          out.v=res
+          out.info['v']['name']=var
+          out.info['v']['units']='second-2'
+
+  
+        elif var=='hdiv':
+          res=phys.hor_div(outu.v,outv.v,self.grid.pm,self.grid.pn)
+          out.v=res
+          out.info['v']['name']=var
+          out.info['v']['units']='second-1'
+
+          if not out.x is None: out.x=out.x[1:-1,1:-1]
+          if not out.y is None: out.y=out.y[1:-1,1:-1]
+          if not out.z is None: out.z=out.z[1:-1,1:-1]
+
+
+        elif var=='rvort':
+          res=phys.vorticity(outu.v,outv.v,self.grid.pm,self.grid.pn)
+          out.v=res
+          out.info['v']['name']=var
+          out.info['v']['units']='second-1'
+
+
+        out.coordsReq=','.join(sorted(coords))
+        return out
+
+
+
+    else: # slice ll:
+      print 'TODO !!!!'
+      return out
+#        X=ind['x']
+#        Y=ind['y']
+#        if var=='okubo':
+#          x,y,z,u,v=self.sliceuv(ind,time,**opts)
+#          data=okubo(rt.psi2uvr(u,'u'),rt.psi2uvr(v,'v'),self.grid.pm,self.grid.pn)
+#          res=slicell(self,'r',X,Y,time,dist=True,data=data,**opts)
+#
+#        elif var in ['speed','ek']:
+#          dist,z,u=self.slicell('u',X,Y,time,dist=True,**opts)
+#          dist,z,v=self.slicell('v',X,Y,time,dist=True,**opts)
+#
+#          if   var=='speed': res=speed(u,v)
+#          elif var=='ke':    res=ke(u,v)
+#
+#        return dist,z,res

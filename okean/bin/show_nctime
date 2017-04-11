@@ -7,7 +7,7 @@ def find_tvar(fname):
   tvar=''
   vars=netcdf.varnames(fname)
   for v in vars:
-    if v.endswith('time'):
+    if v.lower().endswith('time') or v.lower()=='t':
       return v
 
   return tvar
@@ -28,7 +28,10 @@ def show(fname,tvar=False,tind=False):
     T0=netcdf.nctime(fname,tvar,**{'0':0})
     T1=netcdf.nctime(fname,tvar,**{'0':-1})
     nrec=netcdf.vdim(fname,tvar).values()[0]
-    print '%d reccords, from %s to %s' % (nrec,T0.isoformat(' '),T1.isoformat(' '))
+    if nrec==1:
+      print 'One reccord = %s' % T0.isoformat(' ')
+    else:
+      print '%d reccords, from %s to %s' % (nrec,T0.isoformat(' '),T1.isoformat(' '))
   else:
     T=netcdf.nctime(fname,tvar,**{'0':tind})
     print T,'('+tvar+')'
@@ -59,4 +62,3 @@ if __name__=='__main__':
   if tind!='all' and not tind is False: tind=int(tind)
 
   show(filename,varname,tind)
-

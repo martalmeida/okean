@@ -1,6 +1,5 @@
 from os.path import isfile
 import numpy as np
-import netcdftime
 import datetime
 
 from okean import calc, cookbook as cb, netcdf
@@ -220,39 +219,44 @@ def load_data(f,quiet=0,**kargs):
   # time:
   # file may have one or several times. If several, time dim must be given
   # with kargs inds!
-  if not quiet: print '  loading time...'
-  if t_units:
-    times=netcdf.use(ncTime,sett.time_name)
-    times=netcdftime.num2date(times,t_units)
+  # but file may also have no time dim or time name !
+  if sett.time_name:
+    if not quiet: print '  loading time...'
+    if t_units:
+      times=netcdf.use(ncTime,sett.time_name)
+      times=netcdf.num2date(times,t_units)
+    else:
+      times=netcdf.nctime(ncTime,sett.time_name)
+
+    if inds.has_key(sett.tdim):
+      try: tind=dts.parse_date(inds[sett.tdim])
+      except: tind=inds[sett.tdim] # is an integer, for instance
+
+      if isinstance(tind,datetime.datetime):
+        tind,=np.where(times==tind)
+        if tind.size:
+          tind=tind[0]
+          inds[sett.tdim]=tind # update inds to extract other variables
+        else:
+          Msg='date not found'
+          msg+='\n'+Msg
+          return res,msg+' ERROR'
+
+      date=times[tind]
+      if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
+
+    elif times.size==1:
+      date=times[0]
+      if not quiet: print '    date= %s' % date.isoformat(' ')
+    else: # must provide tind as input!!
+      Msg='several dates in file... provice tind!'
+      msg+='\n'+Msg
+      return res,msg+' ERROR'
+
+    res['date'] = date
   else:
-    times=netcdf.nctime(ncTime,sett.time_name)
-
-  if inds.has_key(sett.tdim):
-    try: tind=dts.parse_date(inds[sett.tdim])
-    except: tind=inds[sett.tdim] # is an integer, for instance
-
-    if isinstance(tind,datetime.datetime):
-      tind,=np.where(times==tind)
-      if tind.size:
-        tind=tind[0]
-        inds[sett.tdim]=tind # update inds to extract other variables
-      else:
-        Msg='date not found'
-        msg+='\n'+Msg
-        return res,msg+' ERROR'
-
-    date=times[tind]
-    if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
-
-  elif times.size==1:
-    date=times[0]
-    if not quiet: print '    date= %s' % date.isoformat(' ')
-  else: # must provide tind as input!!
-    Msg='several dates in file... provice tind!'
-    msg+='\n'+Msg
-    return res,msg+' ERROR'
-
-  res['date'] = date
+    if not quiet: print '    warning: not using time !!'
+    res['date']=0
 
   empty3d=np.zeros([res['NZ'],res['NY'],res['NX']])
   empty2d=np.zeros([res['NY'],res['NX']])
@@ -341,12 +345,29 @@ def data2z(data,**kargs):
   **kargs:
   ij : axis for vertical interpolations (*i,j)
   quiet : output messages flag (True by default)
+  rep_surf: repeat surface level, ie, add a new surface level with same
+    data as the old surface. This will ensure extrapolations in vertical
+    slices do not occur horizontally, ie, misture will occur in the vertical
+    not along the slice (True by default)
+  interp_opts: options for griddata
   '''
 
-  ij='j'
-  quiet=True
-  if 'ij'    in kargs.keys(): ij    = kargs['ij']
-  if 'quiet' in kargs.keys(): quiet = kargs['quiet']
+  ij=kargs.get('ij','j')
+  quiet=kargs.get('quiet',True)
+  rep_surf=kargs.get('rep_surf',True)
+  interp_opts=kargs.get('interp_opts',{})
+
+  # repeat surface:
+  if rep_surf:
+    for vname in ['z3d','temp','salt','u','v']:
+      if np.ma.isMA(data[vname]):
+        data[vname]=np.ma.vstack((data[vname],data[vname][-1][np.newaxis,...]))
+      else:
+        data[vname]=np.vstack((data[vname],data[vname][-1][np.newaxis,...]))
+
+    data['z3d'][-1]=data['z3d'].max()+1
+    data['NZ']=data['NZ']+1
+
 
   Z = data['depth'] # new depths 1D
   z = data['z3d'] # 3D depths
@@ -381,38 +402,38 @@ def data2z(data,**kargs):
 
       v=data['temp'][:,j,:]
       v=np.ma.masked_where(v==0,v)
-      Temp[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True)
+      Temp[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True,**interp_opts)
 
       v=data['salt'][:,j,:]
       v=np.ma.masked_where(v==0,v)
-      Salt[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True)
+      Salt[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True,**interp_opts)
 
       v=data['u'][:,j,:]
       v=np.ma.masked_where(v==0,v)
-      U[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True)
+      U[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True,**interp_opts)
 
       v=data['v'][:,j,:]
       v=np.ma.masked_where(v==0,v)
-      V[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True)
+      V[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True,**interp_opts)
   elif ij=='i':
     for i in range(nx):
       if not quiet and i%10==0: print 'z interp (%d z levels) i=%d of %d' % (nZ,i,nx)
 
       v=data['temp'][:,:,i]
       v=np.ma.masked_where(v==0,v)
-      Temp[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True)
+      Temp[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True,**interp_opts)
 
       v=data['salt'][:,:,i]
       v=np.ma.masked_where(v==0,v)
-      Salt[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True)
+      Salt[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True,**interp_opts)
 
       v=data['u'][:,:,i]
       v=np.ma.masked_where(v==0,v)
-      U[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True)
+      U[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True,**interp_opts)
 
       v=data['v'][:,:,i]
       v=np.ma.masked_where(v==0,v)
-      V[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True)
+      V[:,:,i]=calc.griddata(y[:,:,i],z[:,:,i],v,yy[:,:,i],zz[:,:,i],extrap=True,**interp_opts)
 
 
   res = data.copy()
@@ -450,16 +471,21 @@ def data2roms(data,grd,sparams,**kargs):
              returned and can be used for next data2roms call with
              this same karg
   quiet : output messages flag (false by default)
+  proj : projection - False, name or basemap proj - lcc by default
+         if False, horizontal interpolations will use lonxlat instead of distances
+  interp_opts: options for griddata
+  rep_surf: repeat surface level (new upper level)
   '''
 
-  ij='j'
-  ij_ind=False
-  horizAux=False
-  quiet=False
-  if 'ij'       in kargs.keys(): ij       = kargs['ij']
-  if 'ij_ind'   in kargs.keys(): ij_ind   = kargs['ij_ind']
-  if 'horizAux' in kargs.keys(): horizAux = kargs['horizAux']
-  if 'quiet'    in kargs.keys(): quiet    = kargs['quiet']
+  ij          = kargs.get('ij','j')
+  ij_ind      = kargs.get('ij_ind',False)
+  horizAux    = kargs.get('horizAux',False)
+  quiet       = kargs.get('quiet',False)
+  proj        = kargs.get('proj','lcc') # lonxlat to distance before
+                                        # horizontal interpolation
+  interp_opts = kargs.get('interp_opts',{})
+  rep_surf    = kargs.get('rep_surf',True) # create a surface upper level
+                                           # before interpolation
 
   if not quiet: print 'using grid %s' % grd
   g=roms.Grid(grd)
@@ -469,13 +495,55 @@ def data2roms(data,grd,sparams,**kargs):
   ny,nx=hr.shape
   nz=sparams[3]
 
+  if proj:
+    print 'projecting coordinates...'
+    if isinstance(proj,basestring):
+       lonc=(xr.max()+xr.min())/2.
+       latc=(yr.max()+yr.min())/2.
+       from mpl_toolkits.basemap import Basemap
+       proj=Basemap(projection=proj,width=1,height=1,resolution=None,
+                    lon_0=lonc,lat_0=latc, lat_1=latc)
+
+    xr,yr=proj(xr,yr)
+    xu,yu=proj(xu,yu)
+    xv,yv=proj(xv,yv)
+    dlon,dlat=proj(data['lon'],data['lat'])
+    Rdz=1/100. # distance to depth ratio (300km vs 3000m)
+    distance=lambda x,y: np.append(0.,np.sqrt(np.diff(x)**2+np.diff(y)**2).cumsum())
+  else:
+    dlon,dlat=data['lon'],data['lat']
+    distance=calc.distance
+
+  # needed for s_levels and for rep_surf!
+  sshr=calc.griddata(dlon,dlat,data['ssh'],xr,yr,extrap=True,**interp_opts)
+
+  # repeat surface:
+  if rep_surf:
+    # copy data cos dont want to change the original dataset:
+    import copy
+    data=copy.deepcopy(data)
+    for vname in ['temp','salt','u','v','depth']:
+      if data[vname].ndim==1: # depth !
+        if np.ma.isMA(data[vname]): vstack=np.ma.hstack
+        else: vstack=np.hstack
+      else:
+        if np.ma.isMA(data[vname]): vstack=np.ma.vstack
+        else: vstack=np.vstack
+
+      if data['depth'][0]>data['depth'][1]: # surf at ind 0
+        data[vname]=vstack((data[vname][0][np.newaxis],data[vname]))
+        if vname=='depth': data[vname][0]=sshr.max()
+      else:
+        data[vname]=vstack((data[vname],data[vname][-1][np.newaxis]))
+        if vname=='depth': data[vname][-1]=sshr.max()
+
+    data['NZ']=data['NZ']+1
+
   NX=data['NX']
   NY=data['NY']
   NZ=data['NZ']
 
   if not quiet: print 'calc s levels...'
-  sshr=calc.griddata(data['lon'],data['lat'],data['ssh'],xr,yr,extrap=True)
-
   Zr = g.s_levels(sparams,sshr,hr,'r')
   Zu = g.s_levels(sparams,sshr,hr,'u')
   Zv = g.s_levels(sparams,sshr,hr,'v')
@@ -495,16 +563,16 @@ def data2roms(data,grd,sparams,**kargs):
       #pylab.figure()
       #pylab.pcolormesh(data['lon'],data['lat'],data['temp'][i,...])
 
-      try: TEMP[i,...] = calc.griddata(data['lon'],data['lat'],data['temp'][i,...],xr,yr,extrap=True)
+      try: TEMP[i,...] = calc.griddata(dlon,dlat,data['temp'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: SALT[i,...] = calc.griddata(data['lon'],data['lat'],data['salt'][i,...],xr,yr,extrap=True)
+      try: SALT[i,...] = calc.griddata(dlon,dlat,data['salt'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: U[i,...] = calc.griddata(data['lon'],data['lat'],data['u'][i,...],xr,yr,extrap=True)
+      try: U[i,...] = calc.griddata(dlon,dlat,data['u'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
-      try: V[i,...] = calc.griddata(data['lon'],data['lat'],data['v'][i,...],xr,yr,extrap=True)
+      try: V[i,...] = calc.griddata(dlon,dlat,data['v'][i,...],xr,yr,extrap=True,**interp_opts)
       except: pass
 
     # rotate U,V:
@@ -579,17 +647,17 @@ def data2roms(data,grd,sparams,**kargs):
     for j in range(ny):
       if not quiet and (ny<10 or (ny>=10 and j%10==0)): print '  j=%3d of %3d' % (j,ny)
       ind=ij_ind[j]
-      dr=np.tile(calc.distance(xr[ind,:],yr[ind,:]),(nz,1))
-      du=np.tile(calc.distance(xu[ind,:],yu[ind,:]),(nz,1))
-      Dr=np.tile(calc.distance(xr[ind,:],yr[ind,:]),(NZ,1))
-      Du=np.tile(calc.distance(xu[ind,:],yu[ind,:]),(NZ,1))
+      dr=np.tile(distance(xr[ind,:],yr[ind,:]),(nz,1))
+      du=np.tile(distance(xu[ind,:],yu[ind,:]),(nz,1))
+      Dr=np.tile(distance(xr[ind,:],yr[ind,:]),(NZ,1))
+      Du=np.tile(distance(xu[ind,:],yu[ind,:]),(NZ,1))
 
       if useInd:
         distr[:,j,:]=dr;
         distu[:,j,:]=du;
 
-      Temp[:,j,:]   = calc.griddata(Dr,ZZr[:,j,:],TEMP[:,j,:],dr,Zr[:,j,:],extrap=True)
-      Salt[:,j,:]   = calc.griddata(Dr,ZZr[:,j,:],SALT[:,j,:],dr,Zr[:,j,:],extrap=True)
+      Temp[:,j,:]   = calc.griddata(Rdz*Dr,ZZr[:,j,:],TEMP[:,j,:],Rdz*dr,Zr[:,j,:],extrap=True,**interp_opts)
+      Salt[:,j,:]   = calc.griddata(Rdz*Dr,ZZr[:,j,:],SALT[:,j,:],Rdz*dr,Zr[:,j,:],extrap=True,**interp_opts)
       if 0 and j%10==0:
         print Dr.shape, ZZr[:,j,:].shape
         import pylab as pl
@@ -606,11 +674,11 @@ def data2roms(data,grd,sparams,**kargs):
         pl.colorbar()
         raw_input()
       
-      Uvel[:,j,:]   = calc.griddata(Du,ZZu[:,j,:],U[:,j,:],   du,Zu[:,j,:],extrap=True)
+      Uvel[:,j,:]   = calc.griddata(Rdz*Du,ZZu[:,j,:],U[:,j,:],   Rdz*du,Zu[:,j,:],extrap=True,**interp_opts)
       if j<Vvel.shape[1]:
-        dv=np.tile(calc.distance(xv[ind,:],yv[ind,:]),(nz,1))
-        Dv=np.tile(calc.distance(xv[ind,:],yv[ind,:]),(NZ,1))
-        Vvel[:,j,:] = calc.griddata(Dv,ZZv[:,j,:],V[:,j,:],   dv,Zv[:,j,:],extrap=True)
+        dv=np.tile(distance(xv[ind,:],yv[ind,:]),(nz,1))
+        Dv=np.tile(distance(xv[ind,:],yv[ind,:]),(NZ,1))
+        Vvel[:,j,:] = calc.griddata(Rdz*Dv,ZZv[:,j,:],V[:,j,:],   Rdz*dv,Zv[:,j,:],extrap=True,**interp_opts)
         if useInd:
           distv[:,j,:]=dv
 
@@ -624,22 +692,22 @@ def data2roms(data,grd,sparams,**kargs):
     for i in range(nx):
       if not quiet and (nx<10 or (nx>=10 and i%10==0)): print '  i=%3d of %3d' % (i,nx)
       ind=ij_ind[i]
-      dr=np.tile(calc.distance(xr[:,ind],yr[:,ind]),(nz,1))
-      dv=np.tile(calc.distance(xv[:,ind],yv[:,ind]),(nz,1))
-      Dr=np.tile(calc.distance(xr[:,ind],yr[:,ind]),(NZ,1))
-      Dv=np.tile(calc.distance(xv[:,ind],yv[:,ind]),(NZ,1))
+      dr=np.tile(distance(xr[:,ind],yr[:,ind]),(nz,1))
+      dv=np.tile(distance(xv[:,ind],yv[:,ind]),(nz,1))
+      Dr=np.tile(distance(xr[:,ind],yr[:,ind]),(NZ,1))
+      Dv=np.tile(distance(xv[:,ind],yv[:,ind]),(NZ,1))
 
       if useInd:
         distr[:,:,i]=dr;
         distv[:,:,i]=dv;
 
-      Temp[:,:,i]   = calc.griddata(Dr,ZZr[:,:,i],TEMP[:,:,i],dr,Zr[:,:,i],extrap=True)
-      Salt[:,:,i]   = calc.griddata(Dr,ZZr[:,:,i],SALT[:,:,i],dr,Zr[:,:,i],extrap=True)
-      Vvel[:,:,i]   = calc.griddata(Dv,ZZv[:,:,i],V[:,:,i],   dv,Zv[:,:,i],extrap=True)
+      Temp[:,:,i]   = calc.griddata(Rdz*Dr,ZZr[:,:,i],TEMP[:,:,i],Rdz*dr,Zr[:,:,i],extrap=True,**interp_opts)
+      Salt[:,:,i]   = calc.griddata(Rdz*Dr,ZZr[:,:,i],SALT[:,:,i],Rdz*dr,Zr[:,:,i],extrap=True,**interp_opts)
+      Vvel[:,:,i]   = calc.griddata(Rdz*Dv,ZZv[:,:,i],V[:,:,i],   Rdz*dv,Zv[:,:,i],extrap=True,**interp_opts)
       if i<Uvel.shape[2]:
-        du=np.tile(calc.distance(xu[:,ind],yu[:,ind]),(nz,1))
-        Du=np.tile(calc.distance(xu[:,ind],yu[:,ind]),(NZ,1))
-        Uvel[:,:,i] = calc.griddata(Du,ZZu[:,:,i],U[:,:,i],   du,Zu[:,:,i],extrap=True)
+        du=np.tile(distance(xu[:,ind],yu[:,ind]),(nz,1))
+        Du=np.tile(distance(xu[:,ind],yu[:,ind]),(NZ,1))
+        Uvel[:,:,i] = calc.griddata(Rdz*Du,ZZu[:,:,i],U[:,:,i],   Rdz*du,Zu[:,:,i],extrap=True,**interp_opts)
         if useInd:
           distu[:,:,i]=du
 
@@ -649,8 +717,8 @@ def data2roms(data,grd,sparams,**kargs):
   if useInd is False:
     ubar,vbar=rt.uvbar(Uvel,Vvel,sshr,hr,sparams)
   else: #>------------------------------------------------------------
-    sshu=calc.griddata(data['lon'],data['lat'],data['ssh'],xu,yu,extrap=True)
-    sshv=calc.griddata(data['lon'],data['lat'],data['ssh'],xv,yv,extrap=True)
+    sshu=calc.griddata(dlon,dlat,data['ssh'],xu,yu,extrap=True,**interp_opts)
+    sshv=calc.griddata(dlon,dlat,data['ssh'],xv,yv,extrap=True,**interp_opts)
 
     if ij=='j':
       sshu=sshu[ij_ind,:]

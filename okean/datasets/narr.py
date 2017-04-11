@@ -1,11 +1,7 @@
 import numpy as np
-from ompy.nc import netcdf
-from ompy.roms import roms
+from okean import roms, netcdf, dateu, calc, air_sea
+from okean import cookbook as cb
 import os
-from ompy.tools import date_tools as dt
-from ompy.tools import cookbook as cb
-from ompy.tools import num_tools as nt
-from ompy.tools import air_sea
 import datetime
 
 grd='http://nomads.ncdc.noaa.gov/thredds/dodsC/narr-a/AWIP32-fixed.grb'
@@ -13,14 +9,13 @@ grd='http://nomads.ncdc.noaa.gov/thredds/dodsC/narr-a/AWIP32-fixed.grb'
 # cant find grid in opendap anymore !!
 grd='AWIP32-fixed.grb'
 grdTxt='latlon.g221.txt'
-from okean.cookbook import run
 if not os.path.isfile(grd):
-  run('wget','http://nomads.ncdc.noaa.gov/data/narr/AWIP32-fixed.grb')
+  cb.run('wget','http://nomads.ncdc.noaa.gov/data/narr/AWIP32-fixed.grb')
 
 # pygrib cannot read the grid vars !!! so, will use the lon x lat txt
 # file form the http server!
 if not os.path.isfile(grdTxt):
-  run('wget','http://nomads.ncdc.noaa.gov/data/narr/latlon.g221.txt')
+  cb.run('wget','http://nomads.ncdc.noaa.gov/data/narr/latlon.g221.txt')
 
 #baseurl = 'http://nomads.ncdc.noaa.gov/thredds/dodsC/narr/'
 baseurl = 'http://nomads.ncdc.noaa.gov/thredds/dodsC/narr-a/'
@@ -57,11 +52,11 @@ class NARRData:
   def __init__(self): pass
 
   def files(self,date0,date1=False):
-    date0=dt.parse_date(date0)
+    date0=dateu.parse_date(date0)
     if not date1: date1=date0+datetime.timedelta(1)
-    else: date1=dt.parse_date(date1)
+    else: date1=dateu.parse_date(date1)
 
-    dates=dt.drange(date0,date1,True)
+    dates=dateu.drange(date0,date1,True)
 
     files=[]
     time=[]
@@ -125,7 +120,7 @@ def narr_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   if (xlim,ylim)==(False,False):i0,i1,j0,j1=0,nx,0,ny
   else:
-    i0,i1,j0,j1=nt.ij_limits(x, y, xlim, ylim, margin=0)
+    i0,i1,j0,j1=calc.ij_limits(x, y, xlim, ylim, margin=0)
     x=x[j0:j1,i0:i1]
     y=y[j0:j1,i0:i1]
 

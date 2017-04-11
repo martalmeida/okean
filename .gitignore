@@ -5,4 +5,7 @@
 *.so
 MANIFEST
 dist/
+build/
 *TODO*
+TMP/
+.ipynb_checkpoints/

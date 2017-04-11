@@ -18,7 +18,7 @@ except:
 from okean import calc
 
 
-def show(fname):
+def show_all(fname):
   '''
   Lists variables inside grib file
   '''
@@ -39,14 +39,38 @@ def show(fname):
       vlevel = g.vertical_level
       units  = g.parameter_units
 
-    print '%10s %30s %40s %10s %20s' % (abb.ljust(10),name.ljust(30)[:30],level.ljust(40)[:40],vlevel.ljust(10)[:10],units.ljust(20)[:20])
+#    print '%10s %30s %40s %10s %20s' % (abb.ljust(10),name.ljust(30)[:30],level.ljust(40)[:40],vlevel.ljust(10)[:10],units.ljust(20)[:20])
+    print '%-10s %-20s %-20s %-10s %-10s' % (abb,name[:20],level[:20],vlevel[:10],units[:10])
+
+
+def show(fname):
+  # organize variables with same short name:
+  G=Grib2Decode(fname)
+  from collections import OrderedDict
+  vars=OrderedDict()
+  varsn={}
+  for g in G:
+    abb    = g['shortName']
+    if abb in vars.keys():
+      varsn[abb]+=1
+    else:
+      vars[abb]=g['parameterName'],str(g['level']),g['parameterUnits']
+      varsn[abb]=1
+
+
+  print '%-10s %-25s %5s   %-10s' % ('','name','n vel','units')
+  for abb in vars.keys():
+    name,vlevel,units=vars[abb]
+    vlevel=str(varsn[abb])
+    print '%-10s %-25s %5s   %-10s' % (abb,name[:25],vlevel[:10],units[:10])
+
 
 
 def findvar(fname,name,*args):
   '''
   Locates variable inside grib file
   Inputs:
-    name, part of variable parameter
+    name, part of variable short name (parameter abbv)
     args, any string inside variable string representation
 
   Example:
@@ -57,10 +81,12 @@ def findvar(fname,name,*args):
   out=[]
   for g in G:
     if isPygrib:
-      if g['parameterName'].lower().find(name.lower())>=0:
+      #if g['parameterName'].lower().find(name.lower())>=0:
+      if g['shortName'].lower()==name:
         if all([str(g).lower().find(i.lower())>=0 for i in args]): out+=[g]
     else:
-      if g.parameter.lower().find(name.lower())>=0:
+      #if g.parameter.lower().find(name.lower())>=0:
+      if g.parameter_abbrev.lower()==name:
         if all([str(g).lower().find(i.lower())>=0 for i in args]): out+=[g]
 
   return out
@@ -71,16 +97,28 @@ def cross_lon0(x,y,v):
   cross longitude 0
   used by getvar
   '''
-  i=np.where(x[0]==180.)[0]
+  #i=np.where(x[0]==180.)[0]
+  i=np.where(x[0]>180.)[0]
+  L=len(i)
+#  print x[0].min(),x[0].max()
+  i=i[0]
   X=x.copy()
   Y=y.copy()
   V=v.copy()
-  X[:,i-1:]=x[:,:i+1]
-  X[:,:i-1]=x[:,i+1:]
-  Y[:,i-1:]=y[:,:i+1]
-  Y[:,:i-1]=y[:,i+1:]
-  V[:,i-1:]=v[:,:i+1]
-  V[:,:i-1]=v[:,i+1:]
+  #X[:,i-1:]=x[:,:i+1]
+  #X[:,:i-1]=x[:,i+1:]
+  #Y[:,i-1:]=y[:,:i+1]
+  #Y[:,:i-1]=y[:,i+1:]
+  #V[:,i-1:]=v[:,:i+1]
+  #V[:,:i-1]=v[:,i+1:]
+#  print X.shape, L
+  X[:,:L]=x[:,i:]
+  X[:,L:]=x[:,:i]
+  Y[:,:L]=y[:,i:]
+  Y[:,L:]=y[:,:i]
+  V[:,:L]=v[:,i:]
+  V[:,L:]=v[:,:i]
+  X=np.where(X>180.,X-360.,X)
   return X,Y,V
 
 
@@ -95,13 +133,12 @@ def extract_region(lon,lat,data,lons,lats):
   return lon[j1:j2,i1:i2],lat[j1:j2,i1:i2],data[j1:j2,i1:i2]
 
 
-def getvar(fname,name,quiet=1,**kargs):
+def getvar(*args,**kargs):
   '''
-  Returns data from GFS grib file
+  Returns data from grib file
 
   Inputs:
     Name, grib filename
-    quiet, print info flag
     kargs:
       lons, x limits
       lats, y limits
@@ -109,47 +146,53 @@ def getvar(fname,name,quiet=1,**kargs):
       neglon, if true west is negative (True)
 
   Example:
-      gfs_getvar('file.grib2','temperature',tags='2 m')
-      gfs_getvar('file.grib2','temperature',tags='2 m',lons=(-60,-30),lats=(-50,0))
+      getvar('file.grib2','temperature',tags='2 m')
+      getvar('file.grib2','temperature',tags='2 m',lons=(-60,-30),lats=(-50,0))
+      or:
+      var=findvar('file.grib2','temperature','2 m')
+      getvar(var)
   '''
 
-  if not isinstance(fname,basestring): fname=fname['name']
-  lons=False
-  lats=False
-  neglon=True
-  tags=[]
-  for k in kargs.keys():
-    if k=='lons':   lons   = kargs[k]
-    if k=='lats':   lats   = kargs[k]
-    if k=='neglon': neglon = kargs[k]
-    if k=='tags':   tags   = kargs[k]
 
-  if isinstance(tags,str): tags=[tags]
-  var=findvar(fname,name,*tags)
+  lons   = kargs.get('lons',False)
+  lats   = kargs.get('lats',False)
+  neglon = kargs.get('neglon',True)
+  tags   = kargs.get('tags',[])
+  quiet  = kargs.get('quiet',False)
 
-  if len(var)==1:
-    var=var[0]
+  if len(args)==2:
+    fname,name=args
+#    if not isinstance(fname,basestring): fname=fname['name'] # what for is this?
+    if isinstance(tags,str): tags=[tags]
+    var=findvar(fname,name,*tags)
+  elif len(args)==1:
+    var=args[0]
 
-    if isPygrib:
-      lat,lon=var.latlons()
-      data=var.values
-    else:
-      lat,lon=var.grid()
-      data=var.data()
+  try: len(var)
+  except: var=[var] # an iterable is expected, like the output of findvar
 
-    if neglon:
-      lon=np.where(lon>180.,lon-360.,lon)
-      lon,lat,data=cross_lon0(lon,lat,data)
-
-    if lons or lats:
-      lon,lat,data=extract_region(lon,lat,data,lons,lats)
-
-    return lon,lat,data
-
-  elif len(var)>1:
+  if len(var)>1:
     if not quiet: print 'more than one var found !! found', len(var)
     return False,False,False
-
-  else:
-    if not quiet: print "not found"
+  elif len(var)==0:
+    if not quiet: print "no variable found"
     return False,False,False
+  else: var=var[0]
+
+  if isPygrib:
+    lat,lon=var.latlons()
+    data=var.values
+  else:
+    lat,lon=var.grid()
+    data=var.data()
+
+  if neglon:
+    #lon=np.where(lon>180.,lon-360.,lon)
+    lon,lat,data=cross_lon0(lon,lat,data)
+
+  if lons or lats:
+    lon,lat,data=extract_region(lon,lat,data,lons,lats)
+
+  return lon,lat,data
+
+

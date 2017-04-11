@@ -31,7 +31,8 @@ class plfilt(object):
         else:
             self.dt = np.diff(dt).mean()
         
-        filter_time = np.arange(0.0, 33.0, 1.0/self.dt, dtype='d')
+        #filter_time = np.arange(0.0, 33.0, 1.0/self.dt, dtype='d')
+        filter_time = np.arange(0.0, 33.0, self.dt, dtype='d')
         self.Nt = len(filter_time)
         self.filter_time = np.hstack((-filter_time[-1:0:-1], filter_time))
         

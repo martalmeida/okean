@@ -121,12 +121,20 @@ class GFSDownload:
 
     ptmp=ptmp.replace('#DATE#',date)
     ptmp=ptmp.replace('#HOUR_START#','%02d' % hour_start)
-    ptmp=ptmp.replace('#HOUR_SIM#','%02d' % hour_sim)
+
+    if date>='20150115': # actually, hour sim is not in the path, only in filname.... so, to this in ntmp!
+      ptmp=ptmp.replace('#HOUR_SIM#','%03d' % hour_sim)
+    else:
+      ptmp=ptmp.replace('#HOUR_SIM#','%02d' % hour_sim)
+
     ptmp=ptmp.replace('#VERSION#','%d' % self.gribVersion)
 
     ntmp=ntmp.replace('#DATE#',date)
     ntmp=ntmp.replace('#HOUR_START#','%02d' % hour_start)
-    ntmp=ntmp.replace('#HOUR_SIM#','%02d' % hour_sim)
+    if date>='20150115':
+      ntmp=ntmp.replace('#HOUR_SIM#','%03d' % hour_sim)
+    else:
+      ntmp=ntmp.replace('#HOUR_SIM#','%02d' % hour_sim)
     ntmp=ntmp.replace('#VERSION#','%d' % self.gribVersion)
 
     if   type in ('srcfname','destfname'): name = ntmp
@@ -309,7 +317,7 @@ class GFSDownload:
         if not err:
           # link file:
           open(log,'a').write(':: Linking '+dest2+'\n')
-          symlink(realpath(dest2),realpath(dest2best))
+          os.symlink(os.path.realpath(dest2),os.path.realpath(dest2best))
           if not quiet: print 'linking ',dest2,dest2best
 
 

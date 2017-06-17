@@ -268,7 +268,7 @@ def yearday(y,m,d,h=0.,min=0.,sec=0.,y0=False):
 
 C2K=273.15
 
-def cloud(lw,Tsea,Tair,Rh,Wtype='net'):
+def cloud_fraction(lw,Tsea,Tair,Rh,Wtype='net'):
   '''
   Cloud cover (fraction, 0..1)
 

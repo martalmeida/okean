@@ -200,9 +200,9 @@ class Grid(Common):
       if len(sph): sph=sph[0]
     except: pass
     trueVals=[1,'T']
-    # let us assume that empty sph means True!! (may not be a very
+    # let us assume that empty or None sph means True!! (may not be a very
     # smart idea!
-    trueVals+=['']
+    trueVals+=['',None]
     if sph in trueVals: self.is_spherical=True
     else: self.is_spherical=False
 

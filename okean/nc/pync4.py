@@ -624,10 +624,15 @@ class Pync(Pyncgroup):
       if not isinstance(filename,basestring) or filename.find('*')!=-1 or filename.find('?')!=-1:
         nc=pnc.MFDataset(filename)
       else:
-        if os.path.isfile(filename):
-          nc=pnc.Dataset(filename,perm)
-        else:
+        if perm=='w':
           nc=pnc.Dataset(filename,perm,format=format)
+        else:
+          nc=pnc.Dataset(filename,perm)
+
+        #if os.path.isfile(filename):
+        #  nc=pnc.Dataset(filename,perm)
+        #else:
+        #  nc=pnc.Dataset(filename,perm,format=format)
 
     self.perm=perm
 

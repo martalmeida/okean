@@ -44,7 +44,7 @@ class WRFData:
     for f in self.files:
       time=read_time(f)
       print time[0],time[-1]
-      if not np.any((time>date0)&(time<date1)): continue
+      if not np.any((time>=date0)&(time<=date1)): continue
 
       if not quiet: print '-> extracting file %s'%f
       res=wrf_file_data(f,quiet=quiet)
@@ -78,10 +78,13 @@ def parse_time(t):
   '''
   from dateutil import parser
 
+  if t.dtype.char=='S' and t.ndim==1: # one time of the type 'y','y','y','y','-','... ect
+    t.shape=1,t.size
+
   nt=t.shape[0]
   tout=np.zeros(nt,datetime.datetime)
 
-  if np.isreal(t) is False: # 'y','y','y','y','-','... ect
+  if t.dim==2: # 'y','y','y','y','-','... ect
     for i in range(nt):
        tmp=''.join(t[i])
        tout[i]=parser.parse(tmp.replace('_',' '))
@@ -133,8 +136,8 @@ def wrf_file_data(file,quiet=False):
 
   # lon,lat:
   if not quiet: print ' --> reading x,y'
-  x=netcdf.use(file,'XLONG',**{'0': 0})
-  y=netcdf.use(file,'XLAT',**{'0': 0})
+  x=netcdf.use(file,'XLONG',Time=0)#**{'0': 0})
+  y=netcdf.use(file,'XLAT',Time=0)#**{'0': 0})
 
   # tair [K-->C]
   if not quiet: print ' --> T air'
@@ -204,13 +207,18 @@ def wrf_file_data(file,quiet=False):
 
   # Cloud cover [0--1]:
   if not quiet: print ' --> Cloud cover for LONGWAVE. Use LONGWAVE_OUT instead...'
-  if 'CLDFRA' in netcdf.varnames(file):
-    clouds=netcdf.use(file,'CLDFRA').sum(-3)
-    clouds=np.where(clouds>1,1,clouds)
+  if 0:
+    pass
+# next code is wrong! If cloud cover is really needed, it needs to be calculated using wrfpost.
+# See http://www2.mmm.ucar.edu/wrf/users/docs/user_guide/users_guide_chap8.html#_ARWpost_1
+#
+#  if 'CLDFRA' in netcdf.varnames(file):
+#    clouds=netcdf.use(file,'CLDFRA').sum(-3)
+#    clouds=np.where(clouds>1,1,clouds)
   else:
-    if not quiet: print 'CLDFRA not found!! Using SST and air_sea.clouds'
-    sst=netcdf.use(f,'SST')
-    clouds=air_sea.clouds(lw_net,sst,tair,rhum,Wtype='net')
+    if not quiet: print 'CLDFRA not found!! Using SST and air_sea.cloud_fraction'
+    sst=netcdf.use(file,'SST')
+    clouds=air_sea.cloud_fraction(lw_net,sst,tair,rhum,Wtype='net')
 
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')
 

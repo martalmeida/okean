@@ -145,6 +145,9 @@ class RiverFrc:
     if not quiet: print ' -- filling time...'
     for i in range(len(time)): nc.vars['river_time'][i]=time[i]
 
+    # better sync here:
+    nc._nc.sync()
+
     cont=-1
     for k in data.keys():
       if k=='time': continue

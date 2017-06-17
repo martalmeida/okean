@@ -243,7 +243,15 @@ def load_data(f,quiet=0,**kargs):
           return res,msg+' ERROR'
 
       date=times[tind]
-      if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
+      try:
+        len(date)
+        ndates=True
+      except: ndates=False
+
+      if ndates:
+        if not quiet: print '    tind, date= len=%d: %d to %d, %s to %s' % (len(date),tind[0],tind[-1],date[0].isoformat(' '),date[-1].isoformat(' '))
+      else:
+        if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
 
     elif times.size==1:
       date=times[0]

@@ -58,7 +58,7 @@ def show(fname):
       varsn[abb]=1
 
 
-  print '%-10s %-25s %5s   %-10s' % ('','name','n vel','units')
+  print '%-10s %-25s %5s   %-10s' % ('','name','n lev','units')
   for abb in vars.keys():
     name,vlevel,units=vars[abb]
     vlevel=str(varsn[abb])

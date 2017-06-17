@@ -656,7 +656,9 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   # T air 2m [K->C]
   if not quiet: print ' --> T air'
   if isPygrib:
-    x,y,tair=gribu.getvar(fname,'temperature',tags=(':2 metre',),lons=xlim,lats=ylim)
+    #x,y,tair=gribu.getvar(fname,'temperature',tags=(':2 metre',),lons=xlim,lats=ylim)
+    #newest gribu:
+    x,y,tair=gribu.getvar(fname,'2t',lons=xlim,lats=ylim)
   else:
     x,y,tair=gribu.getvar(fname,'temperature',tags=(':2 m','TMP'),lons=xlim,lats=ylim)
   tair=tair-273.15
@@ -671,19 +673,22 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
     rhum=np.where(rhum>1.0,1.0,rhum)
   else:
     # %
-    x,y,rhum=gribu.getvar(fname,'humidity',tags=('2 m','%'),lons=xlim,lats=ylim)
+    #x,y,rhum=gribu.getvar(fname,'humidity',tags=('2 m','%'),lons=xlim,lats=ylim)
+    x,y,rhum=gribu.getvar(fname,'2r',lons=xlim,lats=ylim)
     rhum=rhum/100.
 
   out['rhum']=Data(x,y,rhum,'0--1')
 
   # surface pressure [Pa]
   if not quiet: print ' --> Surface pressure'
-  x,y,pres=gribu.getvar(fname,'pressure',tags='surface',lons=xlim,lats=ylim)
+  #x,y,pres=gribu.getvar(fname,'pressure',tags='surface',lons=xlim,lats=ylim)
+  x,y,pres=gribu.getvar(fname,'sp',lons=xlim,lats=ylim)
   out['pres']=Data(x,y,pres,'Pa')
 
   # P rate [kg m-2 s-1 -> cm/d]
   if not quiet: print ' --> P rate'
-  x,y,prate=gribu.getvar(fname,'precipitation rate',lons=xlim,lats=ylim)
+  #x,y,prate=gribu.getvar(fname,'precipitation rate',lons=xlim,lats=ylim)
+  x,y,prate=gribu.getvar(fname,'prate',lons=xlim,lats=ylim)
   # Conversion kg m^-2 s^-1  to cm/day
   prate=prate*86400*100/1000.
   prate=np.where(abs(prate)<1.e-4,0,prate)
@@ -692,13 +697,19 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   # Net shortwave flux  [W/m^2]
   if not quiet: print ' --> Net shortwave flux'
   if not quiet: print '       SW down'
-  if isPygrib: x,y,sw_down = gribu.getvar(fname,'',tags='Downward short-wave radiation flux',lons=xlim,lats=ylim)
-  else: x,y,sw_down = gribu.getvar(fname,'downward short-wave',lons=xlim,lats=ylim)
+  if isPygrib:
+    #x,y,sw_down = gribu.getvar(fname,'',tags='Downward short-wave radiation flux',lons=xlim,lats=ylim)
+    x,y,sw_down = gribu.getvar(fname,'dswrf',lons=xlim,lats=ylim)
+  else:
+    x,y,sw_down = gribu.getvar(fname,'downward short-wave',lons=xlim,lats=ylim)
+
   if not quiet: print '       SW up'
-  x,y,sw_up   = gribu.getvar(fname,'',tags='Upward short-wave radiation flux',lons=xlim,lats=ylim)
+  #x,y,sw_up   = gribu.getvar(fname,'',tags='Upward short-wave radiation flux',lons=xlim,lats=ylim)
+  x,y,sw_up   = gribu.getvar(fname,'uswrf',lons=xlim,lats=ylim)
   if sw_up is False:
     if not quiet: print '       SW up not found: using albedo'
-    x,y,albedo  = gribu.getvar(fname,'albedo',lons=xlim,lats=ylim)
+    #x,y,albedo  = gribu.getvar(fname,'albedo',lons=xlim,lats=ylim)
+    x,y,albedo  = gribu.getvar(fname,'al',lons=xlim,lats=ylim)
     albedo=albedo/100.
     sw_net=sw_down*(1-albedo)
   else:
@@ -710,14 +721,23 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   # Net longwave flux  [W/m^2]
   if not quiet: print ' --> Net longwave flux'
   if not quiet: print '       LW down'
-  if isPygrib: x,y,lw_down = gribu.getvar(fname,'',tags='Downward long-wave radiation flux',lons=xlim,lats=ylim)
-  else: x,y,lw_down = gribu.getvar(fname,'downward long-wave',lons=xlim,lats=ylim)
+  if isPygrib:
+    #x,y,lw_down = gribu.getvar(fname,'',tags='Downward long-wave radiation flux',lons=xlim,lats=ylim)
+    x,y,lw_down = gribu.getvar(fname,'dlwrf',lons=xlim,lats=ylim)
+  else:
+    x,y,lw_down = gribu.getvar(fname,'downward long-wave',lons=xlim,lats=ylim)
+
   if not quiet: print '       LW up'
-  x,y,lw_up   = gribu.getvar(fname,'',tags='Upward long-wave radiation flux',lons=xlim,lats=ylim)
+  #x,y,lw_up   = gribu.getvar(fname,'',tags='Upward long-wave radiation flux',lons=xlim,lats=ylim)
+  x,y,lw_up   = gribu.getvar(fname,'ulwrf',lons=xlim,lats=ylim)
   if lw_up is False:
     if not quiet: print '       LW up not found: using sst'
-    if isPygrib: x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-    else: x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
+    if isPygrib:
+      #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
+      x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+    else:
+      x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
+
     lw_net=air_sea.lwhf(sst,lw_down)
     lw_up=lw_down-lw_net
   else:
@@ -731,10 +751,13 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   # downward lw:
   out['dlwrf']=Data(x,y,-lw_down,'W m-2',info='negative... downward')
 
+
   # U and V wind speed 10m
   if not quiet: print ' --> U and V wind'
-  x,y,uwnd  = gribu.getvar(fname,'u',tags=':10 m',lons=xlim,lats=ylim)
-  x,y,vwnd  = gribu.getvar(fname,'v',tags=':10 m',lons=xlim,lats=ylim)
+  #x,y,uwnd  = gribu.getvar(fname,'u',tags=':10 m',lons=xlim,lats=ylim)
+  #x,y,vwnd  = gribu.getvar(fname,'v',tags=':10 m',lons=xlim,lats=ylim)
+  x,y,uwnd  = gribu.getvar(fname,'10u',lons=xlim,lats=ylim)
+  x,y,vwnd  = gribu.getvar(fname,'10v',lons=xlim,lats=ylim)
 
   if not quiet: print ' --> calc wind speed and stress'
   speed = np.sqrt(uwnd**2+vwnd**2)
@@ -746,17 +769,22 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['sustr']=Data(x,y,taux,'Pa')
   out['svstr']=Data(x,y,tauy,'Pa')
 
+
   # Cloud cover [0--100 --> 0--1]:
   if not quiet: print ' --> Cloud cover'
-  x,y,clouds  = gribu.getvar(fname,'cloud cover',lons=xlim,lats=ylim)
+  #x,y,clouds  = gribu.getvar(fname,'cloud cover',lons=xlim,lats=ylim)
+  x,y,clouds  = gribu.getvar(fname,'tcc',lons=xlim,lats=ylim)
   if clouds is False:
     if not quiet: print 'CALC clouds from LW,TAIR,TSEA and RH'
     # first get sst (maybe already done to calc lw_up)
     try: sst
     except:
       if not quiet: print '  get TSEA'
-      if isPygrib: x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-      else: x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
+      if isPygrib:
+        #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
+        x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+      else:
+        x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
 
     clouds=air_sea.cloud(lw_net,sst-273.15,tair,rhum,'net')
   else: clouds=clouds/100.

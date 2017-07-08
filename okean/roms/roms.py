@@ -756,7 +756,7 @@ class His(Common,Derived):
 
   def slicei(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicei')).split(',')
-
+    coords=['x','y','z','d']
     out=Data() 
     out.msg=self.check_slice(varname,t=time,i=ind)
     if out.msg: return out
@@ -823,7 +823,7 @@ class His(Common,Derived):
 
   def slicej(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicej')).split(',')
-
+    coords=['x','y','z','d']
     out=Data()
     out.msg=self.check_slice(varname,t=time,j=ind)
     if out.msg: return out
@@ -890,7 +890,7 @@ class His(Common,Derived):
 
   def slicek(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicek')).split(',')
-
+    coords=['x','y','z','d']
     out=Data()
     out.msg=self.check_slice(varname,t=time,k=ind)
     if out.msg: out

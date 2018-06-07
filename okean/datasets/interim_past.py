@@ -212,10 +212,10 @@ def interim_file_data(files,quiet=False):
   # the last time of forecast file
   aFile=varfile('v2t') # air temp, for instance
   fFile=varfile('ssr') # sw rad, for instance
-  if not quiet: print ' reading "analysis" time from file %s' % aFile
+  if not quiet: print(' reading "analysis" time from file %s' % aFile)
   aTime=netcdf.nctime(aFile,'time')
   aTime.sort() # analysis+forecast files may not have time sorted!!
-  if not quiet: print ' reading "forecast" time from file %s' % fFile
+  if not quiet: print(' reading "forecast" time from file %s' % fFile)
   fTime=netcdf.nctime(fFile,'time')
   fTime.sort() # this one should be sorted...
   time=np.append(aTime,fTime[-1])
@@ -225,13 +225,13 @@ def interim_file_data(files,quiet=False):
   if [fTime[i].hour for i in range(8)]==range(3,22,3)+[0]: nforec=4
   elif [fTime[i].hour for i in range(4)]==range(6,19,6)+[0]: nforec=2
   else:
-    if not quiet: print 'INTERIM WRONG TIME: cannot n forec steps'
+    if not quiet: print('INTERIM WRONG TIME: cannot n forec steps')
     return
 
-  if not quiet: print ' ==> n forecast steps = %d' % nforec
+  if not quiet: print(' ==> n forecast steps = %d' % nforec)
 
   # x,y:
-  if not quiet: print ' reading x,y from file %s' % files[0]
+  if not quiet: print(' reading x,y from file %s' % files[0])
   x=netcdf.use(files[0],'longitude')
   y=netcdf.use(files[0],'latitude')
   x[x>180]=x[x>180]-360
@@ -239,26 +239,26 @@ def interim_file_data(files,quiet=False):
     x,y=np.meshgrid(x,y)
 
   # tair [K-->C]
-  if not quiet: print ' --> T air'
+  if not quiet: print(' --> T air')
   vname='v2t'
   f=varfile(vname)
   # time may not be monotonically increasing !!
   # when using mix of analysis and forecast variables and steps
   sortInds=np.argsort(netcdf.use(f,'time'))
   tair=netcdf.use(f,vname,time=sortInds)-273.15
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend...')
   tair=fill_tend(tair)
   out['tair']=Data(x,y,tair,'Celsius')
 
   # R humidity [0--1]
-  if not quiet: print ' --> R humidity (from T dew)'
+  if not quiet: print(' --> R humidity (from T dew)')
   vname='d2m'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   Td=netcdf.use(f,vname,time=sortInds)-273.15
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend... (T dew)'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend... (T dew)')
   Td=fill_tend(Td)
   T=tair
   rhum=relative_humidity(T,Td)
@@ -267,94 +267,94 @@ def interim_file_data(files,quiet=False):
   out['rhum']=Data(x,y,rhum,'0--1')
 
   # surface pressure [Pa]
-  if not quiet: print ' --> Surface pressure'
+  if not quiet: print(' --> Surface pressure')
   vname='sp'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   pres=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend...')
   pres=fill_tend(pres)
   out['pres']=Data(x,y,pres,'Pa')
 
   # P rate [m --> cm day-1]
-  if not quiet: print ' --> P rate'
+  if not quiet: print(' --> P rate')
   vname='tp'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   prate=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      accum2avg...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      accum2avg...')
   prate=accum2avg(prate,nforec)
   conv= 100*86400       # from m s-1      --> cm day-1
   #conv= 100*86400/1000. # from kg m-2 s-1 --> cm day-1
   prate=prate*conv # cm day-1
-  if not quiet: print '      fill_t0...'
+  if not quiet: print('      fill_t0...')
   prate=fill_t0(prate)
   prate[prate<0]=0
   out['prate']=Data(x,y,prate,'cm day-1')
 
   # Net shortwave flux  [W m-2 s+1 --> W m-2]
-  if not quiet: print ' --> Net shortwave flux'
+  if not quiet: print(' --> Net shortwave flux')
   vname='ssr'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   sw_net=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      accum2avg...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      accum2avg...')
   sw_net=accum2avg(sw_net,nforec)
-  if not quiet: print '      fill_t0...'
+  if not quiet: print('      fill_t0...')
   sw_net=fill_t0(sw_net)
   out['radsw']=Data(x,y,sw_net,'W m-2',info='positive downward')
 
 
   # Net longwave flux  [W m-2 s+1 --> W m-2]
-  if not quiet: print ' --> Net longwave flux'
+  if not quiet: print(' --> Net longwave flux')
   vname='str'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   lw_net=netcdf.use(f,vname,time=sortInds)*-1 # let us consider positive upward (*-1)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      accum2avg...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      accum2avg...')
   lw_net=accum2avg(lw_net,nforec)
-  if not quiet: print '      fill_t0...'
+  if not quiet: print('      fill_t0...')
   lw_net=fill_t0(lw_net)
   out['radlw']=Data(x,y,lw_net,'W m-2',info='positive upward')
 
   # longwave down:
   # can be obtained from clouds!!
-  if not quiet: print ' --> Down longwave flux'
+  if not quiet: print(' --> Down longwave flux')
   vname='strd'
   f=varfile(vname)
   if f:
     sortInds=np.argsort(netcdf.use(f,'time'))
     lw_down=netcdf.use(f,vname,time=sortInds)*-1 # let us consider positive upward (*-1)
-    if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-    if not quiet: print '      accum2avg...'
+    if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+    if not quiet: print('      accum2avg...')
     lw_down=accum2avg(lw_down,nforec)
-    if not quiet: print '      fill_t0...'
+    if not quiet: print('      fill_t0...')
     lw_down=fill_t0(lw_down)
     out['dlwrf']=Data(x,y,lw_down,'W m-2',info='negative... downward')
-  else:  print 'down long wave CANNOT BE USED'
+  else:  print('down long wave CANNOT BE USED')
 
   # U and V wind speed 10m
-  if not quiet: print ' --> U and V wind'
+  if not quiet: print(' --> U and V wind')
   vname='u10'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   uwnd=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend...')
   uwnd=fill_tend(uwnd)
   vname='v10'
   f=varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   vwnd=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend...')
   vwnd=fill_tend(vwnd)
 
-  if not quiet: print ' --> calc wind speed and stress'
+  if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
 
@@ -365,13 +365,13 @@ def interim_file_data(files,quiet=False):
   out['svstr']=Data(x,y,tauy,'Pa')
 
   # Cloud cover [0--1]:
-  if not quiet: print ' --> Cloud cover'
+  if not quiet: print(' --> Cloud cover')
   vname='tcc'
   varfile(vname)
   sortInds=np.argsort(netcdf.use(f,'time'))
   clouds=netcdf.use(f,vname,time=sortInds)
-  if not quiet and np.any(sortInds!=range(len(sortInds))): print '      sort DONE'
-  if not quiet: print '      fill_tend...'
+  if not quiet and np.any(sortInds!=range(len(sortInds))): print('      sort DONE')
+  if not quiet: print('      fill_tend...')
   clouds=fill_tend(clouds)
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')
 

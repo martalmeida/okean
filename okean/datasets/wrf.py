@@ -43,10 +43,10 @@ class WRFData:
     out=None
     for f in self.files:
       time=read_time(f)
-      print time[0],time[-1]
+      print(time[0],time[-1])
       if not np.any((time>=date0)&(time<=date1)): continue
 
-      if not quiet: print '-> extracting file %s'%f
+      if not quiet: print('-> extracting file %s'%f)
       res=wrf_file_data(f,quiet=quiet)
       time=res['time']
       i,=np.where(time>=date0)
@@ -129,39 +129,39 @@ def wrf_file_data(file,quiet=False):
   out={}
 
   # time:
-  if not quiet: print ' --> get time'
+  if not quiet: print(' --> get time')
   time=read_time(file)
 
   out['time']=time
 
   # lon,lat:
-  if not quiet: print ' --> reading x,y'
+  if not quiet: print(' --> reading x,y')
   x=netcdf.use(file,'XLONG',Time=0)#**{'0': 0})
   y=netcdf.use(file,'XLAT',Time=0)#**{'0': 0})
 
   # tair [K-->C]
-  if not quiet: print ' --> T air'
+  if not quiet: print(' --> T air')
   tair=netcdf.use(file,'T2')-273.15
   out['tair']=Data(x,y,tair,'Celsius')
 
   # R humidity [kg/kg --> 0--1]
-  if not quiet: print ' --> R humidity from QV at 2m'
+  if not quiet: print(' --> R humidity from QV at 2m')
   wv=netcdf.use(file,'Q2') # water vapor mixing ratio at 2m
   rhum=wv/air_sea.qsat(tair)
   rhum[rhum>1]=1
   out['rhum']=Data(x,y,rhum,'0--1')
 
   # surface pressure [Pa]
-  if not quiet: print ' --> Surface pressure'
+  if not quiet: print(' --> Surface pressure')
   pres=netcdf.use(file,'PSFC')
   out['pres']=Data(x,y,pres,'Pa')
 
   # P rate [mm --> cm day-1]
-  if not quiet: print ' --> P rate (rainc+rainnc)'
+  if not quiet: print(' --> P rate (rainc+rainnc)')
   rainc  = netcdf.use(file,'RAINC')
   rainnc = netcdf.use(file,'RAINNC')
   prate=rainc+rainnc
-  if not quiet: print '      accum2avg...'
+  if not quiet: print('      accum2avg...')
   prate=accum2avg(prate,dt=time[1]-time[0]) # mm s-1
   conv= 0.1*86400       # from mm s-1      --> cm day-1
   prate=prate*conv # cm day-1
@@ -173,17 +173,17 @@ def wrf_file_data(file,quiet=False):
   #https://www.myroms.org/forum/viewtopic.php?f=1&t=2621
 
   # Net shortwave flux  [W m-2]
-  if not quiet: print ' --> Net shortwave flux'
+  if not quiet: print(' --> Net shortwave flux')
   sw_down=netcdf.use(file,'SWDOWN')
   albedo=netcdf.use(file,'ALBEDO')
   sw_net=sw_down*(1-albedo)
   out['radsw']=Data(x,y,sw_net,'W m-2',info='positive downward')
 
   # Net longwave flux  [W m-2]
-  if not quiet: print ' --> Net longwave flux'
+  if not quiet: print(' --> Net longwave flux')
   lw_down=netcdf.use(file,'GLW') # positive
   # sst needed:
-  if not quiet: print '     --> SST for LW up'
+  if not quiet: print('     --> SST for LW up')
   sst=netcdf.use(file,'SST') # K
   lw_net = air_sea.lwhf(sst,lw_down) # positive down
   # here vars have roms-agrif signs --> radlw is positive upward!
@@ -192,10 +192,10 @@ def wrf_file_data(file,quiet=False):
   out['dlwrf']=Data(x,y,-lw_down,'W m-2',info='positive upward')
 
   # U and V wind speed 10m
-  if not quiet: print ' --> U and V wind'
+  if not quiet: print(' --> U and V wind')
   uwnd=netcdf.use(file,'U10')
   vwnd=netcdf.use(file,'V10')
-  if not quiet: print ' --> calc wind speed and stress'
+  if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
 
@@ -206,7 +206,7 @@ def wrf_file_data(file,quiet=False):
   out['svstr']=Data(x,y,tauy,'Pa')
 
   # Cloud cover [0--1]:
-  if not quiet: print ' --> Cloud cover for LONGWAVE. Use LONGWAVE_OUT instead...'
+  if not quiet: print(' --> Cloud cover for LONGWAVE. Use LONGWAVE_OUT instead...')
   if 0:
     pass
 # next code is wrong! If cloud cover is really needed, it needs to be calculated using wrfpost.
@@ -216,9 +216,11 @@ def wrf_file_data(file,quiet=False):
 #    clouds=netcdf.use(file,'CLDFRA').sum(-3)
 #    clouds=np.where(clouds>1,1,clouds)
   else:
-    if not quiet: print 'CLDFRA not found!! Using SST and air_sea.cloud_fraction'
-    sst=netcdf.use(file,'SST')
+    if not quiet: print('CLDFRA not found!! Using SST and air_sea.cloud_fraction')
+    sst=netcdf.use(file,'SST')-273.15
     clouds=air_sea.cloud_fraction(lw_net,sst,tair,rhum,Wtype='net')
+    clouds[clouds<0]=0
+    clouds[clouds>1]=1
 
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')
 

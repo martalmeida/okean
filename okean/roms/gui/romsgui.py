@@ -9,7 +9,10 @@ from mpl_toolkits.basemap import Basemap
 from mpl_toolkits. basemap import cm as basemap_cm
 
 from okean import calc, netcdf, ticks, cookbook as cbk, pl_tools, locations
+
 from okean.roms import roms
+#import roms
+
 from okean.air_sea import greg2
 from okean.dateu import month_names
 
@@ -113,7 +116,7 @@ def get_colormaps():
   res['matlab like']=[]
   res['gist']=[]
   res['colorbrewer']={'sequencial':[],'diverging':[],'qualitative':[]}
-  res['other']=[]
+  res['other']={'a-m':[],'n-z':[]}
   res['usersdef']=[]
   res['basemap']=[]
   res['ncview']=[]
@@ -143,7 +146,13 @@ def get_colormaps():
     else:
       if n.startswith('gist'): res['gist']+=[n]
       elif n in matlabCmaps:    res['matlab like']+=[n]
-      else: res['other']+=[n]
+      else:
+        if not n.endswith('_r'):
+          import string
+          if n[0].lower() in string.ascii_lowercase[:13]:
+            res['other']['a-m']+=[n]
+          else:
+            res['other']['n-z']+=[n]
 
   # sort:
   for k in res.keys():
@@ -216,25 +225,25 @@ class gui_init:
       home=os.environ['TMPDIR']
     else:
       home='.'
-      print 'CANNOT find home folder!!'
-      print 'rgui folder will be created in current location'
+      print('CANNOT find home folder!!')
+      print('rgui folder will be created in current location')
 
     rguiDir=os.path.join(home,self._namedir)
     rguiTmpDir=os.path.join(home,self._namedir,self._nametmpdir)
     if not os.path.isdir(rguiDir):
-      print 'creating gui folder %s' % rguiDir
+      print('creating gui folder %s' % rguiDir)
       try:
         os.mkdir(rguiDir)
       except:
-        print 'unable to create gui folder'
+        print('unable to create gui folder')
         rguiDir=False
 
     if not os.path.isdir(rguiTmpDir):
-      print 'creating gui tmp folder %s' % rguiTmpDir
+      print('creating gui tmp folder %s' % rguiTmpDir)
       try:
         os.mkdir(rguiTmpDir)
       except:
-        print 'unable to create gui tmp folder'
+        print('unable to create gui tmp folder')
         rguiTmpDir=False
 
     if rguiDir!=False: self.folder=rguiDir
@@ -251,12 +260,12 @@ class gui_init:
       rcfile=os.path.join(self.folder,self._namerc)
       if not os.path.isfile(rcfile):
         try:
-          print 'creating rc file %s' % rcfile
+          print('creating rc file %s' % rcfile)
           import shutil
           shutil.copy2(self._default_rc,rcfile)
           self.rcfile=rcfile
         except:
-          print 'unable to create rc file'
+          print('unable to create rc file')
       else:
         self.rcfile=rcfile
 
@@ -302,7 +311,7 @@ class rgui:
 
     root=tk.Toplevel(self.root0)
     rGUIS+=[root]
-    print rGUIS
+    print(rGUIS)
 
     root.protocol("WM_DELETE_WINDOW", self.closegui)
 
@@ -361,7 +370,7 @@ class rgui:
     self.options['projection'].set('merc')
 
     self.options['colormap'] = tk.StringVar()
-    self.options['colormap'].set('jet')
+    self.options['colormap'].set(pylab.rcParams['image.cmap'])
     self.options['colormap_r'] = tk.IntVar()
     self.options['colormap_r'].set(0)
 
@@ -954,7 +963,7 @@ class rgui:
     self.widgets['hovmuller']=ob
 
     # ----------------------------------------------------------------
-    # zoom, separate, printe, etc:
+    # zoom, separate, print, etc:
     # ----------------------------------------------------------------
 
     # zoom:
@@ -1103,7 +1112,7 @@ class rgui:
       font=self.options['font_name'].get()+' '+\
            self.options['font_size'].get()
     
-    print font
+    print(font)
     def set_font(ch):
       for k in ch.children.keys():
         set_font(ch.children[k])
@@ -1152,7 +1161,7 @@ class rgui:
       r=tmp+[ns[-1]]
 
     r=np.array(r)
-    print r,lev
+    print(r,lev)
 
     if w=='dec':
       i=np.where(r<z)[0]
@@ -1295,7 +1304,8 @@ class rgui:
   def time_show(self):
      if self.files.has_key('His'):
        self.reset_file('his')
-       self.widgets['ttime'].config(text=self.files['His'].TIME-1)
+##       self.widgets['ttime'].config(text=self.files['His'].TIME-1)
+       self.widgets['ttime'].config(text=self.files['His'][0].TIME-1)
 
   def reset_lims(self,*e):  self.__set_grid_lims(show=True)
 
@@ -1375,7 +1385,7 @@ class rgui:
       try: atype=netcdf.fatt(f,'title').split()[0].lower() # agrif child grids
       except: atype='grid'
 
-    print atype
+    print(atype)
     if atype.find('grid')>=0 or atype.find('grd')>=0:
       self.files['grid']=f
       self.files['grid_finfo']=finfo(f)
@@ -1437,7 +1447,10 @@ class rgui:
     Type=type[0].upper()+type[1:]
     ob=eval('roms.'+Type)
     if type!='grid' and self.files.has_key('grid'):
-      self.files[Type]=ob(self.files[type],grd=self.files['grid'])
+##      self.files[Type]=ob(self.files[type],grd=self.files['grid'])
+
+      ob=eval('roms.M'+Type)
+      self.files[Type]=ob(self.files[type])###,grd=self.files['grid'])
     else:
       self.files[Type]=ob(self.files[type])
 
@@ -1502,7 +1515,7 @@ class rgui:
     for v in vars:
       f=self.variables[v]
       if not self.swapp['ftitle'].has_key(f):
-        print f,v
+        print(f,v)
         try:
           ftitle=netcdf.fatt(f,'title')
         except: ftitle='NO TITLE'
@@ -1602,7 +1615,7 @@ class rgui:
     if show: self.show()
 
 
-  def __get_caxis(self):
+  def _get_caxis(self):
     if self.swapp['caxis_mode']=='manual':
 #    if self.widgets['cax_ck'].get():
       try: return [float(i) for i in self.widgets['cax'].get().split()]
@@ -1703,7 +1716,7 @@ class rgui:
       ########print '===>', k, info[k]####.value
       vinfo.insert(tk.END, k+': '+str(info[k]))#####.value))
 
-  def __show_msg(self,msg,msgType=None):
+  def _show_msg(self,msg,msgType=None):
     if   msgType=='error':   color='red'
     elif msgType=='warning': color='blue'
     else: color='black'
@@ -1763,6 +1776,35 @@ class rgui:
       else: map=False
       self.map=map
 
+
+  def _get_field(self,romsobj,varname,time,zlev,surf_nans):
+    if zlev>=0: zlev=int(zlev)
+
+    if varname[0]=='*':
+      data=romsobj.slice_derived(varname[1:],zlev,time,surf_nans=surf_nans)
+    else:
+      if zlev>=0:
+        data=romsobj.slicek(varname,zlev,time,msg=True)
+      else:
+        data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+
+    curr_slice={}
+    curr_slice['varname']   = varname
+#    curr_slice['romsobj']   = romsobj
+    curr_slice['time']      = time
+    curr_slice['zlev']      = zlev
+    if zlev<0:   curr_slice['zslice_SN'] = surf_nans
+
+    return data
+
+
+  def _get_vfield(self,romsobj,varname,time,zlev,surf_nans):
+    if varname in ('zeta','ubar','vbar'): vel_zlev='bar'
+    else: vel_zlev=zlev
+
+    data=romsobj.sliceuv(vel_zlev,time,surf_nans=surf_nans)
+    return data
+
   def __get_slice(self,romsobj,varname,time,zlev,surf_nans,currents=False):
     curr_slice={}
     curr_slice['varname']   = varname
@@ -1775,10 +1817,11 @@ class rgui:
 
     for i in range(len(self.swapp['last_slices'])):
       if self.swapp['last_slices'][i]==curr_slice:
-         print 'USING SWAPP...'
+         print('USING SWAPP...')
          return self.swapp['last_slices_data'][i]
 
-    spherical=romsobj.grid.is_spherical
+##    spherical=romsobj.grid.spherical
+    spherical=romsobj[0].grid.spherical
 
     # slice:
     if zlev>=0: zlev=int(zlev)
@@ -1790,10 +1833,12 @@ class rgui:
       if zlev>=0:
         #x,y,z,v,msg=romsobj.slicek(varname,zlev,time,msg=True)
         data=romsobj.slicek(varname,zlev,time,msg=True)
+        return data
         x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
       else:
         #x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
         data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        return data
         x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
 
     if currents:
@@ -1815,7 +1860,7 @@ class rgui:
 
     data=x,y,z,v, currents,spherical
 
-    print 'STORING NEW SLICE...'
+    print('STORING NEW SLICE...')
     # store slice:
     if len(self.swapp['last_slices'])<self.swapp['n_slices']:
       self.swapp['last_slices']+=[curr_slice]
@@ -1896,13 +1941,13 @@ class rgui:
     self.show()
 
   def __show_after_cax(self,evt=False):
-    print 'setting caxis manual'
+    print('setting caxis manual')
     self.swapp['caxis_mode']='manual'
     self.show()
 
 
   def show(self,evt=False,newfig=False,derived=False,**kargs):
-
+    print('MM0')
     try: what=kargs['what']
     except: what=False
 
@@ -1915,6 +1960,7 @@ class rgui:
     currents=False
     t0=pytime.time()
 
+    print('MM1')
     if what !='grid':
       # varname, itime, zlevel:
       varname = self.__get_varname(derived=derived)
@@ -1923,82 +1969,84 @@ class rgui:
         varname=self.swapp['last_varname']
         self.select_var(varname)
 
+      print('MM2',varname)
       if not varname: return
       self.swapp['last_varname']=varname
 
       #q=self.__get_romsobj(varname) isto j n pode ser usado devido as variaveis derived !!!
       q=self.files['His']
 
+      print('MM3')
       if not q:
-        self.__show_msg('roms obj not found %s' % varname,msgType='error')
+        self._show_msg('roms obj not found %s' % varname,msgType='error')
         return
 
       time    = self.__get_itime()
       zlev    = self.__get_zlevel()
-      print '0===',pytime.time()-t0
+###      print '0===',pytime.time()-t0
 
       t0=pytime.time()
       # show v info:
       self.__show_vinfo(varname)
-      print '1 vinfo===',pytime.time()-t0
+###      print '1 vinfo===',pytime.time()-t0
       t0=pytime.time()
 
       # surface nans options for zslice:
       surf_nans=int(self.options['zslice_SN'].get())
 
-      # slice
+      # field:
+    #  data=self.__get_slice(q,varname,time,zlev,surf_nans,currents)
+      data=self._get_field(q,varname,time,zlev,surf_nans)
+
+      # vfield:
       dvec,svec=self.__get_vec()
-      if dvec!=0: currents=True
-      data=self.__get_slice(q,varname,time,zlev,surf_nans,currents)
+      if dvec!=0:
+        datav=self._get_vfield(q,varname,time,zlev,surf_nans)
+      else: datav=False
 
-      # slice title:
-      stitle=self.__gen_title(q,varname,zlev,time,currents)
+      print('MM4')
+      #-------------------
+#      import roms
+#      #print self.files
+#      self.clear_fig()
+#      data.plot(ax=self.axes,cbax=self.cbar)
 
-      if isinstance(data,basestring): # error msg
-        self.__show_msg(data,msgType='error')
+      if len(data.errors):
+        self._show_msg(data.errors,'error')
         return
+      elif len(data.warnings):
+        self._show_msg(data.warnings,'warning')
       else:
-        self.__show_msg('')
-        x,y,z,v,currents,spherical=data
+        self._show_msg('')
 
-      print '3===',pytime.time()-t0
-      t0=pytime.time()
+      print('HERE MM0')
+##        x,y,z,v,currents,spherical=data
+
+      #return data
+
+#      # slice title:
+#      stitle=self.__gen_title(q,varname,zlev,time,currents)
+#
+#      if isinstance(data,basestring): # error msg
+#        self.__show_msg(data,msgType='error')
+#        return
+#      else:
+#        self.__show_msg('')
+#        x,y,z,v,currents,spherical=data
+#
+#      print '3===',pytime.time()-t0
+#      t0=pytime.time()
 
     else:
 
      try:
-       print 'loading grid vars..........'
+       print('loading grid vars..........')
        x,y,v,mask=self.files['Grid'].vars()
        stitle=self.files['grid']
      except:
        self.__show_msg('Cannot use grid',msgType='error')
        return
 
-
-    print 'get/set caxis'
-    # get/set caxis:
-    cax=self.__get_caxis()
-    ntick=12
-    ticksAuto=True
-    if cax:
-      if len(cax)==2:
-        vmin,vmax=cax
-      elif len(cax)==3:
-        vmin,vmax,ntick=cax
-        ticksAuto=False
-      elif len(cax)>3:
-        vmin,vmax=cax[0],cax[-1]
-        ticksAuto=cax
-
-#      try:    vmin,vmax=cax
-#      except:
-#        vmin,vmax,ntick=cax
-#        ticksAuto=False
-    else:
-      vmin,vmax=v.min(),v.max()
-      self.__set_caxis((vmin,vmax))
-
-    print '4===',pytime.time()-t0
 
     # user mask:
     umask=self.widgets['user_mask'].get()
@@ -2028,101 +2076,134 @@ class rgui:
     t0=pytime.time()
     # start plotting:
     pylab.ioff()
-    print 'plotting...'
+    print('plotting...')
     if newfig:
-      fig=pylab.figure()
-      ax=pylab.axes()
-      cbarOrientation='vertical'
-      #cbar=fig.add_axes((.1,.06,.8,.03))#colorbar()
-      #cbar=pylab.colorbar(orientation=cbarOrientation).ax
-      cbar=None
+#      fig=pylab.figure()
+#      ax=pylab.axes()
+#      cbarOrientation='vertical'
+#      #cbar=fig.add_axes((.1,.06,.8,.03))#colorbar()
+#      #cbar=pylab.colorbar(orientation=cbarOrientation).ax
+#      cbar=None
+     pass
     else:
       self.clear_fig()
       ax=self.axes
       cbar=self.cbar
       cbarOrientation='horizontal'
 
-    print '4.5===',pytime.time()-t0
+    print('4.5===',pytime.time()-t0)
     t0=pytime.time()
 
-    print 'here 0'
-    # use projection:
-    
-    spherical=self.files['Grid'].is_spherical
 
-    if spherical:
-      self.__start_proj()
+#    data.plot(ax=self.axes,cbax=self.cbar)
+#
+#    print 'here 0'
+#    # use projection:
+#    
+#    spherical=self.files['Grid'].spherical
+#
+#    if spherical:
+#      self.__start_proj()
+#
+#      print 'here 1'
+#
+#      print '5===',pytime.time()-t0
+#      t0=pytime.time()
+#
+#      if self.options['coastline_res'].get()!='none':
+#        try:
+#          self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
+#        except: pass
+#
+#      if self.options['draw_rivers'].get():
+#        self.map.drawrivers(linewidth=.5,color='blue',ax=ax)
+#
+#      if self.options['draw_countries'].get():
+#        self.map.drawcountries(linewidth=.5,color='#999999',ax=ax)
+#
+#      if self.options['draw_states'].get():
+#        self.map.drawstates(linewidth=.5,color='green',ax=ax)
+#
+#      if self.options['fill_continents'].get():
+#        try: # may fail for high zooms
+#          self.map.fillcontinents(color='#ebebeb',ax=ax)
+#        except: pass
+#
+#      scale=self.options['draw_scale'].get()
+#      scaleL=self.options['scale_length'].get()
+#      if scale!='none':
+#        lonlims,latlims=self.__get_grid_lims()
+#        if scaleL=='auto':
+#          grid_dist=calc.distance(np.array(lonlims),np.array(latlims))
+#          scaleL=ticks.nicenum(grid_dist[-1]/4000.,1)
+#        else: scaleL=float(scaleL)
+#
+#        dlon=lonlims[1]-lonlims[0]
+#        dlat=latlims[1]-latlims[0]
+#        rx=5.
+#        ry=15.
+#        if scale=='NW':
+#          lon=lonlims[0]+dlon/rx
+#          lat=latlims[1]-dlat/ry
+#        if scale=='NE':
+#          lon=lonlims[1]-dlon/rx
+#          lat=latlims[1]-dlat/ry
+#        if scale=='SW':
+#          lon=lonlims[0]+dlon/rx
+#          lat=latlims[0]+dlat/ry
+#        if scale=='SE':
+#          lon=lonlims[1]-dlon/rx
+#          lat=latlims[0]+dlat/ry
+#
+#        lon0,lat0=lon,lat
+#        self.map.drawmapscale(lon=lon,lat=lat,lon0=lon0,lat0=lat0,
+#                              length=scaleL,ax=ax,barstyle='fancy',
+#                              fontsize=7)
+#
+#      meridians,paralels=self.__calc_xyticks()
+#      try:
+#        self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
+#                        color='#4d4d4d',ax=ax,dashes=[1,4])
+#      except: pass
+#      try:
+#        self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
+#                        color='#4d4d4d',ax=ax,dashes=[1,4])
+#      except: pass
+#
+#
+#    print '6===',pytime.time()-t0
+#    t0=pytime.time()
+#
+#    # pcolor/contourf:
+#
 
-      print 'here 1'
+    # clim and contour(f) values:
+    # get/set caxis:
+    cax=self._get_caxis()
+    ntick=12
+    ticksAuto=True
+    if cax:
+      if len(cax)==2:
+        vmin,vmax=cax
+      elif len(cax)==3:
+        vmin,vmax,ntick=cax
+        ticksAuto=False
+      elif len(cax)>3:
+        vmin,vmax=cax[0],cax[-1]
+        ticksAuto=cax
 
-      print '5===',pytime.time()-t0
-      t0=pytime.time()
+#      try:    vmin,vmax=cax
+#      except:
+#        vmin,vmax,ntick=cax
+#        ticksAuto=False
+    else:
+      vmin,vmax=data[0].v.min(),data[0].v.max()
+      if vmin==vmax: vmin,vmax=vmin-1,vmin+1
+      self.__set_caxis((vmin,vmax))
 
-      if self.options['coastline_res'].get()!='none':
-        try:
-          self.map.drawcoastlines(linewidth=.5,color='#999999',ax=ax)
-        except: pass
+##    print 'CAX=',cax,vmin,vmax,ticksAuto
+##    print '4===',pytime.time()-t0
 
-      if self.options['draw_rivers'].get():
-        self.map.drawrivers(linewidth=.5,color='blue',ax=ax)
-
-      if self.options['draw_countries'].get():
-        self.map.drawcountries(linewidth=.5,color='#999999',ax=ax)
-
-      if self.options['draw_states'].get():
-        self.map.drawstates(linewidth=.5,color='green',ax=ax)
-
-      if self.options['fill_continents'].get():
-        try: # may fail for high zooms
-          self.map.fillcontinents(color='#ebebeb',ax=ax)
-        except: pass
-
-      scale=self.options['draw_scale'].get()
-      scaleL=self.options['scale_length'].get()
-      if scale!='none':
-        lonlims,latlims=self.__get_grid_lims()
-        if scaleL=='auto':
-          grid_dist=calc.distance(np.array(lonlims),np.array(latlims))
-          scaleL=ticks.nicenum(grid_dist[-1]/4000.,1)
-        else: scaleL=float(scaleL)
-
-        dlon=lonlims[1]-lonlims[0]
-        dlat=latlims[1]-latlims[0]
-        rx=5.
-        ry=15.
-        if scale=='NW':
-          lon=lonlims[0]+dlon/rx
-          lat=latlims[1]-dlat/ry
-        if scale=='NE':
-          lon=lonlims[1]-dlon/rx
-          lat=latlims[1]-dlat/ry
-        if scale=='SW':
-          lon=lonlims[0]+dlon/rx
-          lat=latlims[0]+dlat/ry
-        if scale=='SE':
-          lon=lonlims[1]-dlon/rx
-          lat=latlims[0]+dlat/ry
-
-        lon0,lat0=lon,lat
-        self.map.drawmapscale(lon=lon,lat=lat,lon0=lon0,lat0=lat0,
-                              length=scaleL,ax=ax,barstyle='fancy',
-                              fontsize=7)
-
-      meridians,paralels=self.__calc_xyticks()
-      try:
-        self.map.drawparallels(paralels,  labels=[1,0,0,0],linewidth=.5,
-                        color='#4d4d4d',ax=ax,dashes=[1,4])
-      except: pass
-      try:
-        self.map.drawmeridians(meridians, labels=[0,0,0,1],linewidth=.5,
-                        color='#4d4d4d',ax=ax,dashes=[1,4])
-      except: pass
-
-
-    print '6===',pytime.time()-t0
-    t0=pytime.time()
-
-    # pcolor/contourf:
     if vmin==vmax:
       vals=np.array([vmin-1,vmin,vmin+1])
     elif ticksAuto in [0,1]:
@@ -2132,12 +2213,14 @@ class rgui:
         vals=np.linspace(vmin,vmax,ntick+1)
     else: vals=ticksAuto
 
+##    print ''
+##    print vals,ticksAuto
+
     cmap=self.options['colormap'].get()
     cmapr=self.options['colormap_r'].get()
     if cmapr: cmap=cmap+'_r'
 
     if cmap.startswith('_'): # usersdef
-##      cmap=get_ucmaps(cmap[1:])
       cmap=pl_tools.cm.cmap_d[cmap[1:]]
     elif cmap.startswith(' '): # ncview
       cmap=pl_tools.cm_ncview.cmap_d[cmap[1:]]
@@ -2147,54 +2230,166 @@ class rgui:
       except:
         cmap=getattr(basemap_cm,cmap)
 
+    if not newfig:
+      cbpos=self.cbar.get_position()
+      data[0].config['colorbar.ax_position']=cbpos.x0,cbpos.y0,cbpos.width,cbpos.height
 
-    if 0: #varname=='h':
-      from matplotlib.colors import rgb2hex
-      def calc_colors(var,cmap=pylab.cm.jet,clim=False):
-        mm=pylab.cm.ScalarMappable(cmap=cmap)
-        if clim is False: clim=var.min(),var.max()
-        mm.set_clim(clim)
-        return mm.to_rgba(var)
+    for o in data:
+      o.config['field.cvals']=vals
+      o.config['field.cmap']=cmap
+      o.config['field.clim']=vmin,vmax
+      # plot type:
+      o.config['field.plot']=self.options['graf']
 
+    # bathy contours:
+    ob=data.find('bathy')
+    for o in ob:
+      o.config['field.cvals']=self.__get_hvals()
+      o.config['field.cmap']='k'
+      o.config['field.linewidths']=.5
 
-      from mpl_toolkits.mplot3d import Axes3D
-#      self.clear_fig()
-      self.figure.clf()
+    # proj:
+    data[0].config['proj.name']=self.options['projection'].get()
 
-      ax=Axes3D(self.figure)
-      #handle=ax.plot_surface(x,y,v,rstride=5, cstride=5, cmap=pylab.cm.jet,linewidth=0, antialiased=False)
-      if 1:
-        handle=ax.plot_wireframe(x,y,-v,rstride=2, cstride=2,linewidth=.1)
-        self.xx=x
-        self.yy=y
-        self.hh=v
-      self.ax3=ax
+    lonlims,latlims=self.__get_grid_lims()
+    data[0].config['axes.axis']=lonlims+latlims
 
-      xx,yy,zz,vv=self.files['His'].slicez('temp',-2000,0)
-      zz=np.ma.masked_where(vv.mask,zz)
-#      handle=ax.plot_surface(xx,yy,zz,rstride=5, cstride=5,facecolors=vv)#,vmin=vmin,vmax=vmax)
-      colors=calc_colors(vv[::3,::3])
-      self.colors=colors
-      print colors.shape, xx[::3].shape
-      handle=ax.plot_surface(xx[::3,::3],yy[::3,::3],zz[::3,::3],rstride=1, cstride=1,facecolors=colors,
-                             linewidth=0,shade=0,vmin=vmin,vmax=vmax)
-      #handle=ax.plot_surface(xx[::5,::5],yy[::5,::5],zz[::5,::5],rstride=1, cstride=1,vmin=vmin,vmax=vmax,facecolors=colors)
-      self.canvas.show()
-      return
+    resolution=self.options['coastline_res'].get()[0]
+    if resolution=='n':
+      resolution='c'
+      data[0].config['proj.coast_add']=False
+
+    data[0].config['proj.continents_add'] = self.options['fill_continents'].get()
+    data[0].config['proj.rivers_add']     = self.options['draw_rivers'].get()
+    data[0].config['proj.countries_add']  = self.options['draw_countries'].get()
+    data[0].config['proj.states_add']     = self.options['draw_states'].get()
+
+##    try:
+##      print data[0].ax
+##      print data[0].cbax
+##    except: pass
+##    self.o=data
+##    print 'mMMMMMMMMMMMMMMMMMMM'
+    if newfig:
+      if hasattr(data[0],'ax'): delattr(data[0],'ax')
+      data.plot()
+      data[0].fig.show()
     else:
-      if spherical: x,y=self.map(x,y)
-      if self.options['graf']=='contourf':
-        handle=ax.contourf(x,y,v,vals,cmap=cmap)
-      elif self.options['graf']=='contour':
-        handle=ax.contour(x,y,v,vals,cmap=cmap)
-      elif self.options['graf']=='pcolor':
-        handle=ax.pcolormesh(x,y,v,vmin=vmin,vmax=vmax,cmap=cmap)
+      data.plot(ax=self.axes,cbax=self.cbar)
+      self.canvas.show()
 
-      ax.set_title(stitle)
+    self.map=data[0].map
 
 
-    print '7===',pytime.time()-t0
-    t0=pytime.time()
+    if not datav is False:
+      if svec==0: scale=None
+      else:
+        x=data[0].x
+        xm,ym=data[0]._convCoord(data[0].x,data[0].y)
+
+        dx=xm.max()-xm.min()
+        DX=x.max()-x.min()
+        scale=1./svec*DX/dx
+
+#      bathyZ=[i.config['plot.zorder'] for i in data.find('bathy*')]
+      for c,o in enumerate(datav):
+        o.extra=[]
+        o.config['vfield.options']=dict(units='x',scale=scale)
+        o.config['vfield.dij']=dvec,dvec
+
+#        o.config['plot.zorder']=bathyZ[c]+0.1
+
+
+#################      o.config['plot.zorder']=1e3 # last one above continents!
+
+      # quiver key:
+      val=2*ticks.nicenum(np.abs(datav[0].v).mean(),1)
+      datav[0].config['vfield.key_XYU']=0.15,0.15,val
+      datav[0].config['vfield.key_label']=str(val)+' m/s'
+      datav[0].config['vfield.key_options']=dict(labelpos='W',coordinates='figure')
+
+      for o in datav:
+        o.plot(inherit=data[0])
+
+      self.datav=datav
+      self.data=data
+      self.canvas.show()
+
+
+    # activate tools like zoom, slices, etc:
+    if   self.active_tool == 'zoom':        self.interactive_zoom(chstate=False)
+    elif self.active_tool == 'vslice':      self.interactive_vslice(chstate=False)
+    elif self.active_tool == 'profile':     self.interactive_profile(chstate=False)
+    elif self.active_tool == 'time_series': self.interactive_time_series(chstate=False)
+    elif self.active_tool == 'hovmuller':   self.interactive_hovmuller(chstate=False)
+
+    # put focus on the main window, ie, remove focus from entry widgets
+    # to allow use binds, like time change +-
+    self.root.focus()
+
+    self.sync_save()
+
+    return
+
+#      qv=ax.quiver(xm,ym,u,v,units='x',scale=scale)
+#      #qv=self.map.quiver(xm,ym,u,v,units='x',scale=scale)
+#                   #headwidth=4,headlength=8,linewidth=.2
+##TESTAR self.map.quiver !!!!!!!!!!
+#
+#      print '======',qv.scale
+#      val=2*ticks.nicenum(np.sqrt(u**2+v**2).mean(),1)
+#      #qk = ax.quiverkey(qv, .05, -.1, val, str(val)+' m/s',labelpos='E',coordinates='axes')
+#      qk = ax.quiverkey(qv, .1, .15, val, str(val)+' m/s',labelpos='W',coordinates='figure')
+    return # KK
+
+##================================================================================
+#    if 0: #varname=='h':
+#      from matplotlib.colors import rgb2hex
+#      def calc_colors(var,cmap=pylab.cm.jet,clim=False):
+#        mm=pylab.cm.ScalarMappable(cmap=cmap)
+#        if clim is False: clim=var.min(),var.max()
+#        mm.set_clim(clim)
+#        return mm.to_rgba(var)
+#
+#
+#      from mpl_toolkits.mplot3d import Axes3D
+##      self.clear_fig()
+#      self.figure.clf()
+#
+#      ax=Axes3D(self.figure)
+#      #handle=ax.plot_surface(x,y,v,rstride=5, cstride=5, cmap=pylab.cm.jet,linewidth=0, antialiased=False)
+#      if 1:
+#        handle=ax.plot_wireframe(x,y,-v,rstride=2, cstride=2,linewidth=.1)
+#        self.xx=x
+#        self.yy=y
+#        self.hh=v
+#      self.ax3=ax
+#
+#      xx,yy,zz,vv=self.files['His'].slicez('temp',-2000,0)
+##      zz=np.ma.masked_where(vv.mask,zz)
+##      handle=ax.plot_surface(xx,yy,zz,rstride=5, cstride=5,facecolors=vv)#,vmin=vmin,vmax=vmax)
+#      colors=calc_colors(vv[::3,::3])
+#      self.colors=colors
+#      print colors.shape, xx[::3].shape
+#      handle=ax.plot_surface(xx[::3,::3],yy[::3,::3],zz[::3,::3],rstride=1, cstride=1,facecolors=colors,
+#                             linewidth=0,shade=0,vmin=vmin,vmax=vmax)
+#      #handle=ax.plot_surface(xx[::5,::5],yy[::5,::5],zz[::5,::5],rstride=1, cstride=1,vmin=vmin,vmax=vmax,facecolors=colors)
+#      self.canvas.show()
+#      return
+#    else:
+#      if spherical: x,y=self.map(x,y)
+#      if self.options['graf']=='contourf':
+#        handle=ax.contourf(x,y,v,vals,cmap=cmap)
+#      elif self.options['graf']=='contour':
+#        handle=ax.contour(x,y,v,vals,cmap=cmap)
+#      elif self.options['graf']=='pcolor':
+#        handle=ax.pcolormesh(x,y,v,vmin=vmin,vmax=vmax,cmap=cmap)
+#
+#      ax.set_title(stitle)
+#
+#
+#    print '7===',pytime.time()-t0
+#    t0=pytime.time()
 
     # vectors:
     if currents:
@@ -2218,7 +2413,7 @@ class rgui:
                    #headwidth=4,headlength=8,linewidth=.2
 #TESTAR self.map.quiver !!!!!!!!!!
 
-      print '======',qv.scale
+      print('======',qv.scale)
       val=2*ticks.nicenum(np.sqrt(u**2+v**2).mean(),1)
       #qk = ax.quiverkey(qv, .05, -.1, val, str(val)+' m/s',labelpos='E',coordinates='axes')
       qk = ax.quiverkey(qv, .1, .15, val, str(val)+' m/s',labelpos='W',coordinates='figure')
@@ -2229,7 +2424,7 @@ class rgui:
 
     if varname!='h':
       # colorbar:
-      print 'adding cbar...',handle,cbar,cbarOrientation
+      print('adding cbar...',handle,cbar,cbarOrientation)
       if self.options['graf']=='pcolor':cbarDrawEdges=False
       else: cbarDrawEdges=True
       cb=pylab.colorbar(handle,cax=cbar,orientation=cbarOrientation,drawedges=cbarDrawEdges,
@@ -2286,12 +2481,12 @@ class rgui:
       #  ----------------------------------------------
 
 
-      print '8===',pytime.time()-t0
+      print('8===',pytime.time()-t0)
       t0=pytime.time()
 
       if spherical: ax.axis([self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax])
 
-    print 'now will draw!'
+    print('now will draw!')
     if newfig:
       fig.show()
     else:
@@ -2299,7 +2494,7 @@ class rgui:
 
     pylab.ion()
 
-    print '9===',pytime.time()-t0
+    print('9===',pytime.time()-t0)
 
     # activate tools like zoom, slices, etc:
     if   self.active_tool == 'zoom':        self.interactive_zoom(chstate=False)
@@ -2444,14 +2639,14 @@ class rgui:
       #self.root.destroy()
       self.root.quit()#destroy()
       global rGUIS
-      print rGUIS
+      print(rGUIS)
       rGUIS.remove(self.root)
       if len(rGUIS)==1:
         self.root0.destroy()
         self.root0=False
         rGUIS=[]
 
-      print rGUIS
+      print(rGUIS)
 
   def __about(self):
     import tkMessageBox
@@ -2519,8 +2714,9 @@ class rgui:
 
       self.__set_cursor('tcross')
 
+      lopts=dict(zorder=1e4)
       self.zoom=pl_tools.InteractiveRect(ax=self.axes,axis=(self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax),
-                                             cmd=self.__zoom)
+                                             cmd=self.__zoom,**lopts)
 
       self.active_tool='zoom'
 
@@ -2648,7 +2844,7 @@ class rgui:
         x,y,z,v=data.x,data.y,data.z,data.v
     elif type=='time_series':
         zlev    = self.__get_zlevel()
-        print var,x,y,zlev
+        print(var,x,y,zlev)
         #t,z,v=q.time_series(var,x,y,depth=zlev)
         data=q.time_series(var,x,y,depth=zlev)
         t,z,v=data.t,data.z,data.v
@@ -2662,10 +2858,10 @@ class rgui:
 
     if v.ndim==1:
       if type=='profile':
-        print 'HERE 4 prof'
+        print('HERE 4 prof')
         pylab.plot(v,z)
       elif type=='time_series':
-        print 'HERE 4 ts'
+        print('HERE 4 ts')
         import datetime as dt
         try: yorig=int(self.widgets['yorig'].get())
         except: yorig=1
@@ -2683,9 +2879,9 @@ class rgui:
     elif v.ndim==2:
       pylab.pcolormesh(v)
       pylab.xlabel(var)
-    else: print 'V=',v
+    else: print('V=',v)
 
-    print 'HERE 5 fig=',fig
+    print('HERE 5 fig=',fig)
     if fig:
       fig.show()
 
@@ -2701,7 +2897,7 @@ class rgui:
       try:
         ob=self.cache['vslice']['obj']
       except:
-        print 'cannot file vslice obj'
+        print('cannot file vslice obj')
         return
 
       # covert to lon lat... after zoom the values change!
@@ -2717,7 +2913,7 @@ class rgui:
       try:
         ob=self.cache['vslice']['obj_prev']
       except:
-        print 'cannot file previous vslice obj'
+        print('cannot file previous vslice obj')
         return
 
       # plot slice line:
@@ -2727,7 +2923,7 @@ class rgui:
 
     x,y=ob.lon,ob.lat
     if len(x)<2:
-      print 'at least 2 points needed for vslice'
+      print('at least 2 points needed for vslice')
 
       # keep vslice active:
       if self.active_tool=='vslice':

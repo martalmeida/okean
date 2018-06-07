@@ -101,18 +101,18 @@ def ppm2fli(ppmfiles='*.ppm',animfile='anim.flc',fps=4,size='',options='',percen
   else:
     cmd='ppm2fli  '+s+' '+size+' -N '+listFile+' '+options+' '+animfile;
 
-  print cmd
+  print(cmd)
   a=run(cmd)
   if a:
-    print '\ncreated '+animfile+' from:'
+    print('\ncreated '+animfile+' from:')
     i=0
     for f in files:
       i+=1
-      print '%3d %s' % (i,f)
+      print('%3d %s' % (i,f))
 
   # remove tmp files:
   if clean:
     toRemove=unique(toRemove)
     for f in toRemove:
-      print 'removing ',f
+      print('removing ',f)
       os.remove(f)

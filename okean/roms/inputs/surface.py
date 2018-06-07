@@ -43,7 +43,7 @@ def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=Tr
 
   out=cb.odict()
   if not data:
-    print 'no data found !'
+    print('no data found !')
     return out
 
   time=data['time']
@@ -179,15 +179,15 @@ def conv_units(data,model,quiet=True):
   '''
 
   if model=='roms':
-    if not quiet: print '    rhum',
+    if not quiet: print('    rhum'),
     data['rhum']  = data['rhum']*100                # 0--1  --> 0--100
-    if not quiet: print ' pres',
+    if not quiet: print(' pres'),
     data['pres']  = data['pres']/100.               # Pa --> mb
-    if not quiet: print ' prate',
+    if not quiet: print(' prate'),
     data['prate'] = data['prate']*1000/(86400*100)  # cm day-1 --> kg m-2 s-1
-    if not quiet: print ' radlw'
+    if not quiet: print(' radlw'),
     data['radlw'] = data['radlw']*-1 # positive down
-    if not quiet: print ' dlwrf',
+    if not quiet: print(' dlwrf'),
     data['dlwrf'] = data['dlwrf']*-1 # positive down
 
 
@@ -212,7 +212,7 @@ def data2romsblk(data,grd,**kargs):
     if vname.startswith('INFO') or vname in 'xy': continue
     # vnames starting with INFO are an info key, without data
 
-    if not quiet: print '  interp %s' % vname
+    if not quiet: print('  interp %s' % vname)
 
     if cond is False:
       cond,inds=rt.grid_vicinity(grd,data['x'],data['y'],
@@ -238,7 +238,7 @@ def data2romsblk(data,grd,**kargs):
           out['y_original']=data['y'][j1:j2,i1:i2]
 
   # about wind:
-  if not quiet: print ' --> rot U,V wind and U,V wind stress'
+  if not quiet: print(' --> rot U,V wind and U,V wind stress')
   angle=g.use('angle')
   out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],angle)
   out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],angle)
@@ -282,13 +282,13 @@ def make_blk_interim(interimpath,grd,bulk,date0=False,date1=False,**kargs):
 
   for d in data.keys():
     if model=='roms':
-       if not quiet: print '  converting units:',
+       if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
     D=data2romsblk(data[d],grd,**kargs)
     D['date']=d
 
-    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
 
 
@@ -320,13 +320,13 @@ def make_blk_gfs(gfspath,grd,bulk,date0,date1=False,nforec=0,**kargs):
 
   for d in data.keys():
     if model=='roms':
-       if not quiet: print '  converting units:',
+       if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
     D=data2romsblk(data[d],grd,**kargs)
     D['date']=d
 
-    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
 
 
@@ -362,13 +362,13 @@ def make_blk_narr(grd,bulk,date0,date1=False,**kargs):
 
   for d in data.keys():
     if model=='roms':
-       if not quiet: print '  converting units:',
+       if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
     D=data2romsblk(data[d],grd,**kargs)
     D['date']=d
 
-    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
 
 
@@ -395,13 +395,13 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
 
   for d in data.keys():
     if model=='roms':
-       if not quiet: print '  converting units:',
+       if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
     D=data2romsblk(data[d],grd,**kargs)
     D['date']=d
 
-    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
 
 def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
@@ -440,17 +440,17 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
       tin=netcdf.nctime(bulk,'time')
 
       if tin.size and (d-tin[-1])<datetime.timedelta(hours=dt-0.1):
-        print '-> not including %s'%d.isoformat()
+        print('-> not including %s'%d.isoformat())
         continue
 
     if model=='roms':
-       if not quiet: print '  converting units:',
+       if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
     D=data2romsblk(data[d],grd,**kargs)
     D['date']=d
 
-    if not quiet: print '  =>filling date=%s' % d.isoformat(' ')
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
 
 
@@ -522,12 +522,12 @@ def update_wind_blended2(fname,datapaths,**kargs):
     found=0
     for t in time0:
       if (t.year,t.month,t.day)==(d.year,d.month,d.day):
-        print '==> blended : ',t
+        print('==> blended : ',t)
         out[t]=data[t]
         found=1
 
     if not found: # use quikscat:
-      print '==> quikscat : ',d.strftime('%Y-%m-%d')
+      print('==> quikscat : ',d.strftime('%Y-%m-%d'))
       tmp= b.data(d,dts.next_date(d))
       if not tmp.has_key('x'): continue
       x,y=tmp['x'],tmp['y']
@@ -543,9 +543,9 @@ def update_wind_blended2(fname,datapaths,**kargs):
       tmp[tmp.keys()[0]]=tmp[tmp.keys()[0]][j1:j2,i1:i2]
 
 
-      print '  griddata u'
+      print('  griddata u')
       u=calc.griddata(x,y,tmp[tmp.keys()[0]].real,x0,y0)
-      print '  griddata v'
+      print('  griddata v')
       v=calc.griddata(x,y,tmp[tmp.keys()[0]].imag,x0,y0)
       out[tmp.keys()[0]]=u+1.j*v
       info+='#'+d.strftime('%Y%m%d')
@@ -597,7 +597,7 @@ def update_wind(fname,data,new_wind_info,**kargs):
     if I.size:
       I=I[0]
       uv=data[dates[I]]
-      if not quiet: print t,dates[I]
+      if not quiet: print(t,dates[I])
     else:
       i1,=np.where(dates>t)
       i0,=np.where(dates<t)
@@ -609,26 +609,26 @@ def update_wind(fname,data,new_wind_info,**kargs):
         d0=d0.days+d0.seconds/86400.
         d1=d1.days+d1.seconds/86400.
         uv=(data[dates[i0]]*d1+data[dates[i1]]*d0)/(d0+d1)
-        if not quiet: print t,dates[i0],dates[i1], d0,d1
+        if not quiet: print(t,dates[i0],dates[i1], d0,d1)
       elif not i1.size:
         uv=data[dates[-1]]
-        if not quiet: print t,dates[-1]
+        if not quiet: print(t,dates[-1])
       elif not i0.size:
         uv=data[dates[0]]
-        if not quiet: print t,dates[0]
+        if not quiet: print(t,dates[0])
 
     # interp to grid:
     if cond is False:
       cond,inds=rt.grid_vicinity(grd,x0,y0,margin=Margin,rect=True,retinds=True)
       i1,i2,j1,j2=inds
 
-    if not quiet: print ' --> inter uv %s' % t.isoformat(' ')
+    if not quiet: print(' --> inter uv %s' % t.isoformat(' '))
     u=calc.griddata(x0[cond],y0[cond],uv.real[cond],g.lon,g.lat,extrap=True)
     v=calc.griddata(x0[cond],y0[cond],uv.imag[cond],g.lon,g.lat,extrap=True)
 
 
     # rotate wind, calc stress:
-    if not quiet: print ' --> rot U,V wind and U,V wind stress'
+    if not quiet: print(' --> rot U,V wind and U,V wind stress')
     wspd=np.sqrt(u**2+v**2)
     sustr,svstr=air_sea.wind_stress(u,v)
     angle=g.use('angle')
@@ -647,7 +647,7 @@ def update_wind(fname,data,new_wind_info,**kargs):
     # original xy:
     if tind==0:
       newWind['attr']={'new_wind_info':new_wind_info}
-      if not quiet: print ' --> original xy'
+      if not quiet: print(' --> original xy')
       if keepOriginal==1:
         newWind['x_wind']=x0
         newWind['y_wind']=y0
@@ -657,6 +657,6 @@ def update_wind(fname,data,new_wind_info,**kargs):
 
 
     # add to file:
-    if not quiet: print ' --> adding to file'
+    if not quiet: print(' --> adding to file')
     fob.update_wind(newWind,quiet=quiet)
-    if not quiet: print ''
+    if not quiet: print('')

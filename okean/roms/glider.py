@@ -8,7 +8,7 @@ class RomsGlider:
     self.x=x
     self.y=y
     self.t=t
-    if not quiet: print 'loading ',f
+    if not quiet: print('loading ',f)
     self.roms=roms.His(f)
     self.nc=self.roms.nc
 
@@ -45,9 +45,9 @@ class RomsGlider:
     Iind,Jind,Tind=[],[],[]
     INDS=[]
     for c in range(ntimes):
-      if not quiet: print '  %s   %d of %d' % (self.t[c].isoformat(' '),c,ntimes)
+      if not quiet: print('  %s   %d of %d' % (self.t[c].isoformat(' '),c,ntimes))
       if not c in inds:
-        if not quiet: print ' - outside domain in time %s'%t[c].isoformat()
+        if not quiet: print(' - outside domain in time %s'%t[c].isoformat())
         INDS+=[(-1,-1,-1)]
         continue
 
@@ -140,7 +140,7 @@ class RomsGlider:
 
 
       if not calc.isiterable(nfast) and nfast==1:
-        if not quiet: print 'loading %s : ijt= %d %d %d'%(varname,len(II),len(JJ),len(TT))
+        if not quiet: print('loading %s : ijt= %d %d %d'%(varname,len(II),len(JJ),len(TT)))
         v=netcdf.use(self.nc,varname,xiSEARCH=II,etaSEARCH=JJ,ocean_time=TT)
       else:
         v=False
@@ -152,7 +152,7 @@ class RomsGlider:
 
         for k in range(len(tmp)-1):
           tt=range(tmp[k],tmp[k+1])
-          if not quiet: print 'loading %s : ijt= %d %d %d (t %d to %d)'%(varname,len(II),len(JJ),len(tt), tt[0],tt[-1])
+          if not quiet: print('loading %s : ijt= %d %d %d (t %d to %d)'%(varname,len(II),len(JJ),len(tt), tt[0],tt[-1]))
           vtmp=netcdf.use(self.nc,varname,xiSEARCH=II,etaSEARCH=JJ,ocean_time=tt)
           if not v is False:
             if vtmp.ndim<v.ndim: vtmp=vtmp[np.newaxis,:] # if len of last tt is 1 !
@@ -182,7 +182,7 @@ class RomsGlider:
       V=False
       for i in range(len(I)):
         if T[i]<0: continue
-        if not quiet: print 'loading %s  (%d of %d): ijt= %d %d %d'%(varname,i,len(I),I[i],J[i],T[i])
+        if not quiet: print('loading %s  (%d of %d): ijt= %d %d %d'%(varname,i,len(I),I[i],J[i],T[i]))
         v=netcdf.use(self.nc,varname,xiSEARCH=I[i],etaSEARCH=J[i],ocean_time=T[i])
         if V is False:
           if v.ndim>1: shape=(len(I),)+v.shape

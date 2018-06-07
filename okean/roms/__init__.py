@@ -1,5 +1,5 @@
-''' 
+'''
 '''
 
-from roms import *
-import roms_tools as tools
+from .roms import *
+from . import roms_tools as tools

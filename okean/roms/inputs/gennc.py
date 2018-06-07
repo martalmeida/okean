@@ -266,9 +266,9 @@ class GenIni(GenCommon):
 
     nc=netcdf.Pync(self.filename,'w')
     names='temp','salt','u','v','ubar','vbar','zeta'
-    if not quiet: print 'filling ini file %s' % self.filename
+    if not quiet: print('filling ini file %s' % self.filename)
     for i in names:
-      if not quiet: print '  %s' % i
+      if not quiet: print('  %s' % i)
       nc.vars[i][:]=data[i]
 
     nc.close()
@@ -500,7 +500,7 @@ class GenClm(GenCommon):
     if tind=='next': tind=nc.dims['time']
 
 
-    if not quiet: print 'filling clm file %s' % self.filename
+    if not quiet: print('filling clm file %s' % self.filename)
 
     # about time:
     try:
@@ -511,13 +511,13 @@ class GenClm(GenCommon):
 
     for i in nc.varnames:
       if i.endswith('time'):
-        if not quiet: print '  -- %s tind=%d %f' % (i,tind,time)
+        if not quiet: print('  -- %s tind=%d %f' % (i,tind,time))
         nc.vars[i][tind]=time
 
 
     names='temp','salt','u','v','ubar','vbar','zeta'
     for i in names:
-      if not quiet: print '  %s' % i
+      if not quiet: print('  %s' % i)
       nc.vars[i][tind,...]=data[i]
 
     nc.close()
@@ -785,7 +785,7 @@ class GenBry(GenCommon):
     if tind=='next': tind=nc.dims['time']
 
 
-    if not quiet: print 'filling bry file %s' % self.filename
+    if not quiet: print('filling bry file %s' % self.filename)
 
     # about time:
     try:
@@ -796,7 +796,7 @@ class GenBry(GenCommon):
 
     for i in nc.varnames:
       if i.endswith('time'):
-        if not quiet: print '  -- %s tind=%d %f' % (i,tind,time)
+        if not quiet: print('  -- %s tind=%d %f' % (i,tind,time))
         nc.vars[i][tind]=time
 
     names='temp','salt','u','v','ubar','vbar','zeta'
@@ -809,10 +809,10 @@ class GenBry(GenCommon):
         if vname in nc.varnames:
           if vname.startswith('dist'):
             if tind==0:
-              if not quiet: print '  %s' % vname
+              if not quiet: print('  %s' % vname)
               nc.vars[vname][:]=data[vname] # not time dependent
           else:
-            if not quiet: print '  %s' % vname
+            if not quiet: print('  %s' % vname)
             nc.vars[vname][tind,...]=data[vname]
 
     nc.close()
@@ -1063,7 +1063,7 @@ class GenBlk(GenCommon):
     if tind=='next': tind=nc.dims['time']
 
 
-    if not quiet: print 'filling blk file %s' % self.filename
+    if not quiet: print('filling blk file %s' % self.filename)
 
     # about time:
     try:
@@ -1074,7 +1074,7 @@ class GenBlk(GenCommon):
 
     for i in nc.varnames:
       if i.endswith('time'):
-        if not quiet: print '  -- %s tind=%d %f' % (i,tind,time)
+        if not quiet: print('  -- %s tind=%d %f' % (i,tind,time))
         nc.vars[i][tind]=time
 
 
@@ -1095,26 +1095,26 @@ class GenBlk(GenCommon):
       else:  filev,datav=i
 
       if datav not in data.keys():
-        if not quiet: print '  Warning: data key %s not present' % datav
+        if not quiet: print('  Warning: data key %s not present' % datav)
       else:
-        if not quiet: print '  %s (%s) min=%8.3f max=%8.3f' % (filev.ljust(7),datav.ljust(7),
-                                                               data[datav].min(),data[datav].max())
+        if not quiet: print('  %s (%s) min=%8.3f max=%8.3f' % (filev.ljust(7),datav.ljust(7),
+                                                               data[datav].min(),data[datav].max()))
         nc.vars[filev][tind,...]=data[datav]
 
       # fill original data:
       orig=datav+'_original'
       if orig in data.keys() and not orig in nc.varnames:
-        if not quiet: print '  Warning: original data will not be written %s' % orig
+        if not quiet: print('  Warning: original data will not be written %s' % orig)
       elif not orig in data.keys() and orig in nc.varnames:
-        if not quiet: print '  Warning: original data not present %s' % orig
+        if not quiet: print('  Warning: original data not present %s' % orig)
       elif orig in data.keys() and orig in nc.varnames:
-        if not quiet: print '  %s  min=%8.3f max=%8.3f' % (orig.ljust(7+9),
-                                                          data[orig].min(),data[orig].max())
+        if not quiet: print('  %s  min=%8.3f max=%8.3f' % (orig.ljust(7+9),
+                                                          data[orig].min(),data[orig].max()))
         nc.vars[orig][tind,...]=data[orig]
 
     # fill original x,y:
     if tind==0 and 'x_original' in data.keys() and 'x_original' in nc.varnames:
-      if not quiet: print '  filling x,y original'
+      if not quiet: print('  filling x,y original')
       nc.vars['x_original'][:]=data['x_original']
       nc.vars['y_original'][:]=data['y_original']
 
@@ -1131,7 +1131,7 @@ class GenBlk(GenCommon):
 
     if tind.size: tind=tind[0]
     else:
-      if not quiet: print 'cannot find time=%s' % data['date'].isoformat(' ')
+      if not quiet: print('cannot find time=%s' % data['date'].isoformat(' '))
       return
 
 
@@ -1144,7 +1144,7 @@ class GenBlk(GenCommon):
     if False and tind==0: # not using for now.... too slow!
                           # TODO: remove keepOld form argument !?
       if 'x_wind' in data.keys():
-        if not quiet: print 'adding x_wind, y_wind'
+        if not quiet: print('adding x_wind, y_wind')
         nc.add_dim('x_wind_original',data['x_wind'].shape[1])
         nc.add_dim('y_wind_original',data['x_wind'].shape[0])
 
@@ -1165,10 +1165,10 @@ class GenBlk(GenCommon):
         newType = nc.vars[filev].dtype()
         newDims = nc.vars[filev].dims.keys()
 
-        if  not quiet: print '  creating var %s' % newName
+        if  not quiet: print('  creating var %s' % newName)
         nc.add_var(newName,newType,newDims)
 
-        if  not quiet: print '    filling var %s' % newName
+        if  not quiet: print('    filling var %s' % newName)
         nc.vars[newName][...]=nc.vars[filev][...]
 
         # also store old original data, if present:
@@ -1178,10 +1178,10 @@ class GenBlk(GenCommon):
           newType = nc.vars[orig].dtype()
           newDims = nc.vars[orig].dims.keys()
 
-          if  not quiet: print '  creating var %s' % newName
+          if  not quiet: print('  creating var %s' % newName)
           nc.add_var(newName,newType,newDims)
 
-          if  not quiet: print '    filling var %s' % newName
+          if  not quiet: print('    filling var %s' % newName)
           nc.vars[newName][...]=nc.vars[orig][...]
 
 
@@ -1190,15 +1190,15 @@ class GenBlk(GenCommon):
       if isinstance(i,basestring): filev,datav=i,i 
       else:  filev,datav=i
 
-      if not quiet: print '  %s (%s) min=%8.3f max=%8.3f' % (filev.ljust(7),datav.ljust(7),
-                                                               data[datav].min(),data[datav].max())
+      if not quiet: print('  %s (%s) min=%8.3f max=%8.3f' % (filev.ljust(7),datav.ljust(7),
+                                                               data[datav].min(),data[datav].max()))
       nc.vars[filev][tind,...]=data[datav]
 
       # also store new wind original data, if present:
       orig=datav+'_original'
       if not orig in data.keys(): continue
-      if not quiet: print '  %s  min=%8.3f max=%8.3f' % (orig.ljust(7+9),
-                                                        data[orig].min(),data[orig].max())
+      if not quiet: print('  %s  min=%8.3f max=%8.3f' % (orig.ljust(7+9),
+                                                        data[orig].min(),data[orig].max()))
       nc.vars[orig][tind,...]=data[datav]
 
 

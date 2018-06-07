@@ -105,7 +105,7 @@ class Telemac():
     I=-1
     for i,v in enumerate(self.q.VARNAMES):
       if v.lower().find(vname)>=0:
-        if not quiet: print 'loading %s at %s'%(v,self.time[it])
+        if not quiet: print('loading %s at %s'%(v,self.time[it]))
         I=i
     if I>=0:
       u=self.q.getVariablesAt(it,[I])

@@ -30,12 +30,12 @@ class WW3Download:
     if 'path' in kargs.keys(): self.path=kargs['path']
 
   def connect(self):
-    print 'connecting ...'
+    print('connecting ...')
     self.ftp=ftplib.FTP(self.server)
     self.ftp.login()
     self.ftp.cwd(self.path)
     self.contents=self.ftp.nlst()
-    print 'done'
+    print('done')
 
   def download(self,year,month,overwrite=False):
     files=set_files(year,month).values()
@@ -43,16 +43,16 @@ class WW3Download:
 
     pdest=os.path.join(self.destination,str(year))
     if not os.path.isdir(pdest):
-      print 'creating folder %s'%pdest
+      print('creating folder %s'%pdest)
       os.makedirs(pdest)
 
     for fname in files:
       dest=os.path.join(pdest,fname)
       if os.path.isfile(dest) and not overwrite:
-         print ' -- %s already exists'%dest
+         print(' -- %s already exists'%dest)
          continue
-        
-      print 'downloading %s'%dest
+
+      print('downloading %s'%dest)
       f=open(dest,'w')
       self.ftp.retrbinary('RETR %s' % fname, f.write)
       f.close()
@@ -92,7 +92,7 @@ class WW3Data:
       for f in files[k]:
 
         if not os.path.isfile(f):
-          print 'ERROR: missing data file %s'%f
+          print('ERROR: missing data file %s'%f)
           return
 
         lon,lat,time,val=ww3_file_data(f,xlim,ylim,quiet)
@@ -121,7 +121,7 @@ def ww3_file_data(fname,xlim=False,ylim=False,quiet=False):
   if ylim: xylab+='_%.2f_%.2f'%ylim
   faux=fname+xylab+'.npz'
   if os.path.isfile(faux):
-    if not quiet: print 'loading from %s'%faux
+    if not quiet: print('loading from %s'%faux)
     a=np.load(faux)
     val=a['val']
     mval=a['mval']
@@ -136,7 +136,7 @@ def ww3_file_data(fname,xlim=False,ylim=False,quiet=False):
   for i in range(nt):
     o=f.message(i+1)
     v=o.values
-    if not quiet and i%10==0: print '%03d of %03d %s'%(i,nt,o.validDate.isoformat(' '))
+    if not quiet and i%10==0: print('%03d of %03d %s'%(i,nt,o.validDate.isoformat(' ')))
     if i==0:
       lat,lon=o.latlons()
       lon[lon>180]=lon[lon>180]-360
@@ -153,7 +153,7 @@ def ww3_file_data(fname,xlim=False,ylim=False,quiet=False):
     val[i,...]=v[j1:j2,i1:i2]
 
   # save aux tmp file for fast loading:
-  if not quiet: print 'saving aux file %s'%faux
+  if not quiet: print('saving aux file %s'%faux)
   np.savez(faux,lon=lon,lat=lat,time=time,val=val.data,mval=val.mask)
 
   return lon,lat,time,val
@@ -294,15 +294,15 @@ def ww3_specpoints(romsgrd,nseg=(5,5),addxy=(.001,.001)):
     if 1:
       # not use fully masked segments:
       if np.all(mseg==0):
-        print 'masked segment %d %d %d %d'%(i0,j0,i1,j1)
+        print('masked segment %d %d %d %d'%(i0,j0,i1,j1))
         continue
     else:
       # not use if segment starts with mask:
       if mseg.size and mseg[0]==0:
-        print 'masked 1st point of segment %d %d %d %d'%(i0,j0,i1,j1)
+        print('masked 1st point of segment %d %d %d %d'%(i0,j0,i1,j1))
         continue
 
-   
+
     segx+=[[i0,i1]]
     segy+=[[j0,j1]]
 
@@ -383,7 +383,7 @@ def ww3gb_2TPAR(datafolder,date0,date1,romsgrid,nseg=(10,10),addxy=(0.001,0.001)
   # Primary_wave_direction
 
   for it in range(nt):
-    if it%10==0: print 'time %03d of %03d : %s'%(it,nt,Time[it].isoformat(' '))
+    if it%10==0: print('time %03d of %03d : %s'%(it,nt,Time[it].isoformat(' ')))
     for iv in range(nv):
       vname=vnames[iv]
       #print '  -- %s'%vname
@@ -407,7 +407,7 @@ def ww3gb_2TPAR(datafolder,date0,date1,romsgrid,nseg=(10,10),addxy=(0.001,0.001)
       j.write('%s %6.2f %6.2f  %6.2f  %6.2f\n'%(tiso,TPAR[it,0,i],TPAR[it,1,i],TPAR[it,2,i],dspr))
 
     j.close()
-    print 'created tpar file %s'%fname
+    print('created tpar file %s'%fname)
 
   x1=xy[:,2]
   y1=xy[:,3]
@@ -415,13 +415,13 @@ def ww3gb_2TPAR(datafolder,date0,date1,romsgrid,nseg=(10,10),addxy=(0.001,0.001)
   # add to swan INPUT:
   # BOUND SHAPESPEC JONSWAP PEAK DSPR DEGREES
   # BOUNDSPEC SEGMENT XY -54.3906 33.1171 -55.5271 35.8094 VARIABLE FILE 0 './forcings/TPAR2.txt'
-  print '\n'
-  print 'BOUND SHAPESPEC JONSWAP PEAK DSPR DEGREES'
+  print('\n')
+  print('BOUND SHAPESPEC JONSWAP PEAK DSPR DEGREES')
   for i in range(nx):
     fname=os.path.join(path,name+'_seg%03d.txt'%i)
-    print 'BOUNDSPEC SEGMENT XY %8.4f %8.4f %8.4f %8.4f VARIABLE FILE 0 \'%s\''%(x[i],y[i],x1[i],y1[i],fname)
+    print('BOUNDSPEC SEGMENT XY %8.4f %8.4f %8.4f %8.4f VARIABLE FILE 0 \'%s\''%(x[i],y[i],x1[i],y1[i],fname))
 
-  print '\n'
+  print('\n')
 
 
   i0=ij[:,0]
@@ -430,9 +430,9 @@ def ww3gb_2TPAR(datafolder,date0,date1,romsgrid,nseg=(10,10),addxy=(0.001,0.001)
   j1=ij[:,3]
   for i in range(nx):
     fname=os.path.join(path,name+'_seg%03d.txt'%i)
-    print 'BOUNDSPEC SEGMENT IJ %3d %3d %3d %3d VARIABLE FILE 0 \'%s\''%(i0[i],j0[i],i1[i],j1[i],fname)
+    print('BOUNDSPEC SEGMENT IJ %3d %3d %3d %3d VARIABLE FILE 0 \'%s\''%(i0[i],j0[i],i1[i],j1[i],fname))
 
-  print '\n'
+  print('\n')
 
 
 def roms2swan_grid(grd,exc=9999.,label='swan_bathy'):
@@ -459,22 +459,22 @@ def roms2swan_grid(grd,exc=9999.,label='swan_bathy'):
     fb.write('\n')
 
   fb.close()
-  print ' -- created swan depths file %s'%fbot
+  print(' -- created swan depths file %s'%fbot)
 
   # coords file:
   #v=np.hstack((x.T.flatten(),y.T.flatten()))
   v=np.hstack((x.flatten(),y.flatten()))
   np.savetxt(fgrd,v,fmt='%12.6f')
-  print ' -- created swan computational grid file %s\n'%fgrd
+  print(' -- created swan computational grid file %s\n'%fgrd)
 
   # add to swan INPUT:
-  print '\n'
-  print 'CGRID CURVILINEAR %d %d EXC 9.999000e+003 9.999000e+003 CIRCLE 36 0.04 1.0 24'%(nx-1,ny-1)
-  print 'READGRID COORDINATES 1 \'%s\' 4 0 0 FREE '%(fgrd)
+  print('\n')
+  print('CGRID CURVILINEAR %d %d EXC 9.999000e+003 9.999000e+003 CIRCLE 36 0.04 1.0 24'%(nx-1,ny-1))
+  print('READGRID COORDINATES 1 \'%s\' 4 0 0 FREE '%(fgrd))
 
-  print 'INPGRID BOTTOM CURVILINEAR 0 0 %d %d EXC 9.999000e+003'%(nx-1,ny-1)
-  print 'READINP BOTTOM 1 \'%s\' 4 0 FREE '%(fbot)
-  print '\n'
+  print('INPGRID BOTTOM CURVILINEAR 0 0 %d %d EXC 9.999000e+003'%(nx-1,ny-1))
+  print('READINP BOTTOM 1 \'%s\' 4 0 FREE '%(fbot))
+  print('\n')
 
 
 def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
@@ -490,24 +490,24 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
   if 'grd'   in kargs.keys(): grd  =kargs['grd']
   if 'dt'    in kargs.keys(): dt   =kargs['dt']
   if 'path'  in kargs.keys(): path =kargs['path']
- 
-  print 'wind: loading time ...' 
-  
+
+  print('wind: loading time ...')
+
   time=netcdf.nctime(frc,tname)
   #time=np.load('tfile')
   #cond=(time>=date0)&(time<=date1)
   cond=(time>=date0)&(time<=date1+datetime.timedelta(days=1)) # add one day at the end, just to avoid the "repeating last"
   time=time[cond]
   d=np.diff(pl.date2num(time))
-  print 'current max and min dt = %6.2f %6.2f hrs = %6.2f %6.2f mins'%(d.max()*24, d.min()*24, d.max()*24*60, d.min()*24*60)
+  print('current max and min dt = %6.2f %6.2f hrs = %6.2f %6.2f mins'%(d.max()*24, d.min()*24, d.max()*24*60, d.min()*24*60))
 #  time=time[::dt]
 #  d=np.diff(pl.date2num(time))
 #  print ' final  max and min dt = %6.2f %6.2f hrs = %6.2f %6.2f mins'%(d.max()*24, d.min()*24, d.max()*24*60, d.min()*24*60)
 
-  print 'wind: loading u ...' 
+  print('wind: loading u ...')
   nc=netcdf.ncopen(frc)
   u=netcdf.var(nc,uname)
-  print 'wind: loading v ...' 
+  print('wind: loading v ...')
   v=netcdf.var(nc,uname)
 #  u=u[cond,...][::dt,...]
 #  v=v[cond,...][::dt,...]
@@ -518,7 +518,7 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
 
   if u.ndim==1:
     if not grd:
-      print 'must provide grd karg!'
+      print('must provide grd karg!')
       return
 
     nt=u.size
@@ -544,14 +544,14 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
     if time0>date1: break
 
     if time0>time[-1]:
-      print 'Warning : repeating last ...', it
+      print('Warning : repeating last ...', it)
 
     times+=[time0]
     d=np.abs(time-time0)
     it=np.where(d==d.min())[0][0]
     ITs+=[it]
 
-    if it%100==0: print 'saving u %s %s'%(fname,time[it].isoformat(' '))
+    if it%100==0: print('saving u %s %s'%(fname,time[it].isoformat(' ')))
     if u[it,...].ndim==0:
       U=np.tile(u[it,...],(eta,xi)).flatten()
     else:
@@ -560,7 +560,7 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
     [i.write('%8.4f\n'%uu) for uu in U]
 
   for it in ITs:
-    if it%100==0: print 'saving v %s %s'%(fname,time[it].isoformat(' '))
+    if it%100==0: print('saving v %s %s'%(fname,time[it].isoformat(' ')))
     if v[it,...].ndim==0:
       V=np.tile(v[it,...],(eta,xi)).flatten()
     else:
@@ -576,12 +576,12 @@ def roms2swan_wind(frc,date0,date1,fname='swan_wind.dat',**kargs):
   dt=times[1]-times[0]
   dth=dt.days*24. + dt.seconds/60.**2
 
-  print ' -- created swan wind file %s\n'%fname
+  print(' -- created swan wind file %s\n'%fname)
 
   # add to swan INPUT:
-  print '\n'
-  print 'INPGRID WIND CURVILINEAR 0 0 %d %d EXC 9.999000e+003 &'%(xi-1,eta-1)
-  print '       NONSTATIONARY %s %.2f HR %s'%(t0iso,dth,t1iso)
-  print 'READINP WIND 1 \'%s\' 4 0 FREE '%(os.path.join(path,fname))
-  print '\n'
+  print('\n')
+  print('INPGRID WIND CURVILINEAR 0 0 %d %d EXC 9.999000e+003 &'%(xi-1,eta-1))
+  print('       NONSTATIONARY %s %.2f HR %s'%(t0iso,dth,t1iso))
+  print('READINP WIND 1 \'%s\' 4 0 FREE '%(os.path.join(path,fname)))
+  print('\n')
 

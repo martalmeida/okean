@@ -175,7 +175,7 @@ class Display:
 if __name__=='__main__':
   import sys
   if len(sys.argv)>1 and sys.argv[1] in ('-h','--h','--help'):
-    print 'Usage: disp.py image or folder (defaul is ./)'
+    print('Usage: disp.py image or folder (defaul is ./)')
     sys.exit()
   if len(sys.argv)>1:
     Display(sys.argv[1:])

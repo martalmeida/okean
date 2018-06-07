@@ -24,7 +24,7 @@ class ascat:
     if not self.f: self.connect()
     if isinstance(date,basestring): date=date_parse(date)
     p=os.path.join(path,'%d'%date.year,'%02d'%date.month,'%02d'%date.day)
-    print 'entering folder %s'%p
+    print('entering folder %s'%p)
     res=''
     try:
       self.f.cwd(p)
@@ -34,18 +34,18 @@ class ascat:
   def list(self,date):
     msg=self.goto(date)
     if msg:
-      print msh
+      print(msh)
       return
 
     res=self.f.nlst()
-    for r in res: print r
+    for r in res: print(r)
 
   def destination(self,date,gen=False):
     if isinstance(date,basestring): date=date_parse(date)
     dest=os.path.join(self.dest,'%d'%date.year)
     if gen:
       if not os.path.isdir(dest):
-        print 'creating folder %s'%dest
+        print('creating folder %s'%dest)
         os.makedirs(dest)
 
     return dest
@@ -57,7 +57,7 @@ class ascat:
     for f in destnames:
       data=bz2.decompress(open(f,'rb').read())
       dest_decomp=os.path.splitext(f)[0]
-      print 'decompressing to %s'%dest_decomp
+      print('decompressing to %s'%dest_decomp)
       open(dest_decomp,'wb').write(data)
 
       # remove compressed file:
@@ -66,7 +66,7 @@ class ascat:
   def download_day(self,date):
     msg=self.goto(date)
     if msg:
-      print msg
+      print(msg)
       return
 
     files=self.f.nlst()
@@ -75,11 +75,11 @@ class ascat:
       dest_decomp=os.path.splitext(destname)[0]
 
       if os.path.isfile(destname):
-        print 'file %s already exists'%destname
+        print('file %s already exists'%destname)
       elif os.path.isfile(dest_decomp):
-        print 'file %s already exists'%dest_decomp
+        print('file %s already exists'%dest_decomp)
       else:
-        print 'downloading %s'%r
+        print('downloading %s'%r)
         dest=open(destname,'wb')
         self.f.retrbinary('RETR '+r,dest.write)
 
@@ -100,7 +100,7 @@ def source(date):
 
 def read_wind(grd,date,ij=False):
   f=source(date)
-  print '-- reading from %s'%f
+  print('-- reading from %s'%f)
   time=netcdf.nctime(f,'time')
 
   if 0:
@@ -119,9 +119,9 @@ def read_wind(grd,date,ij=False):
     xl0=np.asarray((g.lon.min(),g.lon.max()))
     xl=np.asarray((g.lon.min(),g.lon.max()))
     if np.any(xl>180) or np.any(xl<-180):
-      print 'ERROR: grid is supposed to be -180<x<180'
-      print 'Can be implemented with mpl_toolkits.basemap.shiftgrid ... TODO'
-      print '(http://matplotlib.org/basemap/api/basemap_api.html)'
+      print('ERROR: grid is supposed to be -180<x<180')
+      print('Can be implemented with mpl_toolkits.basemap.shiftgrid ... TODO')
+      print('(http://matplotlib.org/basemap/api/basemap_api.html)')
       return
 
     yl=g.lat.min(),g.lat.max()
@@ -220,7 +220,7 @@ def make_frc(frcname,grd,date0,date1):
     gen_frc(frcname,grd)
   else:
     last=netcdf.nctime(frcname,'wind_time',wind_time=-1)
-    print '-->found file %s with last time %s'%(frcname,last.isoformat())
+    print('-->found file %s with last time %s'%(frcname,last.isoformat()))
     date0=last+datetime.timedelta(1.) # daily
 
   dates=[date0]
@@ -239,11 +239,11 @@ def make_frc(frcname,grd,date0,date1):
     V=calc.griddata(x,y,v,g.lon,g.lat,extrap=True)
 
      # rotate wind,
-    print ' --> rot U,V'
+    print(' --> rot U,V')
     angle=g.use('angle')
     U,V=calc.rot2d(U,V,angle)
 
-    print '  filling %s'%d.isoformat(' ')
+    print('  filling %s'%d.isoformat(' '))
     fill_frc(frcname,d,U,V)
 
 
@@ -274,8 +274,8 @@ if __name__=='__main__':
       else: a.decompress_day(date)
 
   else:
-     print 'USAGE: python ascat.py roms_grd.nc  wind_frc.nc 20100101 20110101'
-     print 'or:'
-     print 'python ascat.py yyyymmdd ACTION:'
-     print 'ACTION=download or decompress'
+     print('USAGE: python ascat.py roms_grd.nc  wind_frc.nc 20100101 20110101')
+     print('or:')
+     print('python ascat.py yyyymmdd ACTION:')
+     print('ACTION=download or decompress')
 

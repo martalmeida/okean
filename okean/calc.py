@@ -51,15 +51,15 @@ def inpolygon(x,y,xp,yp):
   except: pass
 
   if _use_mpl==1:
-    verts=np.array(zip(xp,yp))
+    verts=np.array(list(zip(xp,yp)))
     if isiterable(x,y):
-      points=np.array(zip(x,y))
+      points=np.array(list(zip(x,y)))
       res=points_inside_poly(points,verts)
     else:
       res=pnpoly(x,y,verts)==1
 
   elif _use_mpl==2:
-    verts=np.array(zip(xp,yp))
+    verts=np.array(list(zip(xp,yp)))
     p=Path(verts)
     if not isiterable(x,y): x,y,itr=[x],[y],0
     else: itr=1
@@ -107,7 +107,7 @@ def poly_area(x,y):
   If positive, the polygon is counter-clockwise (direct)
   The polygon need not to be closed
   '''
-  r=range(1,x.size)+[0]
+  r=list(range(1,x.size))+[0]
   return 0.5*np.sum(x*y[r]-y*x[r])
 
 
@@ -116,7 +116,7 @@ def poly_centroid(x,y):
   Geometric centre (Centroid) of non-self-intersecting polygon
   The polygon doesn't need to be closed
   '''
-  r=range(1,x.size)+[0]
+  r=list(range(1,x.size))+[0]
   a=poly_area(x,y)
   xc=1./(6.*a)*np.sum((x+x[r])*(x*y[r]-y*x[r]))
   yc=1./(6.*a)*np.sum((y+y[r])*(x*y[r]-y*x[r]))
@@ -450,7 +450,7 @@ def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
     mask=np.hstack((mask,mv))
 
     tri=mtri.Triangulation(x[~mask],y[~mask])
-    print u.shape,x.shape,y.shape,mask.shape
+    #print u.shape,x.shape,y.shape,mask.shape
     u[mask] = mtri.CubicTriInterpolator(tri, u[~mask])(x[mask],y[mask])
     if np.any(np.isnan(u)):
       mask=np.isnan(u)
@@ -706,7 +706,7 @@ def meetpoint(x1,y1,x2,y2):
   mma IEO-A Coruna 2008
   '''
 
-  from alg import meetpoint as meetp
+  from .alg import meetpoint as meetp
   xy=[]
   xyi,N=meetp(x1,y1,x2,y2,len(x1),len(x2))
   return xyi[0,:N],xyi[1,:N]
@@ -1201,4 +1201,96 @@ def leggauss_ab(N,a=-1,b=1):
   x=(a*(1-x)+b*(1+x))/2.
   w=w*(b-a)/2.
   return x,w
+
+
+def legendre(n,x,norm=True):
+  '''Associated Legendre functions'''
+
+  if n==0:
+    if norm:
+      return 1/np.sqrt(2)*(1+0*x)
+    else:
+      return 1+0*x
+
+  rootn = np.sqrt(range(2*n+1))
+  s = np.sqrt(1-x**2)
+  P = np.zeros((n+3,x.size),x.dtype)
+
+  e=np.geterr()['divide']
+  np.seterr(divide='ignore')
+  twocot = -2*x/s
+  np.seterr(divide=e)
+
+  sn=(-s)**n
+  tol=np.finfo(x.dtype).tiny**0.5
+  ind = np.where((s>0)& (np.abs(sn)<=tol))[0]
+  if ind.size:
+    v = 9.2-np.log(tol)/(n*s[ind])
+    w = 1/np.log(v)
+    m1 = 1+n*s[ind]*v*w*(1.0058+ w*(3.819 - w*12.173))
+    m1 = np.minimum(n, np.floor(m1))
+
+    # Column-by-column recursion
+    for k in range(len(m1)):
+        mm1 = int(m1[k])-1
+        col = ind[k]
+        P[mm1:n+1,col] = 0
+
+        # Start recursion with proper sign
+        tstart = np.finfo(x.dtype).eps
+        P[mm1,col] = np.sign(np.remainder(mm1+1,2)-0.5)*tstart
+        if x[col] < 0:
+            P[mm1,col] = np.sign(np.remainder(n+1,2)-0.5)*tstart
+
+        # Recur from m1 to m = 0, accumulating normalizing factor.
+        sumsq = tol
+        for m in range(mm1-1,-1,-1):
+          P[m+1-1,col] = ((m+1)*twocot[col]*P[m+2-1,col]-
+                rootn[n+m+3-1]*rootn[n-m-1]*P[m+3-1,col])/(rootn[n+m+2-1]*rootn[n-m+1-1])
+
+          sumsq = P[m+1-1,col]**2 + sumsq
+
+        scale = 1/np.sqrt(2*sumsq - P[0,col]**2)
+        P[:mm1+1,col] = scale*P[:mm1+1,col]
+
+  # Find the values of x,s for which there is no underflow, and for
+  # which twocot is not infinite (x~=1).
+
+  nind = np.where((x!=1)&(np.abs(sn)>=tol))[0]
+
+  if nind.size:
+    # Produce normalization constant for the m = n function
+    c=(1-1/np.arange(2.,2*n+1,2)).prod()
+
+    # Use sn = (-s).^n (written above) to write the m = n function
+    P[n,nind] = np.sqrt(c)*sn[nind]
+    P[n-1,nind] = P[n,nind]*twocot[nind]*n/rootn[-1]
+
+    # Recur downwards to m = 0
+    for m in  range(n-2,-1,-1):
+      P[m,nind] = (P[m+1,nind]*twocot[nind]*(m+1) \
+            -P[m+2,nind]*rootn[n+m+2]*rootn[n-m-1])/ \
+            (rootn[n+m+2-1]*rootn[n-m+1-1])
+
+  y = P[:n+1]
+
+  # Polar argument   (x = +-1)
+  s0 = np.where(s==0)[0]
+  if s0.size:
+    y[0,s0] = x[s0]**n
+
+  if not norm:
+    for m in range(n-1):
+      y[m+1]=rootn[n-m:n+m+2].prod()*y[m+1]
+
+    y[n] = rootn[1:].prod()*y[n]
+  else:
+    y = y*(n+0.5)**0.5
+    const1 = -1
+    for r in range(n+1):
+        const1 = -const1
+        y[r] = const1*y[r]
+
+
+  return y
 

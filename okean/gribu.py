@@ -40,7 +40,7 @@ def show_all(fname):
       units  = g.parameter_units
 
 #    print '%10s %30s %40s %10s %20s' % (abb.ljust(10),name.ljust(30)[:30],level.ljust(40)[:40],vlevel.ljust(10)[:10],units.ljust(20)[:20])
-    print '%-10s %-20s %-20s %-10s %-10s' % (abb,name[:20],level[:20],vlevel[:10],units[:10])
+    print('%-10s %-20s %-20s %-10s %-10s' % (abb,name[:20],level[:20],vlevel[:10],units[:10]))
 
 
 def show(fname):
@@ -58,11 +58,11 @@ def show(fname):
       varsn[abb]=1
 
 
-  print '%-10s %-25s %5s   %-10s' % ('','name','n lev','units')
+  print('%-10s %-25s %5s   %-10s' % ('','name','n lev','units'))
   for abb in vars.keys():
     name,vlevel,units=vars[abb]
     vlevel=str(varsn[abb])
-    print '%-10s %-25s %5s   %-10s' % (abb,name[:25],vlevel[:10],units[:10])
+    print('%-10s %-25s %5s   %-10s' % (abb,name[:25],vlevel[:10],units[:10]))
 
 
 
@@ -172,10 +172,10 @@ def getvar(*args,**kargs):
   except: var=[var] # an iterable is expected, like the output of findvar
 
   if len(var)>1:
-    if not quiet: print 'more than one var found !! found', len(var)
+    if not quiet: print('more than one var found !! found', len(var))
     return False,False,False
   elif len(var)==0:
-    if not quiet: print "no variable found"
+    if not quiet: print("no variable found")
     return False,False,False
   else: var=var[0]
 

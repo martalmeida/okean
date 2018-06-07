@@ -252,7 +252,7 @@ def wind_rose(D,F,**kargs):
     if legTickLab and not (hasH and IncHiLow):
       ax.text(x1+L/4,y0,str(Ag[-1]),verticalalignment='center',fontsize=FontSize)
 
-  else:
+  elif legType==2:
      for j in range(len(Ag)-1):
       lab=str(Ag[j])+ ' - '+ str(Ag[j+1])
       if j==0 and hasL and  IncHiLow:
@@ -272,9 +272,10 @@ def wind_rose(D,F,**kargs):
   y=np.mean([g+ri,g*rs])
   ax.text(x,y,titStr,horizontalalignment='center',fontsize=FontSize)
 
-  x=x0
-  y=y1+dy
-  ax.text(x,y,legStr,horizontalalignment='left',verticalalignment='bottom',fontsize=FontSize)
+  if legType in [0,1]:
+    x=x0
+    y=y1+dy
+    ax.text(x,y,legStr,horizontalalignment='left',verticalalignment='bottom',fontsize=FontSize)
 
 
   ax.axis('equal') #'image')
@@ -562,13 +563,13 @@ def parrow(x,y,n=4,d=0,d0=0,**kargs):
 
   if d0:
     if d0<0:
-      if n+d0<2: print 'Warning: d0 is too low!' # arrow is just one point...
+      if n+d0<2: print('Warning: d0 is too low!') # arrow is just one point...
       x=np.hstack((x[0]+np.zeros(-d0),x))
       y=np.hstack((y[0]+np.zeros(-d0),y))
       c=np.ma.hstack((c[0]+np.zeros(-d0),c))
       c.mask[:-d0]=True
     else:
-      if d0>d+1: print 'Warning: d0 too high!' # a new arrow should be on the way...
+      if d0>d+1: print('Warning: d0 too high!') # a new arrow should be on the way...
       x=x[d0:]
       y=y[d0:]
       c=c[d0:]

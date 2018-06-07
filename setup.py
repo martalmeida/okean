@@ -38,9 +38,9 @@ class my_install(install):
         dest=os.path.join(p,'okean','pppack.so')
 #        os.symlink(src,dest)
 
-        print '''
+        print('''
         enjoy okean
-        '''
+        ''')
 
 
 alg = Extension(name = 'alg',

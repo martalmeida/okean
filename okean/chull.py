@@ -14,7 +14,7 @@ def _distances(x,y):
     foundJ+=[j]
     dst+=[d[j]]
 
-  print 'avg min dist: %f'%np.mean(dst)
+  print('avg min dist: %f'%np.mean(dst))
   return np.asarray(dst)
 
 def _distances_kdt(x,y):
@@ -30,7 +30,7 @@ def _distances_kdt(x,y):
     foundJ+=[ind[1]]
     dst+=[dist[1]]
 
-  print 'avg min dist: %f'%np.mean(dst)
+  print('avg min dist: %f'%np.mean(dst))
   return np.asarray(dst)
 
 
@@ -131,7 +131,7 @@ def find_next(X,Y,x0,y0,xi,yi,x,y,rmax,rmax_prev,method='circ',**kargs):
   if ang.dtype==np.dtype('float64'):
     ang=ang.astype('float32')
   else:
-    print 'warning chull: ang is not float 64 -- possible colinear points problem !'
+    print('warning chull: ang is not float 64 -- possible colinear points problem !')
 
   i=np.where(ang==ang.min())[0]
   if len(ang)==1:
@@ -157,7 +157,7 @@ def _chull(x,y,rmax,maxr='auto',method='circ'):
   segs=[]
 
   if method=='kdt' and rmax>len(x):
-    print rmax,'Max k is %d'%len(x)
+    print(rmax,'Max k is %d'%len(x))
     return X,Y,1
 
   if method=='kdt':
@@ -188,9 +188,9 @@ def _chull(x,y,rmax,maxr='auto',method='circ'):
 
     if method!='kdt':
       inverted_path=(xx==x0)&(yy==y0)
-      if inverted_path: print 'inverted...'
+      if inverted_path: print('inverted...')
       while (xx is None) or (maxr and inverted_path):
-        print '- looking for next inside while',rmax2
+        print('- looking for next inside while',rmax2)
         rmax2=rmax2*1.1
 
         if rmax2<=maxr:
@@ -201,7 +201,7 @@ def _chull(x,y,rmax,maxr='auto',method='circ'):
           break
 
     if xx is None:
-      print 'cannot locate next point!'
+      print('cannot locate next point!')
       status=1
       break
 
@@ -223,14 +223,14 @@ def _chull(x,y,rmax,maxr='auto',method='circ'):
           Y=Y[:-2]
 
       if is_closed:
-        print 'DONE: polygon is closed!'
-        print 'AREA=',calc.poly_area(np.asarray(X),np.asarray(Y))
+        print('DONE: polygon is closed!')
+        print('AREA=',calc.poly_area(np.asarray(X),np.asarray(Y)))
         break
 
     # current segment:
     seg=X[-2],X[-1],Y[-2],Y[-1]
     if seg in segs:
-      print 'ERROR: repeating segment !'
+      print('ERROR: repeating segment !')
       status=1
       break
 
@@ -259,7 +259,7 @@ def chull(x,y,rmax,maxr='auto',method='circ'):
     else: rmax=rmax*1.05
 
     if status and rmax>maxr:
-      print 'maxr reached!'
+      print('maxr reached!')
       break
 
   return xx,yy, status

@@ -92,12 +92,12 @@ class _pstere(Basemap):
         from okean import ticks
         tks=ticks.tight(Lat0,Lat1,4)
       except ImportError:
-        print 'Warning: okean needed to calculate parallels (circles)'
-        print 'You may get okean from https://github.com/martalmeida/okean'
-        print 'or specify them: ex: drawparallels([-80,-60])'
-        print 'Will now use 2 linearly spaced ticks...'
+        print('Warning: okean needed to calculate parallels (circles)')
+        print('You may get okean from https://github.com/martalmeida/okean')
+        print('or specify them: ex: drawparallels([-80,-60])')
+        print('Will now use 2 linearly spaced ticks...')
         tks=np.linspace(Lat0,Lat1,4)[1:-1]
-        print 'circles: ',tks
+        print('circles: ',tks)
 
     else: tks=np.asarray(parallels)
     self.circles=tks
@@ -128,7 +128,7 @@ class _pstere(Basemap):
 
     central_lat=kargs.get('central_lat',None)
     if not hasattr(self,'central_lat') and not central_lat:
-      print 'Error: central_lat not set. Provide it in kargs of draw parallels first'
+      print('Error: central_lat not set. Provide it in kargs of draw parallels first')
       return
 
     if not ax: ax=pl.gca()

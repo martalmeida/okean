@@ -283,11 +283,12 @@ class InteractiveLine:
 
 
 class InteractiveRect:
-  def __init__(self,ax=False,cmd=False,axis=False):
+  def __init__(self,ax=False,cmd=False,axis=False,**lineOpts):
     if not ax: ax=plt.gca()
     self.x=[]
     self.y=[]
     self.line=False
+    self.lineOpts=lineOpts
 
     self.cmd=cmd
     self.axis=axis
@@ -332,14 +333,15 @@ class InteractiveRect:
       self.figure.canvas.draw()
 
   def onkey(self,event):
-    print 'key !!'
     if event.key=='e':
       if self.line.get_markersize()==0: self.edit()
       else: self.edit_stop()
 
   def update_line(self):
     if not self.line:
-      self.line,=self.ax.plot(self.x,self.y,'r-',picker=5,marker='s',ms=0,mfc='w',mec='r',alpha=.7)
+      if not 'alpha'in self.lineOpts: self.lineOpts['alpha']=0.7
+      if not 'color'in self.lineOpts: self.lineOpts['color']='r'
+      self.line,=self.ax.plot(self.x,self.y,**self.lineOpts)
     else: self.line.set_data(self.x,self.y)
     if self.axis: self.ax.axis(self.axis)
     self.figure.canvas.draw()
@@ -791,7 +793,7 @@ class ncview_cmaps(cmap_aux):
       vals=[int(j) for j in line.split()]
       r=np.hstack((r,vals))
 
-    r.shape=r.size/3,3
+    r.shape=r.size//3,3
     return r/255.
 
 

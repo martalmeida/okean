@@ -133,7 +133,7 @@ def roms2roms(f0,grd,sparams,tind=0,**kargs):
     data['z3d']=r0.s_levels(tind)
 
     # u,v at rho:
-    print '  u,v at rho ...'
+    print('  u,v at rho ...')
     u=np.ma.zeros((data['NZ'],data['NY'],data['NX']),data['u'].dtype)
     v=np.ma.zeros((data['NZ'],data['NY'],data['NX']),data['v'].dtype)
 
@@ -145,7 +145,7 @@ def roms2roms(f0,grd,sparams,tind=0,**kargs):
     v[:,0,:]=data['v'][:,0,:]
     v[:,-1,:]=data['v'][:,-1,:]
 
-    print 'rot 2d from original grid'
+    print('rot 2d from original grid')
     for k in range(v.shape[0]):
       u[k],v[k]=calc.rot2d(u[k],v[k],-g0.angle)
 
@@ -153,7 +153,7 @@ def roms2roms(f0,grd,sparams,tind=0,**kargs):
     data['v']=v
 
     # simplify data:
-    print '  simplify data...'
+    print('  simplify data...')
     i0,i1,j0,j1=calc.ij_limits(g0.lon,g0.lat,xlim,ylim,margin=3)
     for v in 'z3d','temp','salt','u','v': data[v]=data[v][:,j0:j1,i0:i1]
     for v in 'ssh','lon','lat': data[v]=data[v][j0:j1,i0:i1]
@@ -170,18 +170,18 @@ def roms2roms(f0,grd,sparams,tind=0,**kargs):
     data['depth']=Z
 
     for v in 'temp','salt','u','v','ssh':
-      print '  %-6s %6.3f %6.3f'%(v,data[v].min(), data[v].max())
+      print('  %-6s %6.3f %6.3f'%(v,data[v].min(), data[v].max()))
 
     # to z levels:
     Data=prognostic.data2z(data,quiet=quiet,ij=ij)
     for v in 'temp','salt','u','v','ssh':
-      print '  %-6s %6.3f %6.3f'%(v,Data[v].min(), Data[v].max())
+      print('  %-6s %6.3f %6.3f'%(v,Data[v].min(), Data[v].max()))
 
 
     # clm:
     data,HA=prognostic.data2roms(Data,grd,sparams,quiet=quiet,horizAux=True,ij=ij)
     for v in 'temp','salt','u','v','zeta':
-      print '  %-6s %6.3f %6.3f'%(v,data[v].min(), data[v].max())
+      print('  %-6s %6.3f %6.3f'%(v,data[v].min(), data[v].max()))
 
     # bry:
     datab=prognostic.data2romsbry(Data,grd,sparams,quiet=quiet,horizAux=HA)

@@ -1,7 +1,7 @@
 import numpy as np
-import roms_tools as rt
-from okean import phys
-from okean.vis import Data
+from . import roms_tools as rt
+from .. import phys
+from ..vis import Data
 
 
 class Derived:
@@ -114,7 +114,7 @@ class Derived:
 
 
     else: # slice ll:
-      print 'TODO !!!!'
+      print('TODO !!!!')
       return out
 #        X=ind['x']
 #        Y=ind['y']

@@ -19,7 +19,7 @@ class Common:
     var,nc=netcdf.var(self.name)
     varnames=var.keys()
     for i in vars:
-      if not self.quiet: print ':: loading var ',  i
+      if not self.quiet: print(':: loading var ',  i)
 
       if isinstance(i,dict):
         iname, iopts = i.items()[0]
@@ -40,14 +40,14 @@ class Common:
         if j in varnames:
           setattr(self,iname,var[j][:])
           found=1
-          if not self.quiet: print '  - found %s as %s'  % (iname,j)
+          if not self.quiet: print('  - found %s as %s'  % (iname,j))
 
           # store original name and other info, like units
           try: units=var[j].atts['units'].value
           except: units=''
           self.var_as[iname]={'name':j,'units':units}
           break
-      if not found and not self.quiet: print ':: %s not found in %s' % (str(iopts),self.name)
+      if not found and not self.quiet: print(':: %s not found in %s' % (str(iopts),self.name))
 
     nc.close()
 
@@ -506,7 +506,7 @@ class His(Common,Derived):
     d,x,y,z,v=[[]]*5
 
     if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
+      print(':: variable %s not found' % varname)
       if dist: return  d,z,v
       else:  return  x,y,z,v
 
@@ -527,7 +527,7 @@ class His(Common,Derived):
       XI= self.XI_RHO
       xi='XI_RHO'
 
-    if ind >= XI:  print 'j = %d exceeds %s dimension (%d)' % (ind,xi,XI)
+    if ind >= XI:  print('j = %d exceeds %s dimension (%d)' % (ind,xi,XI))
 
     x,y,h,m=self.grid.vars(ruvp=self.var_at(varname),i=ind)
     karg={'SEARCHtime':time,xi.lower(): ind}
@@ -586,7 +586,7 @@ class His(Common,Derived):
     d,x,y,z,v=[[]]*5
 
     if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
+      print(':: variable %s not found' % varname)
       if dist: return  d,z,v
       else:  return  x,y,z,v
 
@@ -608,7 +608,7 @@ class His(Common,Derived):
       eta='ETA_RHO'
 
     if ind >= ETA:
-      print 'j = %d exceeds %s dimension (%d)' % (ind,eta,ETA)
+      print('j = %d exceeds %s dimension (%d)' % (ind,eta,ETA))
       if dist: return  d,z,v
       else:  return  x,y,z,v
 
@@ -680,7 +680,7 @@ class His(Common,Derived):
       msg=':: variable %s not found' % varname
       if retMsg: return x,y,z,v,msg
       else:
-        print msg
+        print(msg)
         return x,y,z,v
 
     isW=varname=='w'
@@ -691,21 +691,21 @@ class His(Common,Derived):
         msg='k = %d exceeds S_W dimension (%d)' % (ind,self.S_W)
         if retMsg: return x,y,z,v,msg
         else:
-          print msg
+          print(msg)
           return x,y,z,v
 
       elif ind >= self.S_RHO:
         msg='k = %d exceeds S_RHO dimension (%d)' % (ind,self.S_RHO)
         if retMsg: return x,y,z,v,msg
         else:
-          print msg
+          print(msg)
           return x,y,z,v
 
     if self.hast(varname) and time>=self.TIME:
       msg='t = %d exceeds TIME dimension (%d)' % (time,self.TIME)
       if retMsg: return x,y,z,v,msg
       else:
-        print msg
+        print(msg)
         return x,y,z,v
 
     if isW: v=self.use(varname,SEARCHtime=time,s_w=ind)
@@ -754,14 +754,14 @@ class His(Common,Derived):
       msg=':: variable %s not found' % varname
       if retMsg: return x,y,z,v,msg
       else:
-        print msg
+        print(msg)
         return x,y,z,v
 
     if self.hast(varname) and time>=self.TIME:
       msg='t = %d exceeds TIME dimension (%d)' % (time,self.TIME)
       if retMsg: return x,y,z,v,msg
       else:
-        print msg
+        print(msg)
         return x,y,z,v
 
     v=self.use(varname,SEARCHtime=time);
@@ -808,11 +808,11 @@ class His(Common,Derived):
     if Y.ndim>1: Y=np.squeeze(X)
 
     if varname not in netcdf.varnames(self.name):
-      print ':: variable %s not found' % varname
+      print(':: variable %s not found' % varname)
       return x,y,z,v,m
 
     if time>=self.TIME:
-      print 't = %d exceeds TIME dimension (%d)' % (time,self.TIME)
+      print('t = %d exceeds TIME dimension (%d)' % (time,self.TIME))
       return x,y,z,v,m
 
     if data is False: v=self.use(varname,SEARCHtime=time)
@@ -943,7 +943,7 @@ class His(Common,Derived):
       msg=':: variable %s not found' % varname
       if retMsg: return t,z,v,msg
       else:
-        print msg
+        print(msg)
         return t,z,v
 
     isW=varname=='w'
@@ -954,14 +954,14 @@ class His(Common,Derived):
         msg='k = %d exceeds S_W dimension (%d)' % (depth,self.S_W)
         if retMsg: return t,z,v,msg
         else:
-          print msg
+          print(msg)
           return t,z,v
 
       elif depth >= self.S_RHO:
         msg='k = %d exceeds S_RHO dimension (%d)' % (depth,self.S_RHO)
         if retMsg: return t,z,v,msg
         else:
-          print msg
+          print(msg)
           return t,z,v
 
     if times is False:
@@ -971,7 +971,7 @@ class His(Common,Derived):
       msg='t = %d exceeds TIME dimension (%d)' % (times[-1],self.TIME)
       if retMsg: return t,z,v,msg
       else:
-        print msg
+        print(msg)
         return t,z,v
 
     lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
@@ -1020,14 +1020,14 @@ class His(Common,Derived):
 
 
   def extrap_at_mask(self,vname,time,quiet=1,**opts):
-    if not quiet: print 'Extrap at mask:\n  loading'
+    if not quiet: print('Extrap at mask:\n  loading')
     v=self.use(vname,SEARCHtime=time)
     x,y,h,m=self.grid.vars(vname)
 
     if self.hasz(vname): # 3d
       N=v.shape[0]
       for n in range(N):
-        if not quiet: print '  extrap level %d of %d' % (n,N)
+        if not quiet: print('  extrap level %d of %d' % (n,N))
         v[n,...]=calc.mask_extrap(x,y,np.ma.masked_where(m==0,v[n,...]))
     else: # 2d
         v=calc.mask_extrap(x,y,np.ma.masked_where(m==0,v))
@@ -1081,7 +1081,7 @@ class Flt(Common):
 
     if not quiet:
       for i in range(len(D)):
-        print '%5d %8.2f' % (D[i],d[D[i]])
+        print('%5d %8.2f' % (D[i],d[D[i]]))
 
     return D[::-1],d[::-1]
 
@@ -1141,20 +1141,20 @@ class Sta(Common):
         args['ftime']=time
 
       if not quiet:
-        print 'loading Sta data time=',time
-        print '* * * * * * * * * * * *.'
+        print('loading Sta data time=',time)
+        print('* * * * * * * * * * * *.')
 
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['lon']  = self.use('lon',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['lat']  = self.use('lat',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['h']  = self.use('h',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['zeta'] = self.use('zeta', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['ubar'] = self.use('ubar', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['vbar'] = self.use('vbar', **args)
 
     statime=self.use('scrum_time',**args)
@@ -1296,32 +1296,32 @@ class Blk(Common):
         args['bulk_time']=time
 
       if not quiet:
-        print 'loading Blk data time=',time
-        print '* * * * * * * * * * * *.'
+        print('loading Blk data time=',time)
+        print('* * * * * * * * * * * *.')
 
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['tair']  = self.use('tair',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['rhum']  = self.use('rhum',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['pres']  = self.use('pres',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['prate'] = self.use('prate', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['radsw'] = self.use('radsw', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['radlw'] = self.use('radlw', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['dlwrf'] = self.use('dlwrf', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['uwnd']  = self.use('uwnd',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['vwnd']  = self.use('vwnd',  **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['sustr'] = self.use('sustr', **args)
-      if not quiet: print '*',
+      if not quiet: print('*'),
       out['svstr'] = self.use('svstr', **args)
-      if not quiet: print '*.'
+      if not quiet: print('*.')
       out['wspd']  = self.use('wspd',  **args)
 
     blktime=self.use('bulk_time',**args)

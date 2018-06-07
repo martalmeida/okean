@@ -1,4 +1,9 @@
-from ompy.tools import cookbook as cbt
+'''
+python 2x, 3x
+'''
+
+from collections import OrderedDict
+from .. import cookbook as cb
 
 def parse_dims(lines):
   i=-1
@@ -13,7 +18,7 @@ def parse_dims(lines):
       i1=i
       break
 
-  res=cbt.odict()
+  res=OrderedDict()
   for j in range(i0,i1):
       tmp=lines[j].split('=')
       dimname=tmp[0].strip()
@@ -38,12 +43,12 @@ def parse_vars(lines):
       i1=i
       break
 
-  res=cbt.odict()
+  res=OrderedDict()
   for j in range(i0,i1):
     if lines[j].strip():
         if lines[j].find('=')==-1 and lines[j].strip()[0]!='"':
           varname=lines[j][:-2].strip().split()[1].split('(')[0]
-          res[varname]=cbt.odict()
+          res[varname]=OrderedDict()
         else:
           if lines[j].strip()[0]!='"': # multiline !!
             name=lines[j].split(':')[0].strip()
@@ -66,7 +71,7 @@ def parse_atts(lines):
       i1=i
       break
 
-  res=cbt.odict()
+  res=OrderedDict()
   for j in range(i0,i1):
     if lines[j].strip() and lines[j].strip()[0]==':':
       s=lines[j]
@@ -78,8 +83,8 @@ def parse_atts(lines):
 def parse_once(lines,root=False):
   name=lines[0].split()[1]
 
-  res=cbt.odict()
-  res['groups'] = cbt.odict()
+  res=OrderedDict()
+  res['groups'] = OrderedDict()
   res['name']   = name
   res['dimensions'] = parse_dims(lines)
   res['variables']  = parse_vars(lines)
@@ -107,20 +112,20 @@ def ncdump_info(f):
   List of dimensions, variables and attributes from ncdump
   Works with netcdf files version <= 4
   '''
-  ncdump=cbt.search('ncdump')
+  ncdump=cb.search('ncdump')
   if ncdump:
-    #try :   out=cbt.run(ncdump+' -h '+f+' 2>/dev/null')
-    #except: out=cbt.run(ncdump+' -h '+f)
-    out=cbt.run(ncdump,'-h',f)
+    #try :   out=cb.run(ncdump+' -h '+f+' 2>/dev/null')
+    #except: out=cb.run(ncdump+' -h '+f)
+    out=cb.run(ncdump,'-h',f)
   else: return
 
   if not out:
-    res=cbt.odict()
-    res['groups'] = cbt.odict()
+    res=OrderedDict()
+    res['groups'] = OrderedDict()
     res['name']       = f
-    res['dimensions'] = cbt.odict()
-    res['variables']  = cbt.odict()
-    res['attributes'] = cbt.odict()
+    res['dimensions'] = OrderedDict()
+    res['variables']  = OrderedDict()
+    res['attributes'] = OrderedDict()
   else:
     res=parse_once(out,True)
 
@@ -133,11 +138,11 @@ def ncdump_info3(f):
   Works with netcdf files version < 4
   '''
 
-  ncdump=cbt.search('ncdump')
+  ncdump=cb.search('ncdump')
   if ncdump:
-    #try :   out=cbt.run(ncdump+' -h '+f+' 2>/dev/null')
-    #except: out=cbt.run(ncdump+' -h '+f)
-    out=cbt.run(ncdump,'-h',f)
+    #try :   out=cb.run(ncdump+' -h '+f+' 2>/dev/null')
+    #except: out=cb.run(ncdump+' -h '+f)
+    out=cb.run(ncdump,'-h',f)
   else:
     return
 

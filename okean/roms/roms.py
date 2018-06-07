@@ -1,51 +1,38 @@
 import numpy as np
-#import pylab as pl
 import os
 
-from okean import calc, netcdf, ticks
-import roms_tools as rt
-from derived import Derived
-from okean.vis import Data
+from okean import calc, netcdf, vis, ticks, cookbook as cb
+from okean.roms import roms_tools as rt
+from okean.roms.derived import Derived
 
 try:
   from mpl_toolkits.basemap import Basemap
 except:
   Basemap=False
 
-__all__='His','Grid'
+__all__='His','Grid','MHis','MGrid'
 
-#class Aux:
-#  def __init__(self):
-#    self.x=None
-#    self.y=None
-#    self.d=None
-#    self.z=None
-#    self.t=None
-#    self.tnum=None # used with time_series (2d times)
-#    self.msg=''
-#
-#  def info(self):
-#    for i in ['x','y','d','z','t','tnum']:
-#      a=getattr(self,i)
-#      try: print '%5s shape=%12s size=%d'%(i,str(a.shape),a.size)
-#      except: print '%5s %s'%(i,str(a))
-#
-#    if not self.msg: msg='EMPTY'
-#    else: msg=self.msg
-#    print ' == msg == %s'%msg
-    
+class propVar():
+  def __init__(self,vname): self.vname=vname
+  def get(self,gob): return gob._get(self.vname)
 
-class Common:
+
+class Common():
+  def _get(self,vname):
+    if not hasattr(self,'_store'): self._store={}
+    if not vname in self._store:
+      self._store[vname]=self.use(vname)
+
+    return self._store[vname]
+
   def load_vars(self,vars):
-    #self.quiet=0
     var=netcdf.var(self.nc)
-    varnames=var.keys()
     for i in vars:
-      if not self.quiet: print ':: loading var ',  i
+      if not self.quiet: print(':: loading var %s'%i)
 
       if isinstance(i,dict):
-        iname, iopts = i.items()[0]
-      elif isinstance(i,basestring):
+        iname, iopts = list(i.items())[0]
+      elif cb.isstr(i):
         iname=i
         if iname.startswith('@'): iopts=iname[1:]
         else: iopts=iname
@@ -56,29 +43,32 @@ class Common:
       found=0
       if not hasattr(self,'var_as'): self.var_as={}
       for j in iopts:
-        if j in varnames:
-          if iname.startswith('@'):
+        if j in var:
+          if iname.startswith('@'): # variable will be loaded only when needed!
             iname=iname[1:]
-            setattr(Common, iname, property(fget=lambda self: self.use(j)))
-            # not working as expected! self.use is executed in the end, for last variable only!
-            # check later...
+
+            # can't use self._get inside lambda function... j is always the last element!
+            # so, instead of:
+            # setattr(self.__class__, iname, property(fget=lambda self: self._get(j)))
+            # a propVar variable is used, storing the riht j value:
+            ob=propVar(j)
+            setattr(self.__class__,iname,property(fget=ob.get))##lambda self: self.getx(vv)))
           else:
             setattr(self,iname,var[j][:])
 
           found=1
-          if not self.quiet: print '  - found %s as %s'  % (iname,j)
+          if not self.quiet: print('  - found %s as %s'%(iname,j))
 
           # store original name and other info, like units
           try: units=var[j].atts['units'].value
           except: units=''
           self.var_as[iname]={'name':j,'units':units}
           break
-      if not found and not self.quiet: print ':: %s not found in %s' % (str(iopts),self.name)
-
+      if not found and not self.quiet: print(':: %s not found in %s'%(str(iopts),self.name))
 
   def load_dims(self):
     dms=netcdf.fdim(self.nc)
-    for k in dms.keys():
+    for k in dms:
       if k in ('ocean_time','time','scrum_time'):
         setattr(self,'TIME',dms[k])
       else:
@@ -87,12 +77,12 @@ class Common:
   def load_atts(self):
     atts=netcdf.fatt(self.nc)
     self.atts={}
-    for k in atts.keys(): self.atts[k]=atts[k].value
+    self.atts.update(atts)
 
   def load_grid(self,grd=False):
     ats=netcdf.fatt(self.nc)
     if not grd:
-      if 'grd_file' in ats.keys(): grd=ats['grd_file'].value
+      if 'grd_file' in ats: grd=ats['grd_file'].value
       if grd and not os.path.isfile(grd): grd=False
 
     if grd: self.grid=Grid(grd,self.quiet)
@@ -103,44 +93,47 @@ class Common:
         self.grid=False
 
   def show(self): netcdf.show(self.nc)
+
   def showvar(self,vname): netcdf.showvar(self.nc,vname)
-  def use(self,varname,**kargs): return netcdf.use(self.nc,varname,**kargs)
 
-  def hasz(self,v):
-    '''
-    True if variable has depth dimension (s_rho or s_w)
-    '''
+  def use(self,varname,**kargs):
+    return netcdf.use(self.nc,varname,**kargs)
 
-    dnames=netcdf.vdim(self.nc,v)
-    return 's_rho' in dnames or 's_w' in dnames
-
-  def hast(self,v):
+  def vaxes(self,v):
     '''
-    True if variable has *time* dimension
+    returns variables axes as string:
+    ex: 'vaxes('temp') is 'tzyx'
+    indicating time (t), vertical (z) and horizontal (y,x) dimensions
     '''
 
     dnames=netcdf.vdim(self.nc,v)
+    out=''
     for d in dnames:
-      if d.find('time')>=0: return True
+      if d.find('time')>=0: out+='t'
+      elif d in ('s_rho','s_w'): out+='z'
+      if d.startswith('eta_'): out+='y'
+      if d.startswith('xi_'): out+='x'
 
-    return False
+    return out
 
-  def var_at(self,v):##,_3d=True):
+  def vloc(self,v):
+##  def var_at(self,v):##,_3d=True):
     '''
     returns location of the variable in the 2d/3d grid
     Possible values are u,v,r(rho), p(psi)
     If _3d, also checks if at w points
     '''
-    dims=netcdf.vdim(self.nc,v).keys()
+    dims=netcdf.vdim(self.nc,v)
 
     hLoc='r' # r,u,v
     vLoc='r' # r,w
 
-    if 's_w' in dims: vLoc='w'
-    if 'xi_u'     in dims or   'eta_u'   in dims: hLoc='u' # or instead of and cos of agrif ...
+    if   's_w' in dims: vLoc='w'
+    if   'xi_u'   in dims or   'eta_u'   in dims: hLoc='u' # or instead of and cos of agrif ...
     elif 'xi_v'   in dims or   'eta_v'   in dims: hLoc='v'
     elif 'xi_psi' in dims and  'eta_psi' in dims: hLoc='p'
-    return hLoc,vLoc
+#    return hLoc,vLoc
+    return hLoc+vLoc
 
     #if _3d and 's_w' in dims: return 'w'
     #elif 'xi_u'   in dims or   'eta_u'   in dims: return 'u'
@@ -164,75 +157,69 @@ class Grid(Common):
     self.quiet=quiet
 
     self.nc=netcdf.ncopen(self.name)
-    self.load()
     self.load_dims()
-    self.load_uvp()
+    self.load()
+    # load_uvp was used to create uvp variables based on rho variables. The
+    # objective was to load few variables in case of remote opendap url. In
+    # the current implementation the variables are loaded only when needed,
+    # so, there is no big gain not to load uvp variables from source.
+    # User may still call self.load_uvp() after object creation to ensure, ie,
+    # to force that less data is downloaded from remote grid
+    if 0: self.load_uvp()
     self.load_atts()
 
 
   def load(self):
-    self.isremote=1
-    if self.isremote: # load as few vars as possible! @ means loaded only when needed!
-      vars={'lon':('lon_rho','x_rho')},{'lat':('lat_rho','y_rho')},\
-           {'mask':'mask_rho'},'h','angle','pm','pn'
-#           {'mask':'mask_rho'},'h','@angle','@pm','@pn'
-
-    else:
-      vars={'lon':('lon_rho','x_rho')}, {'lonu':('lon_u','x_u')},\
-           {'lonv':('lon_v','x_v')},    {'lonp':('lon_psi','x_psi')},\
-           {'lat':('lat_rho','y_rho')}, {'latu':('lat_u','y_u')},\
-           {'latv':('lat_v','y_v')},    {'latp':('lat_psi','y_psi')},\
-           {'mask':'mask_rho'},{'masku':'mask_u'},{'maskv':'mask_v'},{'maskp':'mask_psi'},\
-           'h','angle', 'pm','pn'
-#           'h','@angle', '@pm','@pn'
+    # if grid file is remote (opendap) we could load less variables. But since
+    # @varname will be loaded only when used, there is no need to do it because
+    # by default almost no variables are loaded
+    vars={'@lon':('lon_rho','x_rho')}, {'@lonu':('lon_u','x_u')},\
+         {'@lonv':('lon_v','x_v')},    {'@lonp':('lon_psi','x_psi')},\
+         {'@lat':('lat_rho','y_rho')}, {'@latu':('lat_u','y_u')},\
+         {'@latv':('lat_v','y_v')},    {'@latp':('lat_psi','y_psi')},\
+         {'mask':'mask_rho'},{'@masku':'mask_u'},{'@maskv':'mask_v'},{'@maskp':'mask_psi'},\
+         '@h','angle', '@pn','@pm','spherical'
 
     self.load_vars(vars)
 
     # some vars may not be present... set defaults:
-    if not hasattr(self,'mask'): self.mask=np.ones(self.h.shape)
-    if not hasattr(self,'angle'): self.angle=np.zeros(self.h.shape)
+    if not hasattr(self,'mask'): self.mask=np.ones((self.ETA_RHO,self.XI_RHO))
+    if not hasattr(self,'angle'): self.angle=np.zeros((self.ETA_RHO,self.XI_RHO))
 
-    # add spherical attr:
-    sph=self.use('spherical')
-    # may be 1, T, an array with 'T','','',... etc
+    # about spherical variable:
+    # may be 1, T, an array with 'T','','',...
+    # let's also assume that empty or None sph means True!! (may not be a very smart idea)
+    sph=self.spherical
+    trueVals=[1,'T','',None]
     try:
       sph=''.join(sph).strip()
       if len(sph): sph=sph[0]
     except: pass
-    trueVals=[1,'T']
-    # let us assume that empty or None sph means True!! (may not be a very
-    # smart idea!
-    trueVals+=['',None]
-    if sph in trueVals: self.is_spherical=True
-    else: self.is_spherical=False
-
+    self.spherical=sph in trueVals
 
   def load_grid(): self.load()
 
   def load_uvp(self):
-    if not hasattr(self,'lonu'): self.lonu=rt.rho2uvp(self.lon,'u')
-    if not hasattr(self,'lonv'): self.lonv=rt.rho2uvp(self.lon,'v')
-    if not hasattr(self,'lonp'): self.lonp=rt.rho2uvp(self.lon,'p')
+    '''
+    Set uvp lon, lat and mask based on variables at rho, instead of
+    loading them from file
+    '''
+    [setattr(self,'lon'+i,rt.rho2uvp(self.lon,i)) for i in 'uvp']
+    [setattr(self,'lat'+i,rt.rho2uvp(self.lat,i)) for i in 'uvp']
+    self.masku,self.maskv,self.maskp=rt.uvp_mask(self.mask)
 
-    if not hasattr(self,'latu'): self.latu=rt.rho2uvp(self.lat,'u')
-    if not hasattr(self,'latv'): self.latv=rt.rho2uvp(self.lat,'v')
-    if not hasattr(self,'latp'): self.latp=rt.rho2uvp(self.lat,'p')
-
-    mu,mv,mp=rt.uvp_mask(self.mask)
-    if not hasattr(self,'masku'): self.masku=mu
-    if not hasattr(self,'maskv'): self.maskv=mv
-    if not hasattr(self,'maskp'): self.maskp=mp
-
-    if not hasattr(self,'XI_U'): self.XI_U=self.XI_RHO-1
-    if not hasattr(self,'XI_V'): self.XI_V=self.XI_RHO
-    if not hasattr(self,'ETA_U'): self.ETA_U=self.ETA_RHO
-    if not hasattr(self,'ETA_V'): self.ETA_V=self.ETA_RHO-1
+    if not hasattr(self,'XI_U'):  self.XI_U  = self.XI_RHO-1
+    if not hasattr(self,'XI_V'):  self.XI_V  = self.XI_RHO
+    if not hasattr(self,'ETA_U'): self.ETA_U = self.ETA_RHO
+    if not hasattr(self,'ETA_V'): self.ETA_V = self.ETA_RHO-1
 
 
   def border_multi_corner(self):
     mc=self.use('maskc')
+    if np.unique(m).size==1: return self.border() # it is not multi-corner!
+
     l,n=mc.shape
-    print 
+
     m=np.zeros((l+2,n+2))
     x=np.zeros((l+2,n+2))
     y=np.zeros((l+2,n+2))
@@ -298,23 +285,23 @@ class Grid(Common):
     return xb,yb
 
   def vars(self,ruvp='r',i=False,j=False):
+    '''
+    return lon, lat, h and mask at r, u, v or p
+    i,j slices can also be used
+    '''
+
     ruvp=ruvp[0]
-    isU=ruvp=='u'
-    isV=ruvp=='v'
-    isP=ruvp=='p'
-
-
-    if isU:
+    if ruvp=='u':
       x = self.lonu
       y = self.latu
       h = rt.rho2uvp(self.h,'u')
       m = self.masku
-    elif isV:
+    elif ruvp=='v':
       x = self.lonv
       y = self.latv
       h = rt.rho2uvp(self.h,'v')
       m = self.maskv
-    elif isP:
+    elif ruvp=='p':
       x = self.lonp
       y = self.latp
       h = rt.rho2uvp(self.h,'p')
@@ -330,18 +317,9 @@ class Grid(Common):
 
     return x[j,i],y[j,i],h[j,i],m[j,i]
 
-#####  def s_levels(self,sparams,zeta=0,h=False,ruvpw='r',i=False,j=False,k=False):
   def s_levels(self,sparams,zeta=0,h=False,loc='rr',i=False,j=False,k=False):
-    try:
-      hLoc,vLoc=loc
-    except:
-      hLoc,vLoc=loc,'r'
-
-####    ruvpw=ruvpw[0]
-####    isW=ruvpw=='w'
-
-    if h is False:
-      h=self.h
+    hLoc,vLoc=loc
+    if h is False: h=self.h
 
     try:
       zeta.shape==h.shape
@@ -353,10 +331,6 @@ class Grid(Common):
       zeta=rt.rho2uvp(zeta,hLoc)
 
     z=rt.s_levels(h,zeta,sparams,rw=vLoc)
-###    zr,zw=rt.s_levels(h,zeta,sparams)
-###    if isW:z=zw
-###    if vLoc=='w': z=zw
-###    else: z=zr
 
     if k is False: k=slice(None)
     if j is False: j=slice(None)
@@ -365,44 +339,10 @@ class Grid(Common):
     return np.squeeze(z[k,j,i])
 
 
-#  def inside(self,x,y,data,ij=2):
-#    d1=(x-self.lon.min())**2 + (y-self.lat.min())**2
-#    d2=(x-self.lon.max())**2 + (y-self.lat.min())**2
-#    d3=(x-self.lon.max())**2 + (y-self.lat.max())**2
-#    d4=(x-self.lon.min())**2 + (y-self.lat.max())**2
-#
-#    i1,j1=np.where(d1==d1.min())
-#    i2,j2=np.where(d2==d2.min())
-#    i3,j3=np.where(d3==d3.min())
-#    i4,j4=np.where(d4==d4.min())
-#
-#    i1,j1=i1[0],j1[0]
-#    i2,j2=i2[0],j2[0]
-#    i3,j3=i3[0],j3[0]
-#    i4,j4=i4[0],j4[0]
-#
-#    i1=min((i1,i2,i3,i4))
-#    i2=max((i1,i2,i3,i4))
-#    j1=min((j1,j2,j3,j4))
-#    j2=max((j1,j2,j3,j4))
-#
-#    i1=max((0,i1-ij))
-#    j1=max((0,j1-ij))
-#    i2=min((x.shape[0],i2+ij))
-#    j2=min((x.shape[1],j2+ij))
-#
-#    return x[i1:i2,j1:j2],y[i1:i2,j1:j2],data[i1:i2,j1:j2]
-
-
-  def ingrid(self,x,y):#,retInds=False):
+  def ingrid(self,x,y,**kargs):#,retInds=False):
     '''in polygon of region border'''
-    xb,yb=self.border()
+    xb,yb=self.border(**kargs)
     return calc.inpolygon(x,y,xb,yb)
-#    i=calc.inpolygon(x,y,xb,yb)
-#    if retInds:
-#      return x[i!=0], y[i!=0], np.where(i)[0]
-#    else: return x[i!=0], y[i!=0]
-
 
   def resolution(self):
     dx=1./self.pm
@@ -423,18 +363,23 @@ class Grid(Common):
       # This is because ipython uses pyqt4 using the version 1 of the api
       # see: http://mail.scipy.org/pipermail/ipython-user/2012-February/009478.html
 
+      try:
+        from mayavi import mlab
+      except:
+        print('error: mayavi is required')
+        return
+
       import sys
       pver=eval(sys.version[:3]) 
       qtapi=os.environ.get('QT_API','')
 
       if pver<3 and qtapi!='pyqt':
-        print 'warning: environmen variable QT_API may need to be set as pyqt '\
-              'in python <3 so that mayavi can be used after pylab' \
- 
+        print('warning: environmen variable QT_API may need to be set as pyqt '\
+              'in python <3 so that mayavi can be used after pylab')
+
         a=raw_input('Wanna continue ([n],y) ?')
-        if a!='y': return 
-      
-      from mayavi import mlab
+        if a!='y': return
+
 
       z=-self.h.copy()
       z[self.mask==0]=np.nan
@@ -469,7 +414,6 @@ class Grid(Common):
 
 
   def plot(self,**kargs):
-    from okean import vis
     from matplotlib.cm import gist_earth_r
     h=np.ma.masked_where(self.mask==0,self.h)
     a=vis.Data(x=self.lon,y=self.lat,v=h)
@@ -488,127 +432,113 @@ class Grid(Common):
     return a
 
 
-  def plot_old(self,**kargs):
-    import pylab as pl
-    bathy      = kargs.get('bathy','contourf')
-    hvals      = kargs.get('hvals','auto')
-    resolution = kargs.get('res','i')
-    rivers     = kargs.get('rivers',False)
-    parallels  = kargs.get('parallels','auto')
-    meridians  = kargs.get('meridians','auto')
-    scale      = kargs.get('scale',False)
-    states     = kargs.get('states',False)
-    xlim       = kargs.get('xlim',False)
-    ylim       = kargs.get('ylim',False)
-    title      = kargs.get('title','auto')
-    cmap       = kargs.get('cmap',pl.cm.gist_earth_r)
-    proj       = kargs.get('proj','merc')
-    ax         = kargs.get('ax',False)
-
-    if not ax:
-      fig=pl.figure()
-      ax=pl.axes()
-    else: fig=ax.figure
-
-    h=np.ma.masked_where(self.mask==0,self.h)
-    xb,yb=self.border()
-
-    xt=ticks.loose_label(self.lon.min(),self.lon.max())
-    yt=ticks.loose_label(self.lat.min(),self.lat.max())
-    ht=ticks.loose_label_n(self.h.min(),self.h.max(),7)
-
-    if xlim: Lonlims=xlim
-    else:  Lonlims=xt[0],xt[-1]
-
-    if ylim: Latlims=ylim
-    else: Latlims=yt[0],yt[-1]
-
-    if hvals=='auto': hvals=ht
-
-    if parallels=='auto': parallels=yt
-    if meridians=='auto': meridians=xt
-
-    if Basemap and proj:
-
-      key=Lonlims,Latlims,proj,resolution
-      if not hasattr(self,'_proj'):
-        self._proj={}
-      
-      if self._proj.has_key(key):
-        m=self._proj[key]
-      else:
-        m = Basemap(projection=proj,lat_ts=0.0,
-                  #lon_0=self.lon[0].mean(),
-                  resolution=resolution,
-                  urcrnrlon=Lonlims[1], urcrnrlat=Latlims[1],
-                  llcrnrlon=Lonlims[0], llcrnrlat=Latlims[0])
-
-        self._proj[key]=m
-
-      m.drawcoastlines(ax=ax)
-      m.fillcontinents(ax=ax,color=(0.7604,    1.0000,    0.7459))
-      if rivers: m.drawrivers(color='b')
-
-      m.drawcountries(ax=ax)
-      # m.drawlsmask()
-      # m.drawmapboundary()
-      if scale:
-        dx=Lonlims[1]-Lonlims[0]
-        dy=Latlims[1]-Latlims[0]
-        lon=Lonlims[1]-dx/10
-        lat=Latlims[0]+dy/10
-        lon0=lon
-        lat0=lat
-        length=100
-
-        m.drawmapscale(lon,lat,lon0,lat0,length,ax=ax)
-
-      if states: m.drawstates(ax=ax)
-
-      m.drawparallels(parallels, labels=[1,0,0,0],ax=ax)
-      m.drawmeridians(meridians, labels=[0,0,0,1],ax=ax)
-
-      x, y = m(self.lon, self.lat)
-      pch=False
-      if bathy in ['pcolor','pcolormesh']:
-        pch = ax.pcolormesh(x,y,h,cmap=cmap)
-      elif bathy=='contour':
-        pch = ax.contour(x,y,h,hvals,cmap=cmap)
-      elif bathy=='contourf':
-        pch = ax.contourf(x,y,h,hvals,cmap=cmap)
-
-      if pch:
-        if m.xmax-m.xmin>m.ymax-m.ymin: orientation='horizontal'
-        else: orientation='vertical'
-
-        cbh = pl.colorbar(pch,orientation=orientation,ax=ax)
-        cbh.set_label('Depth',fontsize=10)
-
-        if title=='auto': title=self.name
-        if len(title)>80: font=8
-        elif len(title)>60: font=9
-        else: font=10
-        ax.set_title(title,fontsize=font)
-
-      xb, yb = m(xb,yb)
-      ax.plot(xb,yb)
-      ax.axis([m.xmin, m.xmax, m.ymin, m.ymax])
-      return m
-
+class MGrid():
+  def __init__(self,name):
+    if cb.isstr(name):
+      import glob
+      f=os.path.splitext(name)[0][:-1]+'*'+os.path.splitext(name)[1]
+      files=glob.glob(f)
+      files.sort()
     else:
-      ax.pcolormesh(self.lon,self.lat,h,cmap=cmap)
-      ax.contour(self.lon,self.lat,self.h,hvals,colors='w')
-      ax.plot(xb,yb)
+      files=name
+
+    if cb.isstr(files[0]): # list of filenames
+      self._grids=[Grid(i) for i in files]
+    else: self._grids=name # list of Grid, used by MHis only
+
+  def __getitem__(self,i):
+    return self._grids[i]
+
+  def __len__(self): return len(self._grids)
+
+  def __repr__(self):
+    return '<MGrid at 0x%x>'%id(self)+\
+    '\n'+''.join([' -- '+os.path.basename(i.name)+'\n' for i in self._grids])
+
+  def _set_ingrid(self,ruvp='r'):
+    for i in range(len(self)):
+###########      self[i].ingrd=[]
+      aname='ingrd_'+ruvp
+      setattr(self[i],aname,[])
+      ob=getattr(self[i],aname)
+      if i<len(self)-1:
+        x,y=self[i].vars(ruvp)[:2]
+        for j in range(i+1,len(self)):
+##########          self[i].ingrd+=[self[j].ingrid(x,y)]
+          ob+=[self[j].ingrid(x,y)]
+
+  def border(self,**kargs):
+    xb=[]
+    yb=[]
+    n=0
+    for i in self._grids:
+      x,y=i.border(**kargs)
+      xb+=[x]
+      yb+=[y]
+      n=max(n,x.size)
+
+    X=np.full((n,len(self._grids)),np.nan)
+    Y=np.full((n,len(self._grids)),np.nan)
+
+    for i in range(len(self._grids)):
+      X[:xb[i].size,i]=xb[i]
+      Y[:yb[i].size,i]=yb[i]
+
+    return X,Y
+
+  def plot(self,**kargs):
+    from matplotlib.cm import gist_earth_r
+
+    if 0:
+      j=np.ceil(np.median(range(len(self)))).astype('i')
+      ht=ticks.loose_label_n(self[j].h.min(),self[j].h.max(),7)
+    else:
+      ht=ticks.loose_label_n(self[0].h.min(),self[0].h.max(),7)
+
+    if len(self)>1:
+      ht2=ticks.loose_label_n(ht[0],ht[1]/2,5)[1:]
+      ht=np.concatenate(([ht[0]],ht2,ht[1:]))
+
+    ht=kargs.get('field__cvals',ht)
+    ht=kargs.get('cvals',ht)
+
+    # contour colors:
+    from matplotlib import rcParams
+    colors=rcParams['axes.prop_cycle']()
+
+    for c,i in enumerate(self):
+      h=np.ma.masked_where(i.mask==0,i.h)
+      b=vis.Data(x=i.lon,y=i.lat,v=h)
+      b.set_param(field__plot='contourf',field__cvals=ht,field__cmap=gist_earth_r)
+      b.set_param(**kargs)
+      if c==0:
+        a=b
+      else:
+        a.extra+=[b]
+
+      c=vis.Data(x=i.lon,y=i.lat,v=h)
+      c.set_param(field__plot='contour',field__cvals=ht,field__cmap=next(colors)['color'],
+                  field__linewidths=0.5,plot__zorder=2) # show above everything else
+      a.extra+=[c]
+
+    # show all borders:
+    for i in self:
+      xb,yb=i.border()
+      c=vis.Data(x=xb,v=yb)
+      c.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
+      a.extra+=[c]
+
+    a.plot(**kargs)
+    return a
 
 
 class His(Common,Derived):
   def __init__(self,his,grd=False,quiet=True):
-    #try: self.name=os.path.realpath(his)
-    #except: self.name=his
-
     self.name=his
-    if isinstance(his,basestring) and not his.startswith('http:'):
-      self.name=os.path.realpath(his) # local file
+    self.isremote=False
+    if cb.isstr(his):
+      if his.startswith('http:'): self.isremote=True
+      else: self.name=os.path.realpath(his)
 
     self.type='his'
     self.quiet=quiet
@@ -669,14 +599,11 @@ class His(Common,Derived):
     return np.ma.masked_where(np.isnan(z),z)
 
 
-###  def s_levels(self,time,ruvpw='r',i=False,j=False,k=False,extrapZeta=False):
   def s_levels(self,time,loc='rr',i=False,j=False,k=False,extrapZeta=False):
-##    ruvpw=ruvpw[0]
     try:
       hLoc,vLoc=loc
     except:
       hLoc,vLoc=loc,'r'
-      
 
     h=self.grid.h
     zeta=self.use('zeta',SEARCHtime=time)
@@ -685,10 +612,10 @@ class His(Common,Derived):
       if not calc.ismarray(zeta): zeta=np.ma.masked_where(self.grid.mask==0,zeta)
       zeta=calc.mask_extrap(self.grid.lon,self.grid.lat,zeta)
 
-    h=rt.rho2uvp(h,hLoc) ##########ruvpw)
-    zeta=rt.rho2uvp(zeta,hLoc) ###########ruvpw)
+    h=rt.rho2uvp(h,hLoc)
+    zeta=rt.rho2uvp(zeta,hLoc)
 
-    z=rt.s_levels(h,zeta,self.s_params,rw=vLoc) ##########ruvpw)
+    z=rt.s_levels(h,zeta,self.s_params,rw=vLoc)
 
     if k is False: k=slice(None)
     if j is False: j=slice(None)
@@ -696,7 +623,6 @@ class His(Common,Derived):
 
     return z[k,j,i]
 
-# --------
 
   def check_slice(self,varname,**dims):
     msg=''
@@ -712,12 +638,12 @@ class His(Common,Derived):
     for dim,ind in dims.items():
       # check time:
       if dim=='t':
-        if self.hast(varname) and ind>=self.TIME:
+        if 't' in self.vaxes(varname) and ind>=self.TIME:
           msg='t = %d exceeds TIME dimension (%d)' % (ind,self.TIME)
 
       # check dim k:
       elif dim=='k':
-        if self.hasz(varname):
+        if 'z' in self.vaxes(varname):
           if isW: s='S_W'
           else: s='S_RHO'
           indMax=getattr(self,s)
@@ -751,21 +677,21 @@ class His(Common,Derived):
     elif slc=='sliceuv':     res='x,y,t'
     elif slc=='sliceiso':    res='x,y,t'
     elif slc=='time_series': res='x,y,z,t'
-##    return sorted(res)
     return ','.join(sorted(res.split(',')))
 
   def slicei(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicei')).split(',')
 
-    out=Data() 
+    out=vis.Data()
+    out.label='slicei'
     out.msg=self.check_slice(varname,t=time,i=ind)
     if out.msg: return out
-    
+
     v=self.use(varname,SEARCHtime=time,xi_SEARCH=ind)
 
     # add mask if not masked:
     if not np.ma.isMA(v):
-      m=self.grid.vars(ruvp=self.var_at(varname)[0],i=ind)[-1]
+      m=self.grid.vars(ruvp=self.vloc(varname)[0],i=ind)[-1]
       if v.ndim==2: m=np.tile(m,(v.shape[0],1))
       v=np.ma.masked_where(m==0,v)
 
@@ -774,15 +700,13 @@ class His(Common,Derived):
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
-
     # coords:
     if 'z' in coords and v.ndim==2:
-#######   out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),i=ind)
-      out.z=self.s_levels(time=time,loc=self.var_at(varname),i=ind)
+      out.z=self.s_levels(time=time,loc=self.vloc(varname),i=ind)
       out.info['z']=dict(name='Depth',units='m')
 
     if any([i in coords for i in 'xyd']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0],i=ind)
+      x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0],i=ind)
 
     if 'd' in coords:
       d=calc.distance(x,y)
@@ -805,26 +729,27 @@ class His(Common,Derived):
       out.y=y
       out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
     if v.ndim==2:
-      out.extra=[Data()]
+      out.extra=[vis.Data()]
       if 'd' in coords: out.extra[0].x=out.d[0]
       if 'y' in coords: out.extra[0].x=out.y[0]
       if 'x' in coords: out.extra[0].y=out.x[0]
       out.extra[0].v=-h
       out.extra[0].config['d1.plot']='fill_between'
       out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
-      out.extra[0].alias='bottom'
+      out.extra[0].label='bottom'
 
     out.coordsReq=','.join(sorted(coords))
-    return out 
+    return out
 
 
   def slicej(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicej')).split(',')
 
-    out=Data()
+    out=vis.Data()
+    out.label='slicej'
     out.msg=self.check_slice(varname,t=time,j=ind)
     if out.msg: return out
 
@@ -832,7 +757,8 @@ class His(Common,Derived):
 
     # add mask if not masked:
     if not np.ma.isMA(v):
-      m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)[-1]
+###      m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)[-1]
+      m=self.grid.vars(ruvp=self.vloc(varname)[0],j=ind)[-1]
       if v.ndim==2: m=np.tile(m,(v.shape[0],1))
       v=np.ma.masked_where(m==0,v)
 
@@ -845,11 +771,13 @@ class His(Common,Derived):
     # coords:
     if 'z' in coords and v.ndim==2:
 ######      out.z=self.s_levels(time=time,ruvpw=self.var_at(varname),j=ind)
-      out.z=self.s_levels(time=time,loc=self.var_at(varname),j=ind)
+###      out.z=self.s_levels(time=time,loc=self.var_at(varname),j=ind)
+      out.z=self.s_levels(time=time,loc=self.vloc(varname),j=ind)
       out.info['z']=dict(name='Depth',units='m')
 
     if any([i in coords for i in 'xyd']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)
+###      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0],j=ind)
+      x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0],j=ind)
 
     if 'd' in coords:
       d=calc.distance(x,y)
@@ -872,17 +800,18 @@ class His(Common,Derived):
       out.y=y
       out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+########    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
     if v.ndim==2:
-      out.extra=[Data()]
+      out.extra=[vis.Data()]
       if 'd' in coords: out.extra[0].x=out.d[0]
       if 'x' in coords: out.extra[0].y=out.x[0]
       if 'y' in coords: out.extra[0].x=out.y[0]
       out.extra[0].v=-h
       out.extra[0].config['d1.plot']='fill_between'
       out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
-      out.extra[0].alias='bottom'
+      out.extra[0].label='bottom'
 
     out.coordsReq=','.join(sorted(coords))
     return out
@@ -891,54 +820,60 @@ class His(Common,Derived):
   def slicek(self,varname,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('slicek')).split(',')
 
-    out=Data()
+    out=vis.Data()
+    out.label='slicek'
     out.msg=self.check_slice(varname,t=time,k=ind)
-    if out.msg: out
+    if out.msg: return out
 
     v=self.use(varname,SEARCHtime=time,s_SEARCH=ind)
 
     # add mask if not masked:
     if not np.ma.isMA(v): 
-      m=self.grid.vars(ruvp=self.var_at(varname)[0])[-1]
+###      m=self.grid.vars(ruvp=self.var_at(varname)[0])[-1]
+      m=self.grid.vars(ruvp=self.vloc(varname)[0])[-1]
       v=np.ma.masked_where(m==0,v)
 
     out.v=v
     out.info['v']['name']=varname
-    if self.hasz(varname): out.info['v']['slice']='k=%d'%ind
+#####    if self.hasz(varname): out.info['v']['slice']='k=%d'%ind
+    if 'z' in self.vaxes(varname): out.info['v']['slice']='k=%d'%ind
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
 
     # coords:
-    if 'z' in coords and self.hasz(varname):
+########    if 'z' in coords and self.hasz(varname):
+    if 'z' in coords and 'z' in self.vaxes(varname):
 #####      out.z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
-      out.z=self.s_levels(time,k=ind,loc=self.var_at(varname))
+###      out.z=self.s_levels(time,k=ind,loc=self.var_at(varname))
+      out.z=self.s_levels(time,k=ind,loc=self.vloc(varname))
       out.info['z']=dict(name='Depth',units='m')
 
 
     if any([i in coords for i in 'xy']):
-      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+###      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+      x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
 
     if 'x' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
          out.x=x/1000.
          out.info['x']=dict(name='Distance',units='km')
-         
+
     if 'y' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
          out.y=y/1000.
          out.info['y']=dict(name='Distance',units='km')
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
-    if v.ndim==2:
-      out.extra=[Data()]
+    if out.v.ndim==2: # always?
+      out.extra=[vis.Data()]
       if 'x' in coords: out.extra[0].x=out.x
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
@@ -947,8 +882,8 @@ class His(Common,Derived):
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals
-      out.extra[0].config['field.linecolors']='k'
-      out.extra[0].alias='bathy'
+      out.extra[0].config['field.cmap']='k'
+      out.extra[0].label='bathy'
 
 
     out.coordsReq=','.join(sorted(coords))
@@ -956,19 +891,22 @@ class His(Common,Derived):
 
 
   def slicez(self,varname,ind,time=0,**opts):
-    if not self.hasz(varname):
+###    if not self.hasz(varname):
+    if not 'z' in self.vaxes(varname):
       return self.slicek(varname,ind,time,**opts)
 
     surf_nans=opts.get('surf_nans',True)
     spline=opts.get('spline',True)
     coords=opts.get('coords',self._default_coords('slicez')).split(',')
 
-    out=Data()
+    out=vis.Data()
+    out.label='slicez'
     out.msg=self.check_slice(varname,t=time)
     if out.msg: return out##None,au
 
     v=self.use(varname,SEARCHtime=time)
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+    x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
@@ -985,7 +923,7 @@ class His(Common,Derived):
 
     # coords:
     if 'x' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
@@ -993,7 +931,7 @@ class His(Common,Derived):
          out.info['x']=dict(name='Distance',units='km')
 
     if 'y' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
@@ -1004,10 +942,10 @@ class His(Common,Derived):
       out.z=ind+np.zeros(out.v.shape)
       out.info['z']=dict(name='Depth',units='m')
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
-    if v.ndim==2:
-      out.extra=[Data()]
+    if out.v.ndim==2:
+      out.extra=[vis.Data()]
       if 'x' in coords: out.extra[0].x=out.x
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
@@ -1016,8 +954,8 @@ class His(Common,Derived):
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals
-      out.extra[0].config['field.linecolors']='k'
-      out.extra[0].alias='bathy'
+      out.extra[0].config['field.cmap']='k'
+      out.extra[0].label='bathy'
 
 
     out.coordsReq=','.join(sorted(coords))
@@ -1033,7 +971,8 @@ class His(Common,Derived):
                                       # this value are considered as mask!
                                       # Most strict value is 0
 
-    out=Data()
+    out=vis.Data()
+    out.label='slicell'
     out.msg=self.check_slice(varname,t=time)
     if out.msg: return out#None,aux
 
@@ -1042,7 +981,8 @@ class His(Common,Derived):
     if X.ndim>1: X=np.squeeze(X)
     if Y.ndim>1: Y=np.squeeze(X)
 
-    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
+    x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     if True: # extrat only portion of data needed:
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
       xi='%d:%d'%(i0,i1)
@@ -1076,7 +1016,8 @@ class His(Common,Derived):
     if 'z' in coords and V.ndim==3:
       inds=dict(xi=(i0,i1),eta=(j0,j1))
 #########      out.z=self.path_s_levels(time,X,Y,rw=varname[0],inds=inds)
-      out.z=self.path_s_levels(time,X,Y,rw=self.var_at(varname)[1],inds=inds)
+###      out.z=self.path_s_levels(time,X,Y,rw=self.var_at(varname)[1],inds=inds)
+      out.z=self.path_s_levels(time,X,Y,rw=self.vloc(varname)[1],inds=inds)
 
     if 'd' in coords:
       d=calc.distance(X,Y)
@@ -1091,22 +1032,15 @@ class His(Common,Derived):
       if v.ndim==2: Y=np.tile(Y,(v.shape[0],1))
       out.y=Y
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+#######    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
     out.coordsReq=','.join(sorted(coords))
     return out
 
 
   def sliceuv(self,ind,time=0,**opts):#plot=False,**opts):
-###    plot= opts.pop('plot',False)
-###    opts['plot']=False
-###    ax  = opts.get('ax',None)
     coords=opts.get('coords',self._default_coords('sliceuv')).split(',')
-
-####    out=Data()
-####
-#    savename=opts.pop('savename',False)
-#    retMsg=opts.pop('msg',False)
 
     if ind=='bar':
       slc,uname,vname,ind = self.slicek, 'ubar','vbar', 9999
@@ -1118,17 +1052,11 @@ class His(Common,Derived):
       isK=False
       slc,uname,vname,ind = self.slicez, 'u','v', ind
 
-
-##    if isK:
-#      xu,yu,zu,u,msg1=self.slicek(uname,ind,time,msg=True,**opts)
-#      xv,yv,zv,v,msg2=self.slicek(vname,ind,time,msg=True,**opts)
-##    u,auxu=slc(uname,ind,time,**opts)
-##    v,auxv=slc(vname,ind,time,**opts)
     outu=slc(uname,ind,time,**opts)
     outv=slc(vname,ind,time,**opts)
 
-    if   outu.msg: return outu##None,None,auxu
-    elif outv.msg: return outv##None,None,auxv
+    if   outu.msg: return outu
+    elif outv.msg: return outv
 
     # at psi:
     u,v=outu.v,outv.v
@@ -1136,19 +1064,17 @@ class His(Common,Derived):
     v=( v[:,1:]+ v[:,:-1])/2.
 
     # rotate uv:
-    ang=rt.rho2uvp(self.grid.angle,'p')
+    if 0:
+      ang=rt.rho2uvp(self.grid.angle,'p')
+    else:
+      ang=np.cos(self.grid.angle)+1j*np.sin(self.grid.angle)
+      ang=np.angle(rt.rho2uvp(ang,'p'))
+
     u,v=calc.rot2d(u,v,-ang)
 
-
-##    else:
-##      xu,yu,zu,u,msg1=self.slicez(uname,ind,time,msg=True,**opts)
-##      xv,yv,zv,v,msg2=self.slicez(vname,ind,time,msg=True,**opts)
-##
-##    if msg1: msg=msg1+' and '+msg2
-##    else: msg=msg2
-
     out=outu
-    out.v=u,v
+    out.label=out.label+'_uv'
+    out.v=u+1j*v
     out.info['v']['name']=uname+vname
 
     if 'z' in coords: out.z=(out.z[1:,:]+out.z[:-1,:])/2.
@@ -1156,50 +1082,7 @@ class His(Common,Derived):
     if 'y' in coords: out.y=(out.y[1:,:]+out.y[:-1,:])/2.
 
     out.coordsReq=','.join(sorted(coords))
-    return out###u,v,aux
-
-
-##    # coords:
-##    if 'z' in coords:
-##      out.z=(outu.z[1:,:]+outu.z[:-1,:])/2.
-##
-##    if 'x' in coords: out.x=self.grid.lonp
-##    if 'y' in coords: out.y=self.grid.latp
-##    if 't' in coords: out.t=self.time[time]
-##
-##
-##    if plot:
-##      if not ax:
-##        ax=pl.gca()
-##        opts['ax']=ax
-##
-##      prj=self.grid.plot(bathy=None,**opts)
-##      xm, ym = prj(out.x,out.y)
-##
-##      mm=(0*xm).astype('bool')
-##      nMax=150
-##      nj,ni=xm.shape
-##      dj=np.ceil(nj/float(nMax))
-##      di=np.ceil(ni/float(nMax))
-##      mm[::dj,::di]=1
-######      mm=mm*self.grid.maskp==1
-##
-##      s=np.sqrt(u**2+v**2)
-##      q=ax.quiver(xm[mm],ym[mm],u[mm],v[mm],s[mm])
-##      pl.colorbar(q,shrink=.7)
-##      ax.axis([prj.xmin, prj.xmax, prj.ymin, prj.ymax])
-##      qk = ax.quiverkey(q, .05, .01, 0.2, '0.2 m/s',labelpos='E',
-##                                              coordinates='axes')
-####      if savename:
-####        pylab.savefig(savename,dpi=pylab.gcf().dpi)
-####        pylab.close(pylab.gcf())
-##
-####    if retMsg: return x,y,z,u,v, msg
-####    else: return x,y,z,u,v
-##
-##    out.v=u,v
-##    out.coordsReq=','.join(sorted(coords))
-##    return out###u,v,aux
+    return out
 
 
   def sliceiso(self,varname,iso,time,**opts):
@@ -1213,17 +1096,20 @@ class His(Common,Derived):
 
     coords=opts.get('coords',self._default_coords('sliceiso')).split(',')
 
-    out=Data()
+    out=vis.Data()
+    out.label='slice_iso'
     out.msg=self.check_slice(varname,t=time)
     if out.msg: return out
 
-    if not self.hasz(varname):
+###    if not self.hasz(varname):
+    if not 'z' in self.vaxes(varname):
       out.msg='a depth dependent variable is needed for sliceiso!'
       return out
 
     v=self.use(varname,SEARCHtime=time)
 ####    z=self.s_levels(time=time,ruvpw=self.var_at(varname))
-    z=self.s_levels(time=time,loc=self.var_at(varname))
+###    z=self.s_levels(time=time,loc=self.var_at(varname))
+    z=self.s_levels(time=time,loc=self.vloc(varname))
     v=rt.depthof(v,z,iso)
 
     out.v=v
@@ -1243,10 +1129,11 @@ class His(Common,Derived):
 
     # coords:
     if any([i in coords for i in 'xy']):
-      x,y,h=self.grid.vars(ruvp=self.var_at(varname))[:3]
+###      x,y,h=self.grid.vars(ruvp=self.var_at(varname))[:3]
+      x,y,h=self.grid.vars(ruvp=self.vloc(varname))[:3]
 
     if 'x' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
@@ -1254,7 +1141,7 @@ class His(Common,Derived):
          out.info['x']=dict(name='Distance',units='km')
 
     if 'y' in coords:
-       if self.grid.is_spherical:
+       if self.grid.spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
@@ -1265,10 +1152,10 @@ class His(Common,Derived):
       # makes no sense... v is the depth!
       coords.remove('z')
 
-    if 't' in coords and self.hast(varname): out.t=self.time[time]
+    if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
-    if v.ndim==2:
-      out.extra=[Data()]
+    if out.v.ndim==2:
+      out.extra=[vis.Data()]
       if 'x' in coords: out.extra[0].x=out.x
       if 'y' in coords: out.extra[0].y=out.y
       out.extra[0].v=h
@@ -1277,8 +1164,8 @@ class His(Common,Derived):
       else: cvals=3
       out.extra[0].config['field.plot']='contour'
       out.extra[0].config['field.cvals']=cvals
-      out.extra[0].config['field.linecolors']='k'
-      out.extra[0].alias='bathy'
+      out.extra[0].config['field.cmap']='k'
+      out.extra[0].label='bathy'
 
     out.coordsReq=','.join(sorted(coords))
     return out
@@ -1297,7 +1184,8 @@ class His(Common,Derived):
          isDepth=np.any(depth<0) or depth.kind!='i' 
        else: isDepth=depth<0 or np.asarray(depth).dtype.kind!='i'
 
-    out=Data()
+    out=vis.Data()
+    out.label='time_series'
     if not depth is None and not isDepth:
       out.msg=self.check_slice(varname,t=np.max(times),k=depth) 
     else:
@@ -1306,7 +1194,8 @@ class His(Common,Derived):
     if out.msg: return out
 
     # find nearest point:
-    lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
+###    lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
+    lon,lat,hr,mr=self.grid.vars(ruvp=self.vloc(varname))
     dist=(lon-x)**2+(lat-y)**2
     i,j=np.where(dist==dist.min())
     i,j=i[0],j[0]
@@ -1316,16 +1205,19 @@ class His(Common,Derived):
     v=self.use(varname,xiSEARCH=j,etaSEARCH=i,SEARCHtime=times,**arg).T
 
     # calculate depths:
-    if self.hasz(varname):
+###    if self.hasz(varname):
+    if 'z' in self.vaxes(varname):
       h=self.grid.h[i,j]
       zeta=self.use('zeta',xiSEARCH=j,etaSEARCH=i,SEARCHtime=times)
       h=h+0*zeta
 ####      z=rt.s_levels(h,zeta,self.s_params,rw=varname)
-      z=rt.s_levels(h,zeta,self.s_params,rw=self.var_at(varname)[1])
+###      z=rt.s_levels(h,zeta,self.s_params,rw=self.var_at(varname)[1])
+      z=rt.s_levels(h,zeta,self.s_params,rw=self.vloc(varname)[1])
       z=np.squeeze(z)
 
     # depth slice:
-    if isDepth and self.hasz(varname):
+###    if isDepth and self.hasz(varname):
+    if isDepth and 'z' in self.vaxes(varname):
       if v.ndim==2:
         # could use calc.griddata, but better use slicez cos data at
         # different times may be independent!
@@ -1360,7 +1252,8 @@ class His(Common,Derived):
     except: pass
      
     # coords
-    if 't' in coords and self.hast(varname):
+#########    if 't' in coords and self.hast(varname):
+    if 't' in coords and 't' in self.vaxes(varname):
       if v.ndim==2:
         out.t=np.tile(self.time[times],(v.shape[0],1))
         from matplotlib.dates import date2num
@@ -1369,7 +1262,8 @@ class His(Common,Derived):
       out.info['t']['name']='Time'
       out.info['tnum']=dict(name='Time',units=self.var_as['time']['units'])
 
-    if 'z' in coords and self.hasz(varname):
+###    if 'z' in coords and self.hasz(varname):
+    if 'z' in coords and 'z' in self.vaxes(varname):
       if not depth is None:
         if not isDepth: out.z=z[depth,...]
         else: out.z=depth+0*v
@@ -1378,7 +1272,7 @@ class His(Common,Derived):
 
     if 'x' in coords:
       out.x=lon[i,j]
-      if self.grid.is_spherical:
+      if self.grid.spherical:
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
       else:
         out.x=x/1000.
@@ -1386,7 +1280,7 @@ class His(Common,Derived):
 
     if 'y' in coords:
       out.y=lat[i,j]
-      if self.grid.is_spherical:
+      if self.grid.spherical:
         out.info['y']=dict(name='Latitude',units=r'$\^o$N')
       else:
         out.y=y/1000.
@@ -1397,325 +1291,225 @@ class His(Common,Derived):
     return out
 
 
-  def extrap_at_mask(self,vname,time,**opts): 
-    method=opts.get('method','delaunay') # also available 'easy'
-    quiet=opts.get('quiet',True)
-
-    if method=='delaunay': extrap=calc.mask_extrap
-    elif method=='easy': extrap=calc.easy_extrap
-
-    if not quiet: print 'Extrap at mask:\n  loading'
-    v=self.use(vname,SEARCHtime=time)
-    x,y,h,m=self.grid.vars(vname)
-
-    if self.hasz(vname): # 3d
-      N=v.shape[0]
-      for n in range(N):
-        if not quiet: print '  extrap level %d of %d' % (n,N)
-        v[n,...]=extrap(x,y,np.ma.masked_where(m==0,v[n,...]))
-    else: # 2d
-        v=extrap(x,y,np.ma.masked_where(m==0,v))
-
-    if np.ma.isMA(v) and v.count()==v.size: v=v.data # no need for masked array
-    return v
-
-# ------------------------------------------------------------------------ OLD CODE FROM HERE
-# may not be working anymore....
-
-class Flt(Common):
-  def __init__(self,flt,grd=False,quiet=True):
-    self.name=os.path.realpath(flt)
-    self.type='flt'
-    self.quiet=quiet
-
-    self.load_grid(grd)
-    self.load()
-    self.load_dims()
-    self.load_atts()
-
-
-  def load(self):
-    # time:
-    vars={'time':('time','scrum_time','ocean_time')},'lon','lat','depth'
-
-    self.load_vars(vars)
-
-    if len(self.time)>1:
-      self.dt=self.time[1]-self.time[0]
-    else: self.dt=0
-
-    self.tdays=self.time/86400.
-
-
-  def order_dist(self,quiet=True):
-    '''
-    order floats by distance travelled
-    returns floats indices and distances, ie,
-    returns dist.argsort(), dist
-    '''
-    d=zeros(self.DRIFTER)
-    D=zeros(self.DRIFTER,'i')
-    for i in range(self.DRIFTER):
-      tmp=np.where(self.lon[:,i]>1000)[0]
-      if len(tmp):ie=tmp[0]-1
-      else: ie=-1
-
-      d[i]=distance(self.lon[[0,ie],i],self.lat[[0,ie],i])[1]
-
-    D=d.argsort()
-
-    if not quiet:
-      for i in range(len(D)):
-        print '%5d %8.2f' % (D[i],d[D[i]])
-
-    return D[::-1],d[::-1]
-
-
-class Sta(Common):
-  def __init__(self,sta,grd=False,quiet=True):
-    self.name=os.path.realpath(sta)
-    self.type='sta'
-    self.quiet=quiet
-
-    self.load_grid(grd)
-    self.load()
-    self.load_dims()
-    self.load_atts()
-
-  def load(self):
-    # time:
-    vars={'time':('time','scrum_time','ocean_time')},'lon','lat','h'
-
-    self.load_vars(vars)
-
-    if len(self.time)>1:
-      self.dt=self.time[1]-self.time[0]
-    else: self.dt=0
-
-    self.tdays=self.time/86400.
-
-    # s params:
-    self.s_params=s_params(self.name)
-
-
-  def s_levels(self,itime,isw=False):
-    tts,ttb,hc,N=self.s_params
-    zeta=self.use('zeta',ftime=itime)
-
-    zr,zw=rt.s_levels(self.h,zeta,hc,tts,ttb,N)
-    if isw:z=zw
-    else: z=zr
-
-    return squeeze(z)
-
-  def get(self,what,**kargs):
-    time=False
-    day=False
-    quiet=True
-
-    keys=kargs.keys()
-    if 'time'  in keys: time  = kargs['time']
-    if 'day'   in keys: day   = kargs['day']
-    if 'quiet' in keys: quiet = kargs['quiet']
-
-
-    if what=='data':
-      out={}
-      args={}
-      if not time is False:
-        args['ftime']=time
-
-      if not quiet:
-        print 'loading Sta data time=',time
-        print '* * * * * * * * * * * *.'
-
-      if not quiet: print '*',
-      out['lon']  = self.use('lon',  **args)
-      if not quiet: print '*',
-      out['lat']  = self.use('lat',  **args)
-      if not quiet: print '*',
-      out['h']  = self.use('h',  **args)
-      if not quiet: print '*',
-      out['zeta'] = self.use('zeta', **args)
-      if not quiet: print '*',
-      out['ubar'] = self.use('ubar', **args)
-      if not quiet: print '*',
-      out['vbar'] = self.use('vbar', **args)
-
-    statime=self.use('scrum_time',**args)
-    if 't0' in self.atts.keys():
-      t0=self.atts['t0']
-    else: t0=0
-
-    return out,statime,t0
-
-
-
-class Blk(Common):
-  def __init__(self,flt,grd=False,quiet=True):
-    self.name=os.path.realpath(flt)
-    self.type='blk'
-    self.quiet=quiet
-
-    self.load_grid(grd)
-    self.load()
-    self.load_dims()
-    self.load_atts()
-
-  def load(self):
-    # time:
-    vars={'time':('bulk_time','time','scrum_time','ocean_time')},
-
-    self.load_vars(vars)
-
-    # netcdf time:
-    try:
-      # units must have the format <units> since <date>
-      self.time=netcdf.num2date(self.time,self.var_as['time']['units'])
-    except: pass
-#    try:
-#      # units must have the format <units> since <date>
-#      self.datetime=netcdf.num2date(self.time,self.var_as['time']['units'])
-#    except: self.datetime=False
+#  def extrap_at_mask(self,vname,time,**opts): 
+#    method=opts.get('method','delaunay') # also available 'easy'
+#    quiet=opts.get('quiet',True)
 #
-#    # time is usually seconds, but may be days!!, so:
-#    if self.var_as['time']['units'].strip().startswith('days'): self.time=self.time*86400.
+#    if method=='delaunay': extrap=calc.mask_extrap
+#    elif method=='easy': extrap=calc.easy_extrap
 #
-#    if len(self.time)>1:
-#      self.dt=self.time[1]-self.time[0]
-#    else: self.dt=0
+#    if not quiet: print('Extrap at mask:\n  loading')
+#    v=self.use(vname,SEARCHtime=time)
+#    x,y,h,m=self.grid.vars(vname)
 #
-#    self.tdays=self.time/86400.
+#    if 'z' in self.vaxes(vname): # 3d
+#      N=v.shape[0]
+#      for n in range(N):
+#        if not quiet: print('  extrap level %d of %d' % (n,N))
+#        v[n,...]=extrap(x,y,np.ma.masked_where(m==0,v[n,...]))
+#    else: # 2d
+#        v=extrap(x,y,np.ma.masked_where(m==0,v))
+#
+#    if np.ma.isMA(v) and v.count()==v.size: v=v.data # no need for masked array
+#    return v
 
+class MHis():
+  def __init__(self,name):
+    if cb.isstr(name):
+      import glob
+      f=os.path.splitext(name)[0][:-1]+'*'+os.path.splitext(name)[1]
+      files=glob.glob(f)
+      files.sort()
+    else:
+      files=name
 
-  def get(self,what,**kargs):
-    time=False
-    day=False
-    quiet=True
+    self._his=[His(i) for i in files]
 
-    keys=kargs.keys()
-    if 'time'  in keys: time  = kargs['time']
-    if 'day'   in keys: day   = kargs['day']
-    if 'quiet' in keys: quiet = kargs['quiet']
+    ###self.grid=MGrid([i.grid.name for i in self._his])
+    self.grid=MGrid([i.grid for i in self._his])
 
+  def __getitem__(self,i):
+    return self._his[i]
 
-    if what=='wind_ts':
-      if 'xi' in kargs.keys() and 'eta' in kargs.keys():
-        xi=kargs['xi']
-        eta=kargs['eta']
-      elif 'lon' in kargs.keys() and 'lat' in kargs.keys():
-        d=(self.grid.lon-kargs['lon'])**2+(self.grid.lat-kargs['lat'])**2
-        i,j=np.where(d==d.min())
-        eta=i[0]
-        xi=j[0]
+  def __len__(self): return len(self._his)
 
-      u=self.use('uwnd',xi_rho=xi,eta_rho=eta)
-      v=self.use('vwnd',xi_rho=xi,eta_rho=eta)
-      ang=self.grid.angle[eta,xi]*np.ones(u.shape)
-      u,v=calc.rot2d(u,v,-ang)
-      tdays=self.tdays
+  def __repr__(self):
+    return '<MHis at 0x%x>'%id(self)+\
+    '\n'+''.join([' -- '+os.path.basename(i.name)+'\n' for i in self._his])
 
-      if not day is False:
-        ndays=self.tdays[-1]-self.tdays[0]
-        n=int(86400/self.dt)
-        u=u[day*n:(day+1)*n]
-        v=v[day*n:(day+1)*n]
-        tdays=tdays[day*n:(day+1)*n]
+  def tinds(self,it0):
+    if it0>self[0].time.size-1:
+      return [it0]*len(self),['bad it0','','']
 
-      return tdays,u,v
-
-
-    elif what=='wind':
-      if 'uwnd' in netcdf.varnames(self.name):
-        u=self.use('uwnd')
-        v=self.use('vwnd')
+    it=[it0]
+    msg=['']
+    for c,i in enumerate(self[1:]):
+      if it0<i.time.size and i.time[it0]==self[0].time[it0]:
+        it+=[it0]
+        msg+=['']
       else:
-        u=self.use('Uwind')
-        v=self.use('Vwind')
+        # find closest time index:
+        it2 = np.argmin(np.abs(i.time -self[0].time[it0]))
+        it+=[it2]
+        if i.time[it2]!=self[0].time[it0]:
+          msg+=['time %d differs from slice 0: %s'%(c+1,i.time[it2].isoformat())]
 
-      if time=='mean' and u.ndim==3:
-        u=u.mean(0)
-        v=v.mean(0)
-      elif time=='dailyMean' and u.ndim==3:
-        ndays=self.tdays[-1]-self.tdays[0]
-        n=int(86400/self.dt)
+    return it,msg
 
-        if not day is False:
-          if day==-1: day=ndays-1
-          # this is wrong if there is data missing!
-          u=u[day*n:(day+1)*n,...].mean(0)
-          v=v[day*n:(day+1)*n,...].mean(0)
+  def _slice(self,slc,varname,ind,it0,**opts):
+##    border=opts.get('border',1)
+
+    if slc=='ll': x,y=ind
+
+    o=[]
+    It,twarn=self.tinds(it0)
+    for c,i in enumerate(self):
+      meth=getattr(i,'slice'+slc)
+      if slc=='uv':  o+=[meth(ind,It[c],**opts)]
+      elif slc=='ll':o+=[meth(varname,x,y,It[c],**opts)]
+      else:          o+=[meth(varname,ind,It[c],**opts)]
+      #if msg[c]:
+      #  if o[-1].msg: o[-1].msg+='\n'
+      #  o[-1].msg+=msg[c]
+
+
+    # add filled border for next domain:
+    if slc in ['i','j','k','z','iso']:#,'uv']:
+      for i in range(len(self)-1):
+        xb,yb=self[i+1].grid.border()
+        o[i].extra+=[vis.Data(xb,yb)]
+        o[i].extra[-1].label='border grid %d'%(i+1)
+        #if i>0:
+        o[i].extra[-1].config['d1.plot']='fill'
+        o[i].extra[-1].config['d1_fill.options']['lw']=0
+        o[i].extra[-1].config['d1_fill.options']['facecolor']='w'
+        #o[i].extra[-1].config['plot.zorder']=1
+        #else:
+        #  o[i].extra[-1].config['d1.plot']='plot'
+    elif slc=='uv': # for uv, better to mask arrows inside child domains
+      if not hasattr(self.grid,'ingrd'): self.grid._set_ingrid('p')
+      for c,i in enumerate(o):
+        if not i.v is None:
+          if len(self.grid[c].ingrd_p):
+            mask=reduce(lambda i,j: i&j,self.grid[c].ingrd_p)
+            mask=mask&(~i.v.mask)
+            i.nmask=mask # nested domains mask
+            i.v.mask=i.v.mask|i.nmask
+          else: i.nmask=None
+
+
+
+    # vfield settings:
+    if not o[0].v is None:
+      vfield=o[0].get_param('vfield')
+      if not vfield['options']['scale']:
+        vfield['options']={'units':'width','scale':10}
+
+      # use same vfield settings for all slices:
+      for i in o:
+        for k in vfield: i.config['vfield.'+k]=vfield[k]
+
+      # no key for slices[1:]:
+      for i in o[1:]:
+        i.config['vfield.key_XYU']=0,0,0
+
+
+    # field settings:
+    if not o[0].v is None:
+      field=o[0].get_param('field')
+
+      if field['clim'] is False:
+        if np.iscomplexobj(o[0].v):
+          field['clim']=np.abs(o[0].v).min(),np.abs(o[0].v).max()
         else:
+          field['clim']=o[0].v.min(),o[0].v.max()
 
-          U=range(ndays)
-          V=range(ndays)
-          for i in range(ndays):
-            U[i]=u[i*n:(i+1)*n,...].mean(0)
-            V[i]=v[i*n:(i+1)*n,...].mean(0)
+        if field['clim'][0]==field['clim'][1]:
+          field['clim']=field['clim'][0]-1,field['clim'][0]+1
 
-          u=U
-          v=V
+      if field['cvals'] is False:
+        tk=ticks.loose_label_n(field['clim'][0],field['clim'][1],7)
+        field['cvals']=tk
 
-      elif not time is False and isinstance(time,int) and u.ndim==3:
-        u=u[time,...]
-        v=v[time,...]
+      # use same field settings for all slices:
+      for i in o:
+        for k in field: i.config['field.'+k]=field[k]
 
-      if isinstance(u,list):
-        for i in range(len(u)):
-          u[i],v[i]=calc.rot2d(u[i],v[i],-self.grid.angle)
-      else:
-        if u.ndim==3:
-          for i in range(u.shape[0]):
-            u[i,...],v[i,...]=calc.rot2d(u[i,...],v[i,...],-self.grid.angle)
-        elif u.ndim==2:
-          u,v=calc.rot2d(u,v,-self.grid.angle)
 
-      if self.grid:
-        x=self.grid.lon
-        y=self.grid.lat
-        m=self.grid.mask
-        return x,y,u,v,m
-      else:
-        return u,v
+    # also same settings for extras like bathy contours:
+    Lab=['bathy']
+    for lab in Lab:
+      for e in o[0].extra:
+        if e.label==lab and not e.v is None:
+          field=e.get_param('field')
+          if field['clim'] is False: field['clim']=e.v.min(),e.v.max()
+          if field['cvals'] is False:
+            tk=ticks.loose_label_n(field['clim'][0],field['clim'][1],7)
+            field['cvals']=tk
 
-    elif what=='data':
-      out={}
-      args={}
-      if not time is False:
-        args['bulk_time']=time
+      for i in o:
+        for e in i.extra:
+          if e.label==lab:
+            for k in field: e.config['field.'+k]=field[k]
 
-      if not quiet:
-        print 'loading Blk data time=',time
-        print '* * * * * * * * * * * *.'
+    # add border for all domains:
+#    xb,yb=self.grid.border()
+#    o[0].extra+=[vis.Data(x=xb,v=yb)]
+    borders=[]
+    for i in self:
+      xb,yb=i.grid.border()
+      c=vis.Data(x=xb,v=yb)
+      c.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
+      borders+=[c]
 
-      if not quiet: print '*',
-      out['tair']  = self.use('tair',  **args)
-      if not quiet: print '*',
-      out['rhum']  = self.use('rhum',  **args)
-      if not quiet: print '*',
-      out['pres']  = self.use('pres',  **args)
-      if not quiet: print '*',
-      out['prate'] = self.use('prate', **args)
-      if not quiet: print '*',
-      out['radsw'] = self.use('radsw', **args)
-      if not quiet: print '*',
-      out['radlw'] = self.use('radlw', **args)
-      if not quiet: print '*',
-      out['dlwrf'] = self.use('dlwrf', **args)
-      if not quiet: print '*',
-      out['uwnd']  = self.use('uwnd',  **args)
-      if not quiet: print '*',
-      out['vwnd']  = self.use('vwnd',  **args)
-      if not quiet: print '*',
-      out['sustr'] = self.use('sustr', **args)
-      if not quiet: print '*',
-      out['svstr'] = self.use('svstr', **args)
-      if not quiet: print '*.'
-      out['wspd']  = self.use('wspd',  **args)
+    o[-1].extra+=borders
 
-    blktime=self.use('bulk_time',**args)
-    t0=self.atts['t0']
+    # set zorder:
+    c=1
+    for i in o:
+      c+=0.1
+      i.config['plot.zorder']=c
+      for j in i.extra:
+        c+=0.1
+        j.config['plot.zorder']=c
 
-    return out,blktime,t0
+    # place some stuff above continents:
+    z=o[0].config['proj.continents']['zorder']
+    z+=0.1
+    # vfield:
+    if slc=='uv':
+      for i in o: i.config['plot.zorder']=z
 
+    # place borders above continents:
+    for b in borders: b.config['plot.zorder']=z
+
+
+    return vis.MData(o,warnings=twarn)
+
+
+  def slicek(self,varname,ind,time,**opts):
+    return self._slice('k',varname,ind,time,**opts)
+  def slicez(self,varname,ind,time,**opts):
+    return self._slice('z',varname,ind,time,**opts)
+  def sliceiso(self,varname,ind,time,**opts):
+    return self._slice('iso',varname,ind,time,**opts)
+
+#  def slicei(self,varname,ind,time,**opts):
+#    opts['border']=0
+#    return self._slice('i',varname,ind,time,**opts)
+
+  def slicei(self,varname,ind,time,**opts):
+#    opts['border']=0
+    return self._slice('i',varname,ind,time,**opts)
+  def slicej(self,varname,ind,time,**opts):
+#    opts['border']=0
+    return self._slice('j',varname,ind,time,**opts)
+
+  def slicell(self,varname,X,Y,time,**opts):
+#    opts['border']=0
+    return self._slice('ll',varname,[X,Y],time,**opts)
+
+  def sliceuv(self,ind,time,**opts):
+#    opts['border']=0
+    return self._slice('uv','',ind,time,**opts)
 

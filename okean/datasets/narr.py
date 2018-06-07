@@ -78,19 +78,19 @@ class NARRData:
     res=cb.odict()
 
     for i in range(len(files)):
-      if not quiet: print '|-> getting from file %s' % files[i]
+      if not quiet: print('|-> getting from file %s' % files[i])
 
       try:
         data=narr_file_data(files[i],xlim,ylim,quiet=quiet)
       except:
-        if not quiet: print 'CANNOT use data for %s' % time[i].isoformat()
+        if not quiet: print('CANNOT use data for %s' % time[i].isoformat())
         continue
 
       if data:
         data['INFO_file']   = files[i]
         res[time[i]]=data
       else:
-        if not quiet: print 'NO DATA for %s' % time[i].isoformat()
+        if not quiet: print('NO DATA for %s' % time[i].isoformat())
 
     miss={}
     return res,miss
@@ -104,13 +104,13 @@ def narr_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   # loading grid:
   if 0:
-    if not quiet: print ' reading lon,lat from file %s' % grd
+    if not quiet: print(' reading lon,lat from file %s' % grd)
     nc=netcdf.ncopen(grd)
     x=nc.vars['East_longitude_0-360'][0,...]-360.
     y=nc.vars['Latitude_-90_to_+90'][0,...] # time always 1 !!
     nc.close()
   else:
-    if not quiet: print ' reading lon,lat from file %s' % grdTxt
+    if not quiet: print(' reading lon,lat from file %s' % grdTxt)
     x,y=load_grid()
     #x=x-360.
     x=-x
@@ -133,44 +133,44 @@ def narr_file_data(fname,xlim=False,ylim=False,quiet=False):
   yy=str(j0)+':'+str(j1)
 
   tdim=netcdf.fdim(nc,'time1')
-  if tdim!=1: print 'WARNING: tdim !=1  !!!!!!'
+  if tdim!=1: print('WARNING: tdim !=1  !!!!!!')
 
   # T surface [K->C]
-  if not quiet: print ' --> T air'
+  if not quiet: print(' --> T air')
   tair=netcdf.use(nc,'Temperature_surface',time1=0,x=xx,y=yy)
   tair=tair-273.15
   out['tair']=cb.Data(x,y,tair,'C')
 
   # R humidity [% -> 0--1]
-  if not quiet: print ' --> R humidity'
+  if not quiet: print(' --> R humidity')
   rhum=netcdf.use(nc,'Relative_humidity',time1=0,x=xx,y=yy)
   out['rhum']=cb.Data(x,y,rhum/100.,'0--1')
 
   # surface pressure [Pa]
-  if not quiet: print ' --> Surface pressure'
+  if not quiet: print(' --> Surface pressure')
   pres=netcdf.use(nc,'Pressure_surface',time1=0,x=xx,y=yy)
   out['pres']=cb.Data(x,y,pres,'Pa')
 
   # P rate [kg m-2 s-1 -> cm/d]
-  if not quiet: print ' --> P rate'
+  if not quiet: print(' --> P rate')
   prate=netcdf.use(nc,'Precipitation_rate',time1=0,x=xx,y=yy)
   prate=prate*86400*100/1000.
   out['prate']=cb.Data(x,y,prate,'cm/d')
 
   # Net shortwave flux  [ W m-2]
-  if not quiet: print ' --> Net shortwave flux'
-  if not quiet: print '       SW down'
+  if not quiet: print(' --> Net shortwave flux')
+  if not quiet: print('       SW down')
   sw_down=netcdf.use(nc,'Downward_shortwave_radiation_flux',time1=0,x=xx,y=yy)
-  if not quiet: print '       SW up'
+  if not quiet: print('       SW up')
   sw_up=netcdf.use(nc,'Upward_short_wave_radiation_flux_surface',time1=0,x=xx,y=yy)
   sw_net=sw_down-sw_up
   out['radsw']=cb.Data(x,y,sw_net,'W m-2',info='positive downward')
 
   # Net longwave flux  [W/m^2]
-  if not quiet: print ' --> Net longwave flux'
-  if not quiet: print '       LW down'
+  if not quiet: print(' --> Net longwave flux')
+  if not quiet: print('       LW down')
   lw_down=netcdf.use(nc,'Downward_longwave_radiation_flux',time1=0,x=xx,y=yy)
-  if not quiet: print '       LW up'
+  if not quiet: print('       LW up')
   lw_up=netcdf.use(nc,'Upward_long_wave_radiation_flux_surface',time1=0,x=xx,y=yy)
   lw_net=lw_down-lw_up
   out['radlw']=cb.Data(x,y,-lw_net,'W m-2',info='positive upward')
@@ -179,12 +179,12 @@ def narr_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['dlwrf']=cb.Data(x,y,-lw_down,'W m-2',info='negative... downward')
 
   # U and V wind speed 10m
-  if not quiet: print ' --> U and V wind'
+  if not quiet: print(' --> U and V wind')
   # vertical dim is height_above_ground1: 10 and 30 m
   uwnd=netcdf.use(nc,'u_wind_height_above_ground',height_above_ground1=0,time1=0,x=xx,y=yy)
   vwnd=netcdf.use(nc,'v_wind_height_above_ground',height_above_ground1=0,time1=0,x=xx,y=yy)
 
-  if not quiet: print ' --> calc wind speed and stress'
+  if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
 
@@ -195,7 +195,7 @@ def narr_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['svstr']=cb.Data(x,y,tauy,'Pa')
 
   # Cloud cover [0--100 --> 0--1]:
-  if not quiet: print ' --> Cloud cover'
+  if not quiet: print(' --> Cloud cover')
   clouds=netcdf.use(nc,'Total_cloud_cover',time1=0,x=xx,y=yy)
   out['cloud']=cb.Data(x,y,clouds/100.,'fraction (0--1)')
 

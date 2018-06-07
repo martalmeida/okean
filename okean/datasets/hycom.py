@@ -33,7 +33,7 @@ def get_ij_inds(grd,**kargs):
 
   if fsave:
     np.asarray([ i1,i2,j1,j2]).dump(fsave)
-    print 'saved %s'%fsave
+    print('saved %s'%fsave)
 
   return np.asarray([ i1,i2,j1,j2])
 

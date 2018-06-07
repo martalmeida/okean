@@ -142,7 +142,7 @@ class RiverFrc:
 
     nc=netcdf.Pync(self.fname,'a')
 
-    if not quiet: print ' -- filling time...'
+    if not quiet: print(' -- filling time...')
     for i in range(len(time)): nc.vars['river_time'][i]=time[i]
 
     # better sync here:
@@ -154,7 +154,7 @@ class RiverFrc:
       cont+=1
 
       q,temp,salt,vshape,Xi,Eta,Dir=data[k]
-      if not quiet: print ' -- filling river',cont
+      if not quiet: print(' -- filling river',cont)
       nc.vars['river'][cont]        = cont
       nc.vars['river_Xposition'][cont]   = Xi
       nc.vars['river_Eposition'][cont]   = Eta

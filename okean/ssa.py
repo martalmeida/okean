@@ -83,17 +83,17 @@ class ssa:
     Input:
       win, window width (<= data length /2)
     '''
-    
+
     data=self.data()
     N=len(data)
     if win>N/2:
-      print 'error: win width max = N/2 = ',N/2, ' N=',N    
+      print('error: win width max = N/2 = ',N/2, ' N=',N)
       return
 
     if win<2:
-      print 'error: win width min = 2'
+      print('error: win width min = 2')
       return
-     
+
     K=N-win+1
     X=zeros((win,K),self.dtype)
     for j in range(K):
@@ -209,7 +209,7 @@ class ssa:
 
     eigentriples=unique(eigentriples)
     if any(map(lambda i: i>Last or i<0, eigentriples)):
-       print 'error: eigentriples indice must be < %d' % Last
+       print('error: eigentriples indice must be < %d' % Last)
        return
 
     auxi=self.diagAvg[:,eigentriples]

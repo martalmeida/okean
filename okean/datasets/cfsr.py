@@ -117,11 +117,11 @@ def cfsr_file_data(files,quiet=False):
   def fix_time(t,var,t0,t1):
     # convert 1h, 7h, ... to 0h, 6h, ...
     if t[0].hour in [1,7,13,19]: # not all! sp analysis starts at 0, 6,...!
-      print '     1,7,... to 0,6,...'
+      print('     1,7,... to 0,6,...')
       var=(var[1:]*5+var[:-1]*1)/6.
       t=t[1:]-datetime.timedelta(hours=1)
     elif t[0].hour in [3,9,15,21]:
-      print '     3,9,... to 0,6,...'
+      print('     3,9,... to 0,6,...')
       var=(var[1:]*3+var[:-1]*3)/6.
       t=t[1:]-datetime.timedelta(hours=3)
   
@@ -132,7 +132,7 @@ def cfsr_file_data(files,quiet=False):
     if t[0]>t0:
       dt=t[0]-t0
       dt=dt.days*24+dt.seconds/3600. # hours
-      print 'missind data at start: %.2d h missing --> repeating 1st data'%dt
+      print('missing data at start: %.2d h missing --> repeating 1st data'%dt)
       v=np.zeros((var.shape[0]+1,)+var.shape[1:],var.dtype)
       v[1:]=var
       v[0]=var[0]
@@ -146,7 +146,7 @@ def cfsr_file_data(files,quiet=False):
     if t[-1]<t1:
       dt=t1-t[-1]
       dt=dt.days*24+dt.seconds/3600. # hours
-      print 'missind data at end: %.2d h missing --> repeating last data'%dt
+      print('missing data at end: %.2d h missing --> repeating last data'%dt)
       v=np.zeros((var.shape[0]+1,)+var.shape[1:],var.dtype)
       v[:-1]=var
       v[-1]=var[-1]
@@ -173,7 +173,7 @@ def cfsr_file_data(files,quiet=False):
   out['time']=time
 
   # T air [K->C]
-  if not quiet: print ' --> T air'
+  if not quiet: print(' --> T air')
   f=files['st']
   tair=netcdf.use(f,'TMP_L103')
   tair=tair-273.15
@@ -182,20 +182,20 @@ def cfsr_file_data(files,quiet=False):
   x,y=np.meshgrid(x,y)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!',)
     tair,tfix=fix_time(ttmp,tair,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['tair']=Data(x,y,tair,'C')
 
 
   # R humidity [%-->0--1]
-  if not quiet: print ' --> R humidity'
+  if not quiet: print(' --> R humidity')
   f=files['rh']
   rhum=netcdf.use(f,'R_H_L103')
   rhum=rhum/100.
@@ -204,20 +204,20 @@ def cfsr_file_data(files,quiet=False):
   x,y=np.meshgrid(x,y)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'), # should use end=' ' for python3 print continuation
     rhum,tfix=fix_time(ttmp,rhum,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time): 
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['rhum']=Data(x,y,rhum,'0--1')
 
 
   # surface pressure [Pa]
-  if not quiet: print ' --> Surface pressure'
+  if not quiet: print(' --> Surface pressure')
   f=files['sp']
   pres=netcdf.use(f,'PRES_L1')
   x=netcdf.use(f,'lon'); x[x>180]=x[x>180]-360
@@ -225,20 +225,20 @@ def cfsr_file_data(files,quiet=False):
   x,y=np.meshgrid(x,y)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     pres,tfix=fix_time(ttmp,pres,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['pres']=Data(x,y,pres,'Pa')
 
 
   # P rate [kg m-2 s-1 -> cm/d]
-  if not quiet: print ' --> P rate'
+  if not quiet: print(' --> P rate')
   f=files['pr']
   if 'PRATE_L1' in netcdf.varnames(f):
     prate=netcdf.use(f,'PRATE_L1')
@@ -252,67 +252,67 @@ def cfsr_file_data(files,quiet=False):
   prate=np.where(abs(prate)<1.e-4,0,prate)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     prate,tfix=fix_time(ttmp,prate,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['prate']=Data(x,y,prate,'cm/d')
 
 
   # Net shortwave flux  [W/m^2]
-  if not quiet: print ' --> Net shortwave flux'
-  if not quiet: print '       SW down'
+  if not quiet: print(' --> Net shortwave flux')
+  if not quiet: print('       SW down')
   f=files['rad']
   sw_down=netcdf.use(f,'DSWRF_L1_Avg_1')
   x=netcdf.use(f,'lon'); x[x>180]=x[x>180]-360
   y=netcdf.use(f,'lat')
   x,y=np.meshgrid(x,y)
-  if not quiet: print '       SW up'
+  if not quiet: print('       SW up')
   sw_up=netcdf.use(f,'USWRF_L1_Avg_1')
   sw_net=sw_down-sw_up
   sw_net=np.where(sw_net<1.e-10,0,sw_net)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     sw_net,tfix=fix_time(ttmp,sw_net,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['radsw']=Data(x,y,sw_net,'W m-2',info='positive downward')
 
 
   # Net longwave flux  [W/m^2]
-  if not quiet: print ' --> Net longwave flux'
-  if not quiet: print '       LW down'
+  if not quiet: print(' --> Net longwave flux')
+  if not quiet: print('       LW down')
   f=files['rad']
   lw_down=netcdf.use(f,'DLWRF_L1_Avg_1')
   x=netcdf.use(f,'lon'); x[x>180]=x[x>180]-360
   y=netcdf.use(f,'lat')
   x,y=np.meshgrid(x,y)
-  if not quiet: print '       LW up'
+  if not quiet: print('       LW up')
   lw_up=netcdf.use(f,'ULWRF_L1_Avg_1')
   lw_net=lw_down-lw_up
   lw_net=np.where(np.abs(lw_net)<1.e-10,0,lw_net)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     lw_net,tfix1=fix_time(ttmp,lw_net,time[0],time[-1])
     lw_down,tfix2=fix_time(ttmp,lw_down,time[0],time[-1])
     if  tfix1.size==tfix2.size==time.size and np.all((tfix1==time)&(tfix2==time)):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   # ROMS convention: positive upward
   out['radlw']=Data(x,y,-lw_net,'W m-2',info='positive upward')
@@ -321,7 +321,7 @@ def cfsr_file_data(files,quiet=False):
 
 
   # U and V wind speed 10m
-  if not quiet: print ' --> U and V wind'
+  if not quiet: print(' --> U and V wind')
   f=files['uv']
   uwnd=netcdf.use(f,'U_GRD_L103')
   vwnd=netcdf.use(f,'V_GRD_L103')
@@ -330,18 +330,18 @@ def cfsr_file_data(files,quiet=False):
   x,y=np.meshgrid(x,y)
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     uwnd,tfix1=fix_time(ttmp,uwnd,time[0],time[-1])
     vwnd,tfix2=fix_time(ttmp,vwnd,time[0],time[-1])
     if  tfix1.size==tfix2.size==time.size and np.all((tfix1==time)&(tfix2==time)):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   #
-  if not quiet: print ' --> calc wind speed and stress'
+  if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
 
@@ -353,7 +353,7 @@ def cfsr_file_data(files,quiet=False):
 
 
   # Cloud cover [0--100 --> 0--1]:
-  if not quiet: print ' --> Cloud cover'
+  if not quiet: print(' --> Cloud cover')
   f=files['cc']
   if 'T_CDC_L200' in netcdf.varnames(f):
     clouds=netcdf.use(f,'T_CDC_L200')
@@ -365,14 +365,14 @@ def cfsr_file_data(files,quiet=False):
   clouds=clouds/100.
   # check time:
   ttmp=load_time(f)
-  if ttmp.size==time.size and np.all(ttmp==time): print '    time ok'
+  if ttmp.size==time.size and np.all(ttmp==time): print('    time ok')
   else:
-    print '   time differs !!!!',
+    print('   time differs !!!!'),
     clouds,tfix=fix_time(ttmp,clouds,time[0],time[-1])
     if tfix.size==time.size and np.all(tfix==time):
-      print ' ...fixed!'
+      print(' ...fixed!')
     else:
-      print 'time is NOT OK. Please check !!'
+      print('time is NOT OK. Please check !!')
       return
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')
 
@@ -381,12 +381,12 @@ def cfsr_file_data(files,quiet=False):
   # other vars resolution:
   if out['rhum'].data.shape!=out['uwnd'].data.shape:
     from okean import calc
-    print 'rhum shape differs!! --> interp:'
+    print('rhum shape differs!! --> interp:')
     nt,ny,nx=out['uwnd'].data.shape
     x,y=out['uwnd'].x,out['uwnd'].y
     rhum=np.zeros((nt,ny,nx), out['rhum'].data.dtype)
     for it in range(nt):
-      if it%100==0: print '  %d of %d'%(it,nt)
+      if it%100==0: print('  %d of %d'%(it,nt))
       rhum[it]=calc.griddata(out['rhum'].x,out['rhum'].y,out['rhum'].data[it],x,y)
 
     out['rhum']=Data(x,y,rhum,'0--1')

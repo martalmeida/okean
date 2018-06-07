@@ -171,7 +171,7 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
     xlim=xylim[:2]
     ylim=xylim[2:]
     i1,i2,j1,j2=calc.ij_limits(x0,y0,xlim,ylim)
-    print i1,i2,j1,j2
+    print(i1,i2,j1,j2)
     xi=i2-i1
     eta=j2-j1
   else:
@@ -188,11 +188,11 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
 
   nc=netcdf.ncopen(fname,'a')
   for v0,v in ('lon_rho','lon'),('lat_rho','lat'),('mask_rho','mask'),('h','depth'):
-    print 'filling %s with %s' % (v,v0)
+    print('filling %s with %s' % (v,v0))
     nc.vars[v][:]=netcdf.use(grd,v0,xi_rho=XI,eta_rho=ETA)
 
   if nomask:
-    print 'NO MASK !!!'
+    print('NO MASK !!!')
     nc.vars['mask'][:]=1
 
   if gshhsMask:
@@ -209,7 +209,7 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
       g=gshhs.gshhs(axis, resolution='h',area_thresh=0., max_level=2,clip=True)
       for lon, lat, level in zip(g.lon, g.lat, g.level):
         if level == 1: # land
-          print 'mask ',lon.shape
+          print('mask ',lon.shape)
           i=calc.inpolygon(x,y,lon,lat)
           mask=mask & ~i
 
@@ -242,7 +242,7 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
     v=netcdf.use(nc0,'v',ocean_time=it,s_rho=-1)
 
     # mask extrap:
-    print 'mask extrap...'
+    print('mask extrap...')
 
     u=calc.mask_extrap(x0,y0,np.ma.masked_where(u==0,u))
     v=calc.mask_extrap(x0,y0,np.ma.masked_where(v==0,v))
@@ -262,10 +262,10 @@ def his2gnome(fname,his,grd=False,nomask=False,gshhsMask=True,xylim=False,dates=
     V=V[j1:j2:deta,i1:i2:dxi]
 
     # rotate uv:
-    print 'rotating ...'
+    print('rotating ...')
     U,V=calc.rot2d(U,V,-ang)
 
-    print 'filling uv', n, time[it]
+    print('filling uv', n, time[it])
     nc.vars['u'][n,...]=U
     nc.vars['v'][n,...]=V
 
@@ -379,12 +379,12 @@ def frc2gnome(fname,frc,grd,xylim=False,dates=False,ij=(1,1),**kargs):
 
     # rotate uv:
     if angvar:
-      print 'rotating ...'
+      print('rotating ...')
       u,v=calc.rot2d(u,v,-ang)
 
 
     nc.vars['time'][n]=time[it]
-    print 'filling uv',n,t[it]
+    print('filling uv',n,t[it])
     nc.vars['air_u'][n,...]=u
     nc.vars['air_v'][n,...]=v
 
@@ -407,7 +407,7 @@ class GnomeOut:
     self.ms5=name+'.ms5'
     self.ms6=name+'.ms6'
 
-    print ' -- loading from %s' % name
+    print(' -- loading from %s' % name)
 
     self.get_date()
     self.get_pos()

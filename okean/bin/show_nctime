@@ -18,37 +18,39 @@ def show(fname,tvar=False,tind=False):
     tvar=find_tvar(fname)
 
   if not tvar:
-    print 'provide time varname'
+    print('provide time varname')
     return
 
   if tind=='all':
     T=netcdf.nctime(fname,tvar)
-    for t in T: print t
+    for t in T: print(t)
   elif tind is False:
     T0=netcdf.nctime(fname,tvar,**{'0':0})
     T1=netcdf.nctime(fname,tvar,**{'0':-1})
-    nrec=netcdf.vdim(fname,tvar).values()[0]
-    if nrec==1:
-      print 'One reccord = %s' % T0.isoformat(' ')
+    nrec=list(netcdf.vdim(fname,tvar).values())[0]
+    if nrec==0:
+      print('No reccord')
+    elif nrec==1:
+      print('One reccord = %s' % T0.isoformat(' '))
     else:
-      print '%d reccords, from %s to %s' % (nrec,T0.isoformat(' '),T1.isoformat(' '))
+      print('%d reccords, from %s to %s' % (nrec,T0.isoformat(' '),T1.isoformat(' ')))
   else:
     T=netcdf.nctime(fname,tvar,**{'0':tind})
-    print T,'('+tvar+')'
+    print(T,'('+tvar+')')
 
 if __name__=='__main__':
   import sys
   import getopt
 
   if len(argv)==1:
-    print 'show_nctime [-v tvarname] [-t <tind,"all">] filename'
-    print 'by default show first and last date in the first time var of file'
+    print('show_nctime [-v tvarname] [-t <tind,"all">] filename')
+    print('by default show first and last date in the first time var of file')
     sys.exit()
 
   try:
     opts, args = getopt.getopt(sys.argv[1:], 'v:t:')
-  except getopt.GetoptError, msg:
-    print msg
+  except (getopt.GetoptError, msg):
+    print(msg)
     sys.exit(2)
 
 

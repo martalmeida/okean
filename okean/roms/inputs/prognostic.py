@@ -30,7 +30,7 @@ class DataAccess:
 
   def __init__(self,**kargs):
     for k in kargs.keys():
-      if not hasattr(self,k): print 'new key %s' % k 
+      if not hasattr(self,k): print('new key %s' % k )
       setattr(self,k,kargs[k])
 
 def load_data(f,quiet=0,**kargs):
@@ -83,7 +83,7 @@ def load_data(f,quiet=0,**kargs):
 
   if not isinstance(f,dict) and not f.startswith('http') and not isfile(f):
     msg='file not found %s' % f
-    if not quiet: print msg
+    if not quiet: print(msg)
     return res, msg
 
   # load nc files:
@@ -97,7 +97,7 @@ def load_data(f,quiet=0,**kargs):
   filesUsed=[]
   ncUsed=[]
   for i in f.keys():
-    if not quiet: print '(%s) loading from %s' % (i.ljust(5),f[i])
+    if not quiet: print('(%s) loading from %s' % (i.ljust(5),f[i]))
 
     if i=='temp':
       if f[i] in filesUsed: ncTemp=ncUsed[filesUsed.index(f[i])]
@@ -164,7 +164,7 @@ def load_data(f,quiet=0,**kargs):
 
 
   # load dims:
-  if not quiet: print '  loading dims...'
+  if not quiet: print('  loading dims...')
   dimsXy=netcdf.fdim(ncXy)
   dimsZ =netcdf.fdim(ncZ)
 
@@ -178,7 +178,7 @@ def load_data(f,quiet=0,**kargs):
 
   # about horizontal inds:
   if inds.has_key(sett.xdim) and len(inds[sett.xdim])==2 and not isinstance(inds[sett.xdim],basestring):
-    if not quiet: print '  calc horizontal inds...'
+    if not quiet: print('  calc horizontal inds...')
     xlim=inds[sett.xdim]
     ylim=inds[sett.ydim]
 
@@ -193,7 +193,7 @@ def load_data(f,quiet=0,**kargs):
     inds[sett.ydim]='%d:%d' % (j0,j1)
 
 
-  if not quiet: print '  loading lon, lat, depth...'
+  if not quiet: print('  loading lon, lat, depth...')
   res['lon']  = netcdf.use(ncXy,sett.x_name,**inds)
   if np.any(res['lon']>360): res['lon']=np.mod(res['lon'],360.)
   res['lat']  = netcdf.use(ncXy,sett.y_name,**inds)
@@ -212,7 +212,7 @@ def load_data(f,quiet=0,**kargs):
   # extra misc vars:
   if len(extra):
     for outKey,fileVar in extra:
-      if not quiet: print '  loading extra misc... %s %s' % (outKey,fileVar)
+      if not quiet: print('  loading extra misc... %s %s' % (outKey,fileVar))
       res[outKey]=netcdf.use(ncMisc,fileVar,**inds)
 
 
@@ -221,7 +221,7 @@ def load_data(f,quiet=0,**kargs):
   # with kargs inds!
   # but file may also have no time dim or time name !
   if sett.time_name:
-    if not quiet: print '  loading time...'
+    if not quiet: print('  loading time...')
     if t_units:
       times=netcdf.use(ncTime,sett.time_name)
       times=netcdf.num2date(times,t_units)
@@ -249,13 +249,13 @@ def load_data(f,quiet=0,**kargs):
       except: ndates=False
 
       if ndates:
-        if not quiet: print '    tind, date= len=%d: %d to %d, %s to %s' % (len(date),tind[0],tind[-1],date[0].isoformat(' '),date[-1].isoformat(' '))
+        if not quiet: print('    tind, date= len=%d: %d to %d, %s to %s' % (len(date),tind[0],tind[-1],date[0].isoformat(' '),date[-1].isoformat(' ')))
       else:
-        if not quiet: print '    tind, date= %d %s' % (tind,date.isoformat(' '))
+        if not quiet: print('    tind, date= %d %s' % (tind,date.isoformat(' ')))
 
     elif times.size==1:
       date=times[0]
-      if not quiet: print '    date= %s' % date.isoformat(' ')
+      if not quiet: print('    date= %s' % date.isoformat(' '))
     else: # must provide tind as input!!
       Msg='several dates in file... provice tind!'
       msg+='\n'+Msg
@@ -263,55 +263,55 @@ def load_data(f,quiet=0,**kargs):
 
     res['date'] = date
   else:
-    if not quiet: print '    warning: not using time !!'
+    if not quiet: print('    warning: not using time !!')
     res['date']=0
 
   empty3d=np.zeros([res['NZ'],res['NY'],res['NX']])
   empty2d=np.zeros([res['NY'],res['NX']])
 
   if 'temp' in f.keys():
-    if not quiet: print '  loading temp...'
+    if not quiet: print('  loading temp...')
     if sett.temp_name in ncTemp.varnames: res['temp'] = netcdf.use(ncTemp,sett.temp_name,**inds)
     else:
       Msg='var %s not found' % 'temp'
       msg+='\n'+Msg
-      if not quiet: print Msg
+      if not quiet: print(Msg)
       res['temp']=empty3d
 
   if 'salt' in f.keys():
-    if not quiet: print '  loading salt...'
+    if not quiet: print('  loading salt...')
     if sett.salt_name in ncSalt.varnames: res['salt'] = netcdf.use(ncSalt,sett.salt_name,**inds)
     else:
       Msg='var %s not found' % 'salt'
       msg+='\n'+Msg
-      if not quiet: print Msg
+      if not quiet: print(Msg)
       res['salt']=empty3d
 
   if 'u' in f.keys():
-    if not quiet: print '  loading u...'
+    if not quiet: print('  loading u...')
     if sett.u_name in ncU.varnames: res['u']    = netcdf.use(ncU,sett.u_name,**inds)
     else:
       Msg='var %s not found' % 'u'
       msg+='\n'+Msg
-      if not quiet: print Msg
+      if not quiet: print(Msg)
       res['u']=empty3d
 
   if 'v' in f.keys():
-    if not quiet: print '  loading v...'
+    if not quiet: print('  loading v...')
     if sett.v_name in ncV.varnames: res['v']    = netcdf.use(ncV,sett.v_name,**inds)
     else:
       Msg='var %s not found' % 'v'
       msg+='\n'+Msg
-      if not quiet: print Msg
+      if not quiet: print(Msg)
       res['v']=empty3d
 
   if 'ssh' in f.keys():
-    if not quiet: print '  loading ssh...'
+    if not quiet: print('  loading ssh...')
     if sett.ssh_name in ncSsh.varnames: res['ssh']  = netcdf.use(ncSsh,sett.ssh_name,**inds)
     else:
       Msg='var %s not found' % 'ssh'
       msg+='\n'+Msg
-      if not quiet: print Msg
+      if not quiet: print(Msg)
       res['ssh']=empty2d
 
   for nc in ncUsed:
@@ -324,19 +324,19 @@ def load_data(f,quiet=0,**kargs):
 def avg_dates(Date,data,data1):
   date  = data['date']
   date1 = data1['date']
-  print 'averaging to %s (%s, %s)' % (Date.isoformat(' '),date.isoformat(' '),date1.isoformat(' '))
+  print('averaging to %s (%s, %s)' % (Date.isoformat(' '),date.isoformat(' '),date1.isoformat(' ')))
   a=Date-date
   b=date1-Date
 
   a=a.days+a.seconds/86400.
   b=b.days+b.seconds/86400.
 
-  print '    ',a,b
+  print('    ',a,b)
 
   res=data.copy()
   res['date']=Date
   for i in ('temp','salt','u','v','zeta','ubar','vbar'):
-    print '    avg %s' % i
+    print('    avg %s' % i)
     res[i] = (data[i]*b +data1[i]*a)/(a+b)
 
   return res
@@ -406,7 +406,7 @@ def data2z(data,**kargs):
 
   if ij=='j':
     for j in range(ny):
-      if not quiet and j%10==0: print 'z interp (%d z levels) j=%d of %d' % (nZ,j,ny)
+      if not quiet and j%10==0: print('z interp (%d z levels) j=%d of %d' % (nZ,j,ny))
 
       v=data['temp'][:,j,:]
       v=np.ma.masked_where(v==0,v)
@@ -425,7 +425,7 @@ def data2z(data,**kargs):
       V[:,j,:]=calc.griddata(x[:,j,:],z[:,j,:],v,xx[:,j,:],zz[:,j,:],extrap=True,**interp_opts)
   elif ij=='i':
     for i in range(nx):
-      if not quiet and i%10==0: print 'z interp (%d z levels) i=%d of %d' % (nZ,i,nx)
+      if not quiet and i%10==0: print('z interp (%d z levels) i=%d of %d' % (nZ,i,nx))
 
       v=data['temp'][:,:,i]
       v=np.ma.masked_where(v==0,v)
@@ -495,7 +495,7 @@ def data2roms(data,grd,sparams,**kargs):
   rep_surf    = kargs.get('rep_surf',True) # create a surface upper level
                                            # before interpolation
 
-  if not quiet: print 'using grid %s' % grd
+  if not quiet: print('using grid %s' % grd)
   g=roms.Grid(grd)
   xr,yr,hr,mr=g.vars('r')
   xu,yu,hu,mu=g.vars('u')
@@ -504,7 +504,7 @@ def data2roms(data,grd,sparams,**kargs):
   nz=sparams[3]
 
   if proj:
-    print 'projecting coordinates...'
+    print('projecting coordinates...')
     if isinstance(proj,basestring):
        lonc=(xr.max()+xr.min())/2.
        latc=(yr.max()+yr.min())/2.
@@ -551,10 +551,10 @@ def data2roms(data,grd,sparams,**kargs):
   NY=data['NY']
   NZ=data['NZ']
 
-  if not quiet: print 'calc s levels...'
-  Zr = g.s_levels(sparams,sshr,hr,'r')
-  Zu = g.s_levels(sparams,sshr,hr,'u')
-  Zv = g.s_levels(sparams,sshr,hr,'v')
+  if not quiet: print('calc s levels...')
+  Zr = g.s_levels(sparams,sshr,hr,'rr')
+  Zu = g.s_levels(sparams,sshr,hr,'ur')
+  Zv = g.s_levels(sparams,sshr,hr,'vr')
 
   # interp horiz:
   retHorizAux=horizAux is True
@@ -564,9 +564,9 @@ def data2roms(data,grd,sparams,**kargs):
     U    = np.ma.masked_all((NZ,ny,nx),data['u'].dtype)
     V    = np.ma.masked_all((NZ,ny,nx),data['v'].dtype)
 
-    if not quiet: print 'horizontal interpolation:'
+    if not quiet: print('horizontal interpolation:')
     for i in range(NZ):
-      if not quiet and i%10==0: print '   lev %d of %d' % (i,NZ)
+      if not quiet and i%10==0: print('   lev %d of %d' % (i,NZ))
       #import pylab
       #pylab.figure()
       #pylab.pcolormesh(data['lon'],data['lat'],data['temp'][i,...])
@@ -584,7 +584,7 @@ def data2roms(data,grd,sparams,**kargs):
       except: pass
 
     # rotate U,V:
-    if not quiet: print 'rotating U,V to grid angle'
+    if not quiet: print('rotating U,V to grid angle')
     angle=g.use('angle')  # rad
     U,V=calc.rot2d(U,V,angle)
     U=rt.rho2uvp3d(U,'u')
@@ -650,10 +650,10 @@ def data2roms(data,grd,sparams,**kargs):
     distu=np.zeros((nz,ny, nxu),dtype)
     distv=np.zeros((nz,nyv,nx ),dtype)
 
-  if not quiet: print 'vertical interpolation:'
+  if not quiet: print('vertical interpolation:')
   if ij=='j':
     for j in range(ny):
-      if not quiet and (ny<10 or (ny>=10 and j%10==0)): print '  j=%3d of %3d' % (j,ny)
+      if not quiet and (ny<10 or (ny>=10 and j%10==0)): print('  j=%3d of %3d' % (j,ny))
       ind=ij_ind[j]
       dr=np.tile(distance(xr[ind,:],yr[ind,:]),(nz,1))
       du=np.tile(distance(xu[ind,:],yu[ind,:]),(nz,1))
@@ -667,7 +667,7 @@ def data2roms(data,grd,sparams,**kargs):
       Temp[:,j,:]   = calc.griddata(Rdz*Dr,ZZr[:,j,:],TEMP[:,j,:],Rdz*dr,Zr[:,j,:],extrap=True,**interp_opts)
       Salt[:,j,:]   = calc.griddata(Rdz*Dr,ZZr[:,j,:],SALT[:,j,:],Rdz*dr,Zr[:,j,:],extrap=True,**interp_opts)
       if 0 and j%10==0:
-        print Dr.shape, ZZr[:,j,:].shape
+        print(Dr.shape, ZZr[:,j,:].shape)
         import pylab as pl
         pl.figure(1)
         pl.clf()
@@ -690,15 +690,15 @@ def data2roms(data,grd,sparams,**kargs):
         if useInd:
           distv[:,j,:]=dv
 
-      if np.any(np.isnan(Temp[:,j,:])): print 'found nan in temp',j
-      if np.any(np.isnan(Salt[:,j,:])): print 'found nan in salt',j
-      if np.any(np.isnan(Uvel[:,j,:])): print 'found nan in u',j
-      if j<Vvel.shape[1] and np.any(np.isnan(Vvel[:,j,:])): print 'found nan in v',j
+      if np.any(np.isnan(Temp[:,j,:])): print('found nan in temp',j)
+      if np.any(np.isnan(Salt[:,j,:])): print('found nan in salt',j)
+      if np.any(np.isnan(Uvel[:,j,:])): print('found nan in u',j)
+      if j<Vvel.shape[1] and np.any(np.isnan(Vvel[:,j,:])): print('found nan in v',j)
 
 
   elif ij=='i':
     for i in range(nx):
-      if not quiet and (nx<10 or (nx>=10 and i%10==0)): print '  i=%3d of %3d' % (i,nx)
+      if not quiet and (nx<10 or (nx>=10 and i%10==0)): print('  i=%3d of %3d' % (i,nx))
       ind=ij_ind[i]
       dr=np.tile(distance(xr[:,ind],yr[:,ind]),(nz,1))
       dv=np.tile(distance(xv[:,ind],yv[:,ind]),(nz,1))
@@ -721,7 +721,7 @@ def data2roms(data,grd,sparams,**kargs):
 
 
   # uv bar:
-  if not quiet: print 'calc uvbar'
+  if not quiet: print('calc uvbar')
   if useInd is False:
     ubar,vbar=rt.uvbar(Uvel,Vvel,sshr,hr,sparams)
   else: #>------------------------------------------------------------

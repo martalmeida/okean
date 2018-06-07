@@ -9,7 +9,7 @@ contains general modeling tools. Specific tools are also included for ROMS.
 
 __authors__ = 'Martinho Marta-Almeida <m.martalmeida@gmail.com> \
 <Couto de Esteves, 3740-037, Portugal>',
-__version__='2017-01-17 11:57:52.792354'
+__version__='2018-06-08 00:14:48.445838'
 
 
 def doc(tag=None):
@@ -41,23 +41,24 @@ def doc(tag=None):
     
   if tag==None:
     if not F:
-      print ':: no local doc files found'
-      print ':: folder %s'%pdoc
-      print ':: visit %s'%urldoc
+      print(':: no local doc files found')
+      print(':: folder %s'%pdoc)
+      print(':: visit %s'%urldoc)
     else:
-      print ':: available local doc files:'
-      print ':: folder %s'%pdoc
-      print ''
-      print '     %-10s  %s'%('tag','filename')
-      print '     ----------  ----------'
+      print(':: available local doc files:')
+      print(':: folder %s'%pdoc)
+      print('')
+      print('     %-10s  %s'%('tag','filename'))
+      print('     ----------  ----------')
       for k in F.keys():
-        print '   - %-10s %s'%(k,os.path.basename(F[k]))
-      print ''
-      print ':: doc files are also available in %s'%urldoc
-      print ':: do okean(tag) to open web doc file with desired tag'
-      print "    - ex: okean.doc('roms_glider')"
-      print "    - ex: okean.doc('index') will open doc index file"
-      print "    - ex: okean.doc('')      will open doc folder"
+        print('   - %-10s %s'%(k,os.path.basename(F[k])))
+
+      print('')
+      print(':: doc files are also available in %s'%urldoc)
+      print(':: do okean(tag) to open web doc file with desired tag')
+      print("    - ex: okean.doc('roms_glider')")
+      print("    - ex: okean.doc('index') will open doc index file")
+      print("    - ex: okean.doc('')      will open doc folder")
 
   else:
     import webbrowser

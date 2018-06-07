@@ -103,7 +103,7 @@ class GFSDownload:
             attname  = tags[j]
             attvalue = types[j](f[i+1].strip())
             setattr(self,attname,attvalue)
-            if not quiet: print attname,' : ',attvalue
+            if not quiet: print(attname,' : ',attvalue)
 
 
   def nameof(self,type,date,hour_start,hour_sim):
@@ -233,9 +233,9 @@ class GFSDownload:
     dest1=dest[:-1]+'%d' % self.gribVersion
     dest2=dest[:-1]+'2'
 
-    if not quiet: print 'getting ',dest2
+    if not quiet: print('getting ',dest2)
     if not os.path.isfile(dest2):
-      if not quiet: print 'Downloading '+src
+      if not quiet: print('Downloading '+src)
       cmdGet  = ' '.join((get_inv,source_inv,self.egrep,get_grib,src,dest1))
       mayDownload=1
       if checkinv:
@@ -269,10 +269,10 @@ class GFSDownload:
               open(log,'a').write(':: Problems removing '+dest1+'\n')
 
       else:
-        if not quiet: print '  -- cannot download'
+        if not quiet: print('  -- cannot download')
 
     else:
-      if not quiet: print '  -- already exists'
+      if not quiet: print('  -- already exists')
       err=False
 
     return err,dest2
@@ -318,7 +318,7 @@ class GFSDownload:
           # link file:
           open(log,'a').write(':: Linking '+dest2+'\n')
           os.symlink(os.path.realpath(dest2),os.path.realpath(dest2best))
-          if not quiet: print 'linking ',dest2,dest2best
+          if not quiet: print('linking ',dest2,dest2best)
 
 
   def download_current(self,date=False,del1=True, quiet=True):
@@ -339,7 +339,7 @@ class GFSDownload:
 
     for i in range(self.ngetBefore):
       day=dateu.next_date(date,-i,samefmt=False)
-      if not quiet: print 'Downloading GFS files for date '+day.strftime('%Y%m%d')
+      if not quiet: print('Downloading GFS files for date '+day.strftime('%Y%m%d'))
       if i==0:
         # download files for analysis and forecast:
         self.download_fast(day,FA='a',del1=del1,checkinv=True,quiet=quiet,prevopt=False)
@@ -363,7 +363,7 @@ class GFSDownload:
     p=sofar*size/float(totalsize) * 100
     if int(ceil(mod(p,10)))==10:
       if int(ceil(p))>self.tmp:
-        print '%3d %% (%d secs)' % (int(ceil(p)), time.time()-self.tmp3)
+        print('%3d %% (%d secs)' % (int(ceil(p)), time.time()-self.tmp3))
         self.tmp=int(ceil(p))
         self.tmp3=time.time()
 
@@ -416,7 +416,7 @@ class GFSDownload:
         target=os.path.join(path,F)
         if not os.path.isdir(os.path.join(self.datafolder,date)): os.makedirs(os.path.join(self.datafolder,date))
         if F in url and not os.path.isfile(destination):
-         print 'Getting ',target,destination
+         print('Getting ',target,destination)
          urllib.urlretrieve(target,destination,self.FTP_download_progress)
          self.tmp=0
          self.tmp2=0
@@ -574,15 +574,15 @@ class GFSData:
     missing=odict()
 
     for i in range(len(files)):
-      if not quiet: print '|-> getting from file %s' % files[i]
+      if not quiet: print('|-> getting from file %s' % files[i])
       if isbest[i]!=None:
         data=gfs_file_data(files[i],xlim,ylim,quiet=quiet)
         data['INFO_isbest'] = isbest[i]
         data['INFO_file']   = files[i]
         res[time[i]]=data
-        if not quiet: print '     ** isbest =',isbest[i],'**'
+        if not quiet: print('     ** isbest =',isbest[i],'**')
       else:
-        if not quiet: print '     file is missing !!'
+        if not quiet: print('     file is missing !!')
         missing[time[i]]=files[i]
 
     return res,missing
@@ -654,7 +654,7 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out={}
 
   # T air 2m [K->C]
-  if not quiet: print ' --> T air'
+  if not quiet: print(' --> T air')
   if isPygrib:
     #x,y,tair=gribu.getvar(fname,'temperature',tags=(':2 metre',),lons=xlim,lats=ylim)
     #newest gribu:
@@ -665,7 +665,7 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['tair']=Data(x,y,tair,'C')
 
   # R humidity 2m [%-->0--1]
-  if not quiet: print ' --> R humidity'
+  if not quiet: print(' --> R humidity')
   if 0:
     # kg/kg
     x,y,rhum=gribu.getvar(fname,'humidity',tags=(':2 m','kg'),lons=xlim,lats=ylim)
@@ -680,13 +680,13 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['rhum']=Data(x,y,rhum,'0--1')
 
   # surface pressure [Pa]
-  if not quiet: print ' --> Surface pressure'
+  if not quiet: print(' --> Surface pressure')
   #x,y,pres=gribu.getvar(fname,'pressure',tags='surface',lons=xlim,lats=ylim)
   x,y,pres=gribu.getvar(fname,'sp',lons=xlim,lats=ylim)
   out['pres']=Data(x,y,pres,'Pa')
 
   # P rate [kg m-2 s-1 -> cm/d]
-  if not quiet: print ' --> P rate'
+  if not quiet: print(' --> P rate')
   #x,y,prate=gribu.getvar(fname,'precipitation rate',lons=xlim,lats=ylim)
   x,y,prate=gribu.getvar(fname,'prate',lons=xlim,lats=ylim)
   # Conversion kg m^-2 s^-1  to cm/day
@@ -695,19 +695,19 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['prate']=Data(x,y,prate,'cm/d')
 
   # Net shortwave flux  [W/m^2]
-  if not quiet: print ' --> Net shortwave flux'
-  if not quiet: print '       SW down'
+  if not quiet: print(' --> Net shortwave flux')
+  if not quiet: print('       SW down')
   if isPygrib:
     #x,y,sw_down = gribu.getvar(fname,'',tags='Downward short-wave radiation flux',lons=xlim,lats=ylim)
     x,y,sw_down = gribu.getvar(fname,'dswrf',lons=xlim,lats=ylim)
   else:
     x,y,sw_down = gribu.getvar(fname,'downward short-wave',lons=xlim,lats=ylim)
 
-  if not quiet: print '       SW up'
+  if not quiet: print('       SW up')
   #x,y,sw_up   = gribu.getvar(fname,'',tags='Upward short-wave radiation flux',lons=xlim,lats=ylim)
   x,y,sw_up   = gribu.getvar(fname,'uswrf',lons=xlim,lats=ylim)
   if sw_up is False:
-    if not quiet: print '       SW up not found: using albedo'
+    if not quiet: print('       SW up not found: using albedo')
     #x,y,albedo  = gribu.getvar(fname,'albedo',lons=xlim,lats=ylim)
     x,y,albedo  = gribu.getvar(fname,'al',lons=xlim,lats=ylim)
     albedo=albedo/100.
@@ -719,19 +719,19 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
   out['radsw']=Data(x,y,sw_net,'W m-2',info='positive downward')
 
   # Net longwave flux  [W/m^2]
-  if not quiet: print ' --> Net longwave flux'
-  if not quiet: print '       LW down'
+  if not quiet: print(' --> Net longwave flux')
+  if not quiet: print('       LW down')
   if isPygrib:
     #x,y,lw_down = gribu.getvar(fname,'',tags='Downward long-wave radiation flux',lons=xlim,lats=ylim)
     x,y,lw_down = gribu.getvar(fname,'dlwrf',lons=xlim,lats=ylim)
   else:
     x,y,lw_down = gribu.getvar(fname,'downward long-wave',lons=xlim,lats=ylim)
 
-  if not quiet: print '       LW up'
+  if not quiet: print('       LW up')
   #x,y,lw_up   = gribu.getvar(fname,'',tags='Upward long-wave radiation flux',lons=xlim,lats=ylim)
   x,y,lw_up   = gribu.getvar(fname,'ulwrf',lons=xlim,lats=ylim)
   if lw_up is False:
-    if not quiet: print '       LW up not found: using sst'
+    if not quiet: print('       LW up not found: using sst')
     if isPygrib:
       #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
       x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
@@ -753,13 +753,13 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
 
   # U and V wind speed 10m
-  if not quiet: print ' --> U and V wind'
+  if not quiet: print(' --> U and V wind')
   #x,y,uwnd  = gribu.getvar(fname,'u',tags=':10 m',lons=xlim,lats=ylim)
   #x,y,vwnd  = gribu.getvar(fname,'v',tags=':10 m',lons=xlim,lats=ylim)
   x,y,uwnd  = gribu.getvar(fname,'10u',lons=xlim,lats=ylim)
   x,y,vwnd  = gribu.getvar(fname,'10v',lons=xlim,lats=ylim)
 
-  if not quiet: print ' --> calc wind speed and stress'
+  if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
 
@@ -771,15 +771,15 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
 
   # Cloud cover [0--100 --> 0--1]:
-  if not quiet: print ' --> Cloud cover'
+  if not quiet: print(' --> Cloud cover')
   #x,y,clouds  = gribu.getvar(fname,'cloud cover',lons=xlim,lats=ylim)
   x,y,clouds  = gribu.getvar(fname,'tcc',lons=xlim,lats=ylim)
   if clouds is False:
-    if not quiet: print 'CALC clouds from LW,TAIR,TSEA and RH'
+    if not quiet: print('CALC clouds from LW,TAIR,TSEA and RH')
     # first get sst (maybe already done to calc lw_up)
     try: sst
     except:
-      if not quiet: print '  get TSEA'
+      if not quiet: print('  get TSEA')
       if isPygrib:
         #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
         x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K

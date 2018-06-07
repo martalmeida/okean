@@ -68,7 +68,7 @@ class RTG_SSTdownload:
 ##    p=path.replace('#YEAR#','%d'%year)
 ##############    if version==1: p=p.replace('composite','Composite') #  sick !!
 ##
-    print 'entering folder %s'%p
+    print('entering folder %s'%p)
     res=''
     try:
       self.f.cwd(p)
@@ -78,11 +78,11 @@ class RTG_SSTdownload:
   def list(self,year):####,type):#######level=3,version=2):
     msg=self.goto()####year,type)###########level,version)
     if msg:
-      print msh
+      print(msh)
       return
 
     res=self.f.nlst('rtg_sst_*.%d*'%year)
-    for r in res: print r
+    for r in res: print(r)
 
   def destination_folder(self,year,gen=True):#,type,gen=True):##level=3,version=2,gen=True):
     if year=='mask':
@@ -91,7 +91,7 @@ class RTG_SSTdownload:
       dest=os.path.join(self.dest,'%d'%year)
 
     if gen and not os.path.isdir(dest):
-        print 'creating folder %s'%dest
+        print('creating folder %s'%dest)
         os.makedirs(dest)
 
     return dest
@@ -99,7 +99,7 @@ class RTG_SSTdownload:
   def download(self,year):####,type):##########level=3,version=2):
     msg=self.goto()####year,type)#########level,version)
     if msg:
-      print msg
+      print(msg)
       return
 
     files=self.f.nlst('rtg_sst_*.%d*'%year)
@@ -108,16 +108,16 @@ class RTG_SSTdownload:
       destname=os.path.join(self.destination_folder(year),r)
 
       if os.path.isfile(destname):
-        print 'file %s already exists'%destname
+        print('file %s already exists'%destname)
       else:
-        print 'downloading %s'%r
+        print('downloading %s'%r)
         dest=open(destname,'wb')
         self.f.retrbinary('RETR '+r,dest.write)
 
   def download_mask(self):
     msg=self.goto('mask')
     if msg:
-      print msg
+      print(msg)
       return    
 
     files=['ls.dat']
@@ -125,9 +125,9 @@ class RTG_SSTdownload:
       destname=os.path.join(self.destination_folder('mask'),r)
 
       if os.path.isfile(destname):
-        print 'file %s already exists'%destname
+        print('file %s already exists'%destname)
       else:
-        print 'downloading %s'%r
+        print('downloading %s'%r)
         dest=open(destname,'wb')
         self.f.retrbinary('RETR '+r,dest.write)
 
@@ -139,12 +139,12 @@ class RTG_SST:
   def load_mask(self,shape=False):
     fmask='mask_rtg.npy'
     if os.path.isfile(fmask):
-      print 'loading mask from %s'%fmask
+      print('loading mask from %s'%fmask)
       return np.load(fmask)
 
 
     f=os.path.join(self.path,'lsmask','ls.dat')
-    print 'reading mask file %s'%f
+    print('reading mask file %s'%f)
     w=open(f).read()
     w=w.replace('\n','')
     mask=np.asarray([int(i) for i in w])
@@ -154,7 +154,7 @@ class RTG_SST:
     mask=np.flipud(mask)
 
     mask.dump(fmask)  
-    print '  done'
+    print('  done')
     return mask  
 
 
@@ -176,7 +176,7 @@ class RTG_SST:
 
     c=-1
     for f in files:
-      print ' -- extracting from %s'%f
+      print(' -- extracting from %s'%f)
       q=gribu.findvar(f,'temp')
       for V in q: # times per file
         c+=1
@@ -187,7 +187,7 @@ class RTG_SST:
           if lims:
             if lims[1]<0 and lims[1]<0:
               lon=lon-360 # if not both lon lims <0,, a few more lines are needed !
-            print 'calc ij inds...'
+            print('calc ij inds...')
             ijname='ijinds.npy'
             if os.path.isfile(ijname):
               i0,i1,j0,j1=np.load(ijname)
@@ -195,7 +195,7 @@ class RTG_SST:
               i0,i1,j0,j1=calc.ij_limits(lon,lat,lims[:2],lims[2:],margin=2)
               np.asarray([i0,i1,j0,j1]).dump(ijname)
 
-            print 'done'
+            print('done')
             lon=lon[j0:j1,i0:i1]
             lat=lat[j0:j1,i0:i1]
             mask=mask[j0:j1,i0:i1]
@@ -213,7 +213,7 @@ class RTG_SST:
 
         sst[c]=s
         time[c]=V.analDate
-        print '=> done for %s'%time[c].isoformat(' ')
+        print('=> done for %s'%time[c].isoformat(' '))
 
     return time,lon,lat,sst
 
@@ -226,9 +226,9 @@ if __name__=='__main__':
     year=sys.argv[1]
     if year!='mask': year=int(year)
   except:
-    print 'Usage: python rtg_sst.py YEAR'
-    print 'or, to get land sea mask: python rtg_sst.py mask'
-    print 'Example: python rtg_sst.py 2013'
+    print('Usage: python rtg_sst.py YEAR')
+    print('or, to get land sea mask: python rtg_sst.py mask')
+    print('Example: python rtg_sst.py 2013')
     sys.exit()
 
   if year=='mask':

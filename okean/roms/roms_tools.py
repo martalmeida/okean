@@ -3,7 +3,7 @@
 import os
 import datetime
 import numpy as np
-from okean import netcdf, calc, dateu
+from .. import netcdf, calc, dateu, cookbook as cb
 
 
 def depthof(v,z,val):
@@ -24,7 +24,7 @@ def depthof(v,z,val):
   try: val.shape==v.shape[1:]
   except: val=np.ones(v.shape[1:],v.dtype)*val
 
-  import rtools
+  from . import rtools
   mask=(~v[0].mask).astype('i')
   zz=rtools.depthof(v,z,mask,val)
   # 999 --> surface higher than val
@@ -36,7 +36,7 @@ def depthof(v,z,val):
 def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
   tts,ttb,hc,Nr,vt,vs=sparams
 
-  import rtools
+  from . import rtools
 
   try: level.shape==v.shape[1:]
   except: level=np.ones(v.shape[1:],v.dtype)*level
@@ -61,7 +61,7 @@ def s_levels(h,zeta,sparams,rw=False):
   # h cannot be zero, at least with vt==1
   h=np.where(h==0.,1e-14,h)
 
-  import rtools
+  from . import rtools
   zr,zw=rtools.s_levels(h,zeta,tts,ttb,hc,n,vt,vs)
 
   # add zeta mask to z levels:
@@ -91,30 +91,30 @@ def s_levels(h,zeta,sparams,rw=False):
     else: return zr
 
 
-def ll_rho2uvp(lonr,latr,Type=None):
-  '''
-  Converts lon lat at rho to u, v or p points
-  '''
-  type_=Type
-  Type=Type[0]
-  if Type not in ('u','v','p'):
-    print ':: ll_rho2uvp, unknown Type ',type_
-    return
-
-  if Type=='u':
-    lon=(lonr[:,:-1]+lonr[:,1:])/2.
-    lat=(latr[:,:-1]+latr[:,1:])/2.
-  elif Type=='v':
-    lon=(lonr[:-1,:]+lonr[1:,:])/2.
-    lat=(latr[:-1,:]+latr[1:,:])/2.
-  elif Type=='p':
-    lon=(lonr[:,:-1]+lonr[:,1:])/2.
-    lat=(latr[:,:-1]+latr[:,1:])/2.
-
-    lon=(lon[:-1,:]+lon[1:,:])/2.
-    lat=(lat[:-1,:]+lat[1:,:])/2.
-
-  return lon,lat
+#def ll_rho2uvp(lonr,latr,Type=None):
+#  '''
+#  Converts lon lat at rho to u, v or p points
+#  '''
+#  type_=Type
+#  Type=Type[0]
+#  if Type not in ('u','v','p'):
+#    print(':: ll_rho2uvp, unknown Type ',type_)
+#    return
+#
+#  if Type=='u':
+#    lon=(lonr[:,:-1]+lonr[:,1:])/2.
+#    lat=(latr[:,:-1]+latr[:,1:])/2.
+#  elif Type=='v':
+#    lon=(lonr[:-1,:]+lonr[1:,:])/2.
+#    lat=(latr[:-1,:]+latr[1:,:])/2.
+#  elif Type=='p':
+#    lon=(lonr[:,:-1]+lonr[:,1:])/2.
+#    lat=(latr[:,:-1]+latr[:,1:])/2.
+#
+#    lon=(lon[:-1,:]+lon[1:,:])/2.
+#    lat=(lat[:-1,:]+lat[1:,:])/2.
+#
+#  return lon,lat
 
 
 def rho2uvp(*pargs):
@@ -166,8 +166,8 @@ def rho2uvp3d(*pargs):
   return pargs
 
 
-def psi2rho(vp): return psi2uvr(vp,'r')
-
+#def psi2rho(vp): return psi2uvr(vp,'r')
+#
 
 def psi2uvr(vp,pt):
   '''
@@ -233,7 +233,7 @@ def s_params(nc,show=0):
   vs and vt added aug 2013 (Guayaquil)
   """
 
-  if isinstance(nc,basestring): nc=netcdf.ncopen(nc)
+  if cb.isstr(nc) or isinstance(nc,list) or isinstance(nc,tuple): nc=netcdf.ncopen(nc)
 
   theta_s=theta_b=hc=N=False
   theta_s_src=theta_b_src=hc_src=N_src=''
@@ -245,7 +245,7 @@ def s_params(nc,show=0):
 
 
   v='theta_s'
-  if v in nc.atts.keys():
+  if v in nc.atts:
     theta_s=nc.atts[v].value
     theta_s_source='file attribute'
   elif v in nc.varnames:
@@ -253,7 +253,7 @@ def s_params(nc,show=0):
     theta_s_source='variable'
 
   v='theta_b'
-  if v in nc.atts.keys():
+  if v in nc.atts:
     theta_b=nc.atts[v].value
     theta_b_source='file attribute'
   elif v in nc.varnames:
@@ -261,7 +261,7 @@ def s_params(nc,show=0):
     theta_b_source='variable'
 
   v='hc'
-  if v in  nc.atts.keys():
+  if v in  nc.atts:
     hc=nc.atts[v].value
     hc_source='file attribute'
   elif v in nc.varnames:
@@ -276,7 +276,7 @@ def s_params(nc,show=0):
       Tcline=[]
 
       v='Tcline'
-      if v in  nc.atts.keys():
+      if v in  nc.atts:
         Tcline=nc.atts[v].value
       elif v in nc.varnames:
         Tcline=nc.vars[v][:]
@@ -297,10 +297,10 @@ def s_params(nc,show=0):
       hc_source = 'Tcline'
 
 
-  if 's_rho' in nc.dims.keys():
+  if 's_rho' in nc.dims:
     N=nc.dims['s_rho']
     N_source = 'file dimension s_rho';
-  elif 'sc_r' in nc.atts.keys():
+  elif 'sc_r' in nc.atts:
     N=nc.atts['sc_r']['value']
     N_source = 'file attribute sc_r';
   elif 'sc_r' in nc.varnames:
@@ -308,12 +308,12 @@ def s_params(nc,show=0):
     N_source = 'length of variable sc_r';
 
   if show: # show sources:
-    print '%-10s : %4.2f  %-10s' % ('theta_s',theta_s,theta_s_source)
-    print '%-10s : %4.2f  %-10s' % ('theta_b',theta_b,theta_b_source)
-    print '%-10s : %4.2f  %-10s' % ('hc',hc,hc_source)
-    print '%-10s : %4d  %-10s' % ('N',N,N_source)
-    print '%-10s : %4d  %-10s' % ('vt',vt,'variable')
-    print '%-10s : %4d  %-10s' % ('vs',vs,'variable')
+    print('%-10s : %4.2f  %-10s' % ('theta_s',theta_s,theta_s_source))
+    print('%-10s : %4.2f  %-10s' % ('theta_b',theta_b,theta_b_source))
+    print('%-10s : %4.2f  %-10s' % ('hc',hc,hc_source))
+    print('%-10s : %4d  %-10s' % ('N',N,N_source))
+    print('%-10s : %4d  %-10s' % ('vt',vt,'variable'))
+    print('%-10s : %4d  %-10s' % ('vs',vs,'variable'))
 
   return theta_s, theta_b, hc, N,vt,vs
 
@@ -336,7 +336,7 @@ def roms_read_out(f):
   lines=fid.readlines()
   n=-1
   for l in lines:
-    if l.find('time_ref')>=0: print str(int(float(l.split()[0])))
+    if l.find('time_ref')>=0: print(str(int(float(l.split()[0]))))
     if l.find('time_ref')>=0: time_ref=dateu.parse_date(str(int(float(l.split()[0]))))
     if l.find(tag)==0: break
     n+=1

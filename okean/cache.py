@@ -1,8 +1,12 @@
+'''
+pythin 2x, 3x
+'''
 import os
 try: import memcache
 except: memcache=False
 import tempfile
-import cPickle
+#import cPickle
+import pickle
 import hashlib
 
 class Cache:
@@ -15,16 +19,17 @@ class Cache:
     self.data={}
 
   def local_fname(self,label):
-    label=hashlib.md5(label).hexdigest()
+    # in python 3x, label string must be encoded or be bynary (md5(b'sss'))
+    label=hashlib.md5(label.encode('utf-8')).hexdigest()
     f=os.path.join(self.dir,label)
     return f
 
   def is_stored(self,label,type):
     if type=='remote': 
       self.r=memcache.Client([kargs['client']])
-      return self.r.has_key(label)
+      return label in self.r
     elif type=='localmem':
-      return self.data.has_key(label)
+      return label in self.data
     elif type=='localfile':
       f=self.local_fname(label)
       return os.path.isfile(f)
@@ -35,11 +40,10 @@ class Cache:
     if type=='remote':
 
       if not memcache:
-        print 'error: cannot use memcache'
+        print('error: cannot use memcache')
         return 1
 
-      if kargs.has_key('time'): secs=kargs['time']
-      else: secs=0
+      secs=kargs.get('time',0)
 
       self.r=memcache.Client([kargs['client']])
       s=self.r.set(label,data,time=secs)
@@ -53,7 +57,7 @@ class Cache:
     elif type=='localfile':
       f=self.local_fname(label)
       if not os.path.isdir(self.dir): os.makedirs(self.dir)
-      s=cPickle.dump(data,open(f,'w+'))
+      s=pickle.dump(data,open(f,'wb'))
       self.data[label]=None
       return s    
  
@@ -64,6 +68,6 @@ class Cache:
     elif type=='localmem':
       return self.data[label]
     elif type=='localfile':
-      return cPickle.load(open(self.local_fname(label)))
+      return pickle.load(open(self.local_fname(label),'rb'))
 
 

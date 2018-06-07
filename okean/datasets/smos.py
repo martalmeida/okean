@@ -42,7 +42,7 @@ login LOGIN
 password PASSWORD\n
 To get access to the data, check the site:
 http://www.catds.fr/Products/Products-acces'''
-  print msg
+  print(msg)
 
 url='eftp.ifremer.fr'
 path2='salinity/sss_smos_l#LEVEL#_V02/#YEAR#/10_Day_composite/Quarter_degree'
@@ -67,7 +67,7 @@ class SMOSdownload:
     p=path.replace('#LEVEL#','%d'%level).replace('#YEAR#','%d'%year)
     if version==1: p=p.replace('composite','Composite') #  sick !!
 
-    print 'entering folder %s'%p
+    print('entering folder %s'%p)
     res=''
     try:
       self.f.cwd(p)
@@ -77,16 +77,16 @@ class SMOSdownload:
   def list(self,year,level=3,version=2):
     msg=self.goto(year,level,version)
     if msg:
-      print msh
+      print(msh)
       return
 
     res=self.f.nlst()
-    for r in res: print r
+    for r in res: print(r)
 
   def destination_folder(self,year,level=3,version=2,gen=True):
     dest=os.path.join(self.dest,'%d'%year,'level_%d_version_%d'%(level,version))
     if gen and not os.path.isdir(dest):
-        print 'creating folder %s'%dest
+        print('creating folder %s'%dest)
         os.makedirs(dest)
 
     return dest
@@ -94,7 +94,7 @@ class SMOSdownload:
   def download(self,year,level=3,version=2):
     msg=self.goto(year,level,version)
     if msg:
-      print msg
+      print(msg)
       return
 
     files=self.f.nlst('*.nc')
@@ -102,9 +102,9 @@ class SMOSdownload:
       destname=os.path.join(self.destination_folder(year,level,version),r)
 
       if os.path.isfile(destname):
-        print 'file %s already exists'%destname
+        print('file %s already exists'%destname)
       else:
-        print 'downloading %s'%r
+        print('downloading %s'%r)
         dest=open(destname,'wb')
         self.f.retrbinary('RETR '+r,dest.write)
 
@@ -121,7 +121,7 @@ class SMOS:
 
     res=OrderedDict()
     for f in files:
-      print ' -- extracting from %s'%f
+      print(' -- extracting from %s'%f)
       if f==files[0]:
         lon=netcdf.use(f,'longitude')
         lat=netcdf.use(f,'latitude')
@@ -150,8 +150,8 @@ if __name__=='__main__':
     level=int(sys.argv[2])
     version=int(sys.argv[3])
   except:
-    print 'Usage: python smos.py YEAR LEVEL VERSION'
-    print 'Example: python smos.py 2012 3 2'
+    print('Usage: python smos.py YEAR LEVEL VERSION')
+    print('Example: python smos.py 2012 3 2')
     sys.exit()
 
   a.download(year,level,version)

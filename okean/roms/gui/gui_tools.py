@@ -45,7 +45,7 @@ class bButton():
     self.command()
 
 def callback():
-    print "click!"
+    print("click!")
 
 def rgui_tools(master):
   out={}

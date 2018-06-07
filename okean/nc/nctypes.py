@@ -45,9 +45,12 @@
 
  b       1
  -------------------
+
+python 2x, 3x
 '''
 
 import numpy as np
+from .. import cookbook as cb
 
 nptypes={'float32':'NC_FLOAT','float64':'NC_DOUBLE','int8':'NC_BYTE',
          'int16':'NC_SHORT','int32':'NC_INT','int64':'NC_INT64',
@@ -71,15 +74,16 @@ def type_numpy2nc(type,ncver=4):
   '''
   Convert numpy typecode to netcdf type
   '''
-  if isinstance(type,basestring):
+  if cb.isstr(type):
     npname=np.dtype(type).name
   else: # is datype
     npname=type.name
 
 
-  if ncver==3 and npname.lower().find('uint')==0: return 
+  if ncver==3 and npname.lower().find('uint')==0: return
 
-  if npname.find('string')==0 or npname.find('unicode')==0:
+  #if npname.find('string')==0 or npname.find('unicode')==0:
+  if npname.find('str')==0 or npname.find('unicode')==0:
     npname='stringN'
     if ncver==3: npname='uint8' # to return CHAR
 
@@ -114,7 +118,7 @@ def type_numpy2numeric(type):
   '''
   Convert numpy dtype to numeric typecode
   '''
-  if isinstance(type,basestring):
+  if cb.isstr(type):
     npname=np.dtype(type).name
   else: # is datype
     npname=type.name
@@ -223,7 +227,7 @@ def type_2dtype(type,**kargs):
   if 'isstr'  in kargs.keys(): isstr  = kargs['isstr']
   if 'isbool' in kargs.keys(): isbool = kargs['isbool']
 
-  if isinstance(type,basestring):
+  if cb.isstr(type):
     if len(type)==1: # is a numeric typecode
       return type_numeric2numpy(type,strlen=strlen)
     elif type in numpynames:  # numpy type name
@@ -256,7 +260,7 @@ def type_2nc(type,**kargs):
   ncver=4
   if 'ncver'  in kargs.keys(): ncver  = kargs['ncver']
 
-  if isinstance(type,basestring):
+  if cb.isstr(type):
     if len(type)==1: # is a numeric typecode
       return type_numeric2nc(type,ncver=ncver)
     elif type in numpynames:
@@ -293,7 +297,7 @@ def type_2numeric(type,**kargs):
   isstr=False
   if 'isstr'  in kargs.keys(): isstr  = kargs['isstr']
 
-  if isinstance(type,basestring):
+  if cb.isstr(type):
     if len(type)==1: # numeric typecode
       return type
     elif type in numpynames:

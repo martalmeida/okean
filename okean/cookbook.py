@@ -1,24 +1,35 @@
 """
-Usefull stuff from:
-http://aspn.activestate.com/ASPN/Cookbook/Python
-and other places
+Usefull stuff:
+From http://aspn.activestate.com/ASPN/Cookbook/Python and other places
+
+python 2x, 3x
 """
 
 import os
 
-class _GetMaxIndex:
-  # sys.maxint may not be INT_MAX but LONG_MAX
-  # For 2.4.x, it is *just* that the documentation should be fixed; the
-  # code needs to stay as it is even though there is no convenient way
-  # to get at the maximum index. Just trying one time at startup would
-  # be the recommended way:
-  def __getslice__(self, a, mi):
-    #import sys
-    #sys.maxindex = mi
-    return mi
+##class _GetMaxIndex:
+##  # sys.maxint may not be INT_MAX but LONG_MAX
+##  # For 2.4.x, it is *just* that the documentation should be fixed; the
+##  # code needs to stay as it is even though there is no convenient way
+##  # to get at the maximum index. Just trying one time at startup would
+##  # be the recommended way:
+##  def __getslice__(self, a, mi):
+##    #import sys
+##    #sys.maxindex = mi
+##    return mi
+##
+##def maxint():
+##  return _GetMaxIndex()[:]
 
-def maxint():
-  return _GetMaxIndex()[:]
+def maxint(warning=1):
+  import sys
+  try: return sys.maxint
+  except:
+    # note that the is no maxint in python 3. By maxsize can be used
+    # as the max practical index to use
+    if warning: print('warning: maxsize is not maxint!')
+    return sys.maxsize
+
 
 def relativepath(s1,s2):
   '''
@@ -58,8 +69,9 @@ def run(*args):
   '''
   import subprocess
   return subprocess.Popen(args,stdout=subprocess.PIPE,
-                      stderr=subprocess.PIPE,close_fds=False).communicate()[0].split('\n')[:-1]
+                      stderr=subprocess.PIPE,close_fds=False).communicate()[0].split(b'\n')[:-1]
   # why close_fds=False --> http://bramp.net/blog/python-close_fds-issue
+  # split(b is needed for python 3x
 
 
 def parameters(only=None, exclude=None, ignore='self'):
@@ -132,15 +144,14 @@ def search(file,paths=False):
       return match
 
 
-
 def tree(dir='.', padding='', print_files=False,last=0,noext=()):
     '''Print tree structure of path specified.
     '''
 
     if last:
-      print padding[:-1] + ' -- ' + os.path.basename(os.path.abspath(dir)) + '/'
+      print(padding[:-1] + ' -- ' + os.path.basename(os.path.abspath(dir)) + '/')
     else:
-      print padding[:-1] + '|-- ' + os.path.basename(os.path.abspath(dir)) + '/'
+      print(padding[:-1] + '|-- ' + os.path.basename(os.path.abspath(dir)) + '/')
     padding = padding + '  '
     files = []
     if print_files:
@@ -162,9 +173,9 @@ def tree(dir='.', padding='', print_files=False,last=0,noext=()):
           ext=os.path.splitext(file)[1]
           if ext not in noext:
             if count == len(files):
-              print padding + ' -- ' + file
+              print(padding + ' -- ' + file)
             else:
-              print padding + '|-- ' + file
+              print(padding + '|-- ' + file)
 
 
 def username(name=False):
@@ -192,7 +203,7 @@ def machinename():
 def report_memory(i=''):
   pid = os.getpid()
   a2 = os.popen('ps -p %d -o rss,vsz,%%mem' % pid).readlines()
-  print i, ' ', a2[1],
+  print(i, ' ', a2[1],)
   return int(a2[1].split()[1])
 
 
@@ -356,3 +367,10 @@ def most_common(l):
   counts = [(j,i) for i,j in d.items()]
   count, max_elm = max(counts)
   return count, max_elm
+
+def isstr(s):
+  '''
+  String check compatible with python 2x and 3x
+  Same as isinstance(s,basestring) in python 2x
+  '''
+  return isinstance(s,(''.__class__,u''.__class__))

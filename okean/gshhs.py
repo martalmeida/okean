@@ -380,17 +380,17 @@ if __name__ == '__main__':
               # [-10, 10, 40, 60],
               [-95., -87., 28., 31.0])
     for window in windows:
-        print 'window = ', window
+        print('window = ', window)
         t1 = time.clock()
         m = gshhs(window=window, resolution='f', area_thresh=0., max_level=1)
         t2 = time.clock()
-        print 'gshhs time: ' + str(t2-t1) + ' seconds'
+        print('gshhs time: ' + str(t2-t1) + ' seconds')
         m.plot()
         t3 = time.clock()
-        print 'plot time: ' + str(t3-t2) + ' seconds'
+        print('plot time: ' + str(t3-t2) + ' seconds')
         t4 = time.clock()
-        print 'show time: ' + str(t4-t3) + ' seconds'
+        print('show time: ' + str(t4-t3) + ' seconds')
         draw()
-        print 'Total time: ' + str(t4-t1) + ' seconds'
+        print('Total time: ' + str(t4-t1) + ' seconds')
     show()
 

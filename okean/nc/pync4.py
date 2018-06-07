@@ -1,13 +1,18 @@
-from okean import cookbook as cbt
+'''
+python 2x, 3x
+'''
+
 import os
 import numpy as np
-import nctypes
+from collections import OrderedDict
+from .. import cookbook as cb
+from . import nctypes
 
-# the default intrefaces by be given by the environment variable
+# the default intrefaces are given by the environment variable
 # PY_NETCDF_INTERFACES, if not, will be used:
 default_interfaces    = 'netcdf4','pycdf','pupynere','scientific'
 
-maxint=cbt.maxint()
+maxint=cb.maxint(warning=0)
 
 def __load_pycdf():
   pnc=False
@@ -103,7 +108,7 @@ class Common:
 
   def __atts(self):
     '''Returns netcdf ordered attributes, with types and values'''
-    att=cbt.odict()
+    att=OrderedDict()
     if self._interface=='pycdf':
       for i in range(self._nc.inq_natts()):
         a=self._nc.attr(i)
@@ -183,7 +188,7 @@ class Pyncatt:
       self.nctype = nctypes.type_2nc(self.atttype,ncver=self.ncversion)
 
       # dtype:
-      isstr=isinstance(self.value,basestring)
+      isstr=cb.isstr
       isbool=isinstance(self.value,bool)
       if isstr: strlen=len(str)
       else: strlen=None
@@ -302,7 +307,7 @@ class Pyncvar(Common):
 
   def __dims(self):
     '''Returns variable dimensions dict'''
-    d=cbt.odict()
+    d=OrderedDict()
     if   self._interface=='pycdf': names = self._nc.dimensions()
     elif self._interface=='scientific': names = self._nc.dimensions
     elif self._interface=='netcdf4': names = self._nc.dimensions
@@ -319,7 +324,7 @@ class Pyncvar(Common):
       for n in names:
         p=self.parent
         while True:
-          if p.dims.has_key(n):
+          if n in p.dims:
             d[n]=p.dims[n]
             break
           if p.parent: p=p.parent
@@ -403,7 +408,7 @@ class Pyncgroup(Common):
 
   def __dims(self):
     '''Returns file dimensions dict'''
-    dims=cbt.odict()
+    dims=OrderedDict()
     if self._interface=='pycdf':
       for i in range(self._nc.inq_ndims()):
         dims[self._nc.dim(i).inq()[0]]=self._nc.dim(i).inq()[1]
@@ -432,7 +437,7 @@ class Pyncgroup(Common):
     if self._interface=='pycdf':
       self._nc.dim(oldname).rename(newname)
     elif self._interface=='scientific':
-      print ':: dim_rename not implemented in ',self._interface
+      print(':: dim_rename not implemented in ',self._interface)
     elif self._interface=='netcdf4':
      self._nc.renameDimension(oldname,newname)
 
@@ -512,14 +517,14 @@ class Pyncgroup(Common):
 
       # update ncdump_info:
       if not self._ncdump_info is False:
-        self._ncdump_info['variables'][varname]=cbt.odict()
+        self._ncdump_info['variables'][varname]=OrderedDict()
 
     return newvar
 
 
   def __vars(self):
     '''Returns file variables'''
-    var=cbt.odict()
+    var=OrderedDict()
     if self._interface=='pycdf':
       names=[self._nc.var(i).inq_name() for i in range(self._nc.inq_nvars())]
     elif self._interface in ('scientific','netcdf4'):
@@ -540,7 +545,7 @@ class Pyncgroup(Common):
     if self._interface=='pycdf':
       self._nc.var(oldname).rename(newname)
     elif self._interface=='scientific':
-      print ':: var_rename not implemented in ',self._interface
+      print(':: var_rename not implemented in ',self._interface)
       return
     elif self._interface=='netcdf4':
       self._nc.renameVariable(oldname,newname)
@@ -569,24 +574,24 @@ class Pyncgroup(Common):
 
       # update ncdump info:
       if not self._ncdump_info is False:
-        self._ncdump_info['groups'][groupname]=cbt.odict()
+        self._ncdump_info['groups'][groupname]=OrderedDict()
 
       return newgroup
 
     else:
-      print ':: add_group only implemented in interface ','netcdf4'
+      print(':: add_group only implemented in interface ','netcdf4')
       return False
 
 
   def __groups(self):
-    out=cbt.odict()
+    out=OrderedDict()
     if self._interface=='netcdf4':
       gs=self._nc.groups
       try: gnames=gs.keys()
       except: gnames=()
       for k in gnames: out[k]=Pyncgroup(nc=gs[k],name=k,parent=self)
     else:
-      print ':: groups only implemented in interface ','netcdf4'
+      print(':: groups only implemented in interface ','netcdf4')
 
     return out
 
@@ -617,11 +622,11 @@ class Pync(Pyncgroup):
 
     elif interface=='netcdf4':
       if perm=='w' and os.path.isfile(filename): perm='a'
-      if not isinstance(version,basestring):
+      if not cb.isstr(version):
         format='NETCDF'+str(version)
         if format=='NETCDF3': format='NETCDF3_CLASSIC'
       else: format=version
-      if not isinstance(filename,basestring) or filename.find('*')!=-1 or filename.find('?')!=-1:
+      if not cb.isstr(filename) or filename.find('*')!=-1 or filename.find('?')!=-1:
         nc=pnc.MFDataset(filename)
       else:
         if perm=='w':
@@ -652,7 +657,7 @@ class Pync(Pyncgroup):
 
   def sync(self):
     if self._interface=='netcdf4': self._nc.sync()
-    else: print 'sync only in netcdf4'
+    else: print('sync only in netcdf4')
 
   def close(self):
     self._nc.close()

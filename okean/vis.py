@@ -1,19 +1,18 @@
-import pylab as pl
-import numpy as np
-from okean import dateu as dts, ticks, cache, calc
-import matplotlib
-from string import join as sjoin
-import ConfigParser
-from mpl_toolkits.basemap import Basemap
 import os
 import datetime
-try:
-  from collections import OrderedDict
-except:
-  from ordereddict import OrderedDict
+import pylab as pl
+import numpy as np
+from configparser import ConfigParser
+from collections import OrderedDict
+from mpl_toolkits.basemap import Basemap
+from . import dateu as dts, ticks, cache, calc, cookbook as cb
+
 
 if 1:
     default={}
+    default['plot.label']=''
+    default['plot.zorder']=1
+
     # figure and axes:
     default['figure.figsize']=8,6
     default['figure.edgecolor']=None
@@ -32,31 +31,31 @@ if 1:
     default['proj.options']={}
 
     default['proj.coast_add']=True
-    default['proj.coast']={'color': '#999999', 'linewidth': 0.5}
+    default['proj.coast']={'color': '#999999', 'linewidth': 0.5, 'zorder':999}
 
     default['proj.continents_add'] = True
-    default['proj.continents']     = {'color': '#f2f2f2'}#ebebeb'}
+    default['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
 
     default['proj.oceans_add'] = False
-    default['proj.oceans'] = {'color': 'aqua'}
+    default['proj.oceans'] = {'color': 'aqua', 'zorder':999}
 
 
     default['proj.countries_add'] = True
-    default['proj.countries']     = {'color': '#d4d4d4'}
+    default['proj.countries']     = {'color': '#d4d4d4', 'zorder':999}
 
     default['proj.meridians_add'] = True
     default['proj.meridians_vals'] = 'auto'
-    default['proj.meridians']     = {'labels':[0,0,0,1],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5}
+    default['proj.meridians']     = {'labels':[0,0,0,1],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
 
     default['proj.parallels_add'] = True
     default['proj.parallels_vals'] = 'auto'
-    default['proj.parallels']     = {'labels':[1,0,0,0],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5}
+    default['proj.parallels']     = {'labels':[1,0,0,0],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
 
     default['proj.rivers_add'] = False
-    default['proj.rivers']     = {'color': 'blue', 'linewidth': 0.5}
+    default['proj.rivers']     = {'color': 'blue', 'linewidth': 0.5, 'zorder':999}
 
     default['proj.states_add'] = False
-    default['proj.states']     = {'color': 'green', 'linewidth': 0.5}
+    default['proj.states']     = {'color': 'green', 'linewidth': 0.5, 'zorder':999}
 
     # about scalar field:
     default['field.plot']  = 'pcolormesh'
@@ -73,7 +72,7 @@ if 1:
     default['vfield.key_XYU']=0.05,0.05,'auto'
     default['vfield.key_label']='auto'
     default['vfield.dij0']  = 0,0
-    default['vfield.dij']  = 1,1
+    default['vfield.dij']  = 5,5
     default['vfield.C']  = None
 
     # about 1d plots:
@@ -89,73 +88,7 @@ if 1:
 class visCfg:
 
   def __init__(self):
-    '''
-    default={}
-    # figure and axes:
-    default['figure.figsize']=8,6
-    default['figure.edgecolor']=None
-    default['figure.facecolor']=None
-    default['axes.position']=.1,.1,.75,.8
-    default['axes.axis']=False # xlim ylim
-    default['axes.labels']={'fontsize':10}
-    default['colorbar.ax_position']=.875,.1,.03,.8
-    default['colorbar.options']={}
-    default['colorbar.bg_position']=False #.86,.08,.08,.84
-    default['colorbar.bg']={'edgecolor':'none','facecolor':'white','alpha':0.5,'linewidth':0}
-
-    # map projection:
-    default['proj.name']='merc'
-    default['proj.resolution']='i'
-
-    default['proj.coast_add']=True
-    default['proj.coast']={'color': '#999999', 'linewidth': 0.5}
-
-    default['proj.continents_add'] = True
-    default['proj.continents']     = {'color': '#ebebeb'}
-
-    default['proj.countries_add'] = True
-    default['proj.countries']     = {'color': '#ebebeb'}
-
-    default['proj.meridians_add'] = True
-    default['proj.meridians_vals'] = 'auto'
-    default['proj.meridians']     = {'labels':[0,0,0,1],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5}
-
-    default['proj.parallels_add'] = True
-    default['proj.parallels_vals'] = 'auto'
-    default['proj.parallels']     = {'labels':[1,0,0,0],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5}
-
-    default['proj.rivers_add'] = True
-    default['proj.rivers']     = {'color': 'blue', 'linewidth': 0.5}
-
-    default['proj.states_add'] = False
-    default['proj.states']     = {'color': 'green', 'linewidth': 0.5}
-
-    # about scalar field:
-    default['field.plot']  = 'pcolormesh'
-    default['field.clim']  = False
-    default['field.cvals'] = False
-    default['field.cmap']  = False
-    default['field.linecolors']  = False
-
-    # about vector field:
-    default['vfield.options']={'units':'x','scale':None}
-    default['vfield.key_options']={'coordinates':'figure'}
-    default['vfield.key_XYU']=0.05,0.05,'auto'
-    default['vfield.key_label']='auto'
-    default['vfield.dij0']  = 0,0
-    default['vfield.dij']  = 1,1
-
-    # about 1d plots:
-    default['d1_fill.options']  = {'lw':1,'facecolor':'#cccccc','edgecolor':'none'}
-    default['d1_line.options']  = {'lw':1}
-    default['d1.plot']  = 'plot'
-    default['d1.y0']    = 'min'
-    '''
-
-    #self.default=default
-    #self.config=default.copy()
     self.config=param.copy()
-
 
   def get_param(self,name0,name1=False):
     keys=self.config.keys()
@@ -185,7 +118,7 @@ class visCfg:
 
     for K in kargs.keys():
       key=find_key(K.replace('__','.'))
-      if len(key)>1 and not quiet: print 'found more than one matching key!',key
+      if len(key)>1 and not quiet: print('found more than one matching key!',key)
       else:
        key=key[0]
        self.config[key]=kargs[K]
@@ -210,14 +143,14 @@ class visCfg:
       if k.find('.')>0:
          tmp=k.split('.')
          section=tmp[0]
-         name=sjoin(tmp[1:],'')
+         name=''.join(tmp[1:])
       else:
          section='unknown'
          name=k
 
       if not config.has_section(section):
         config.add_section(section)
-        #print 'adding sec ',section
+        #print('adding sec ',section)
       config.set(section,name,self.config[k])
 
     self.cp=config
@@ -240,15 +173,18 @@ class Vis(visCfg):
 
 
   def init_figure(self,**kargs):
+    print('======= init fig ')
+    print(kargs)
     fig=kargs.get('fig',None) # use existing fig; create a new one if True
     ax=kargs.get('ax',None) # use existing axes
+    cbax=kargs.get('cbax',None) # use existing axes for colorbar
     if ax: fig=ax.figure
 
     self.init_handles()
 
     prev=kargs.get('prev',None)
     if prev:
-      print 'using prev !!'
+      print('using prev !!')
       for i in ['fig','ax','cbax','cbbg']:
         setattr(self,i,getattr(prev,i))
       return
@@ -274,22 +210,23 @@ class Vis(visCfg):
     # main ax:
     if ax: self.ax=ax
     else:
-#      print 'new ax'
       self.ax=self.fig.add_axes(self.config['axes.position'])
 
     # colorbar bg:
     if  self.config['colorbar.bg_position']:
       self.cbbg=self.fig.add_axes(self.config['colorbar.bg_position'])
-      self.cbbg_rec=matplotlib.patches.Rectangle((0,0),1,1,**self.config['colorbar.bg'])
+      self.cbbg_rec=pl.matplotlib.patches.Rectangle((0,0),1,1,**self.config['colorbar.bg'])
       self.cbbg.add_artist(self.cbbg_rec)
       self.cbbg.set(frame_on=0,xticks=[],yticks=[],visible=False)
     else: self.cbbg=False
 
     # colorbar ax:
-    if self.config['colorbar.ax_position']:
-      self.cbax=self.fig.add_axes(self.config['colorbar.ax_position'])
-      self.cbax.set(visible=False)
-    else: self.cbax=False
+    if cbax: self.cbax=cbax
+    else:
+      if self.config['colorbar.ax_position']:
+        self.cbax=self.fig.add_axes(self.config['colorbar.ax_position'])
+        self.cbax.set(visible=False)
+      else: self.cbax=False
 
 
   def inherit(self,parent):
@@ -390,10 +327,10 @@ class Vis(visCfg):
     cch=cache.Cache()
 
     if cch.is_stored(cacheLab,'localfile'):
-      if debug_lev==2: print ' -> loading proj from cache'
+      if debug_lev==2: print(' -> loading proj from cache')
       m=cch.load(cacheLab,'localfile')
     else:
-      if debug_lev==2: print ' -> creating proj'
+      if debug_lev==2: print(' -> creating proj')
 
       if self.config['proj.name'] in ('spstere','npstere'):
         m = Basemap(projection=self.config['proj.name'],
@@ -435,7 +372,9 @@ class Vis(visCfg):
     # argument ax is missing! So, boundary will go the the latest axes, which can be self.cbax!!
     # my current version is 1.0.7
     # To avoid it:
-    pl.axes(self.ax)
+    try:
+      pl.sca(self.ax) # does not work inside tk gui with Figure
+    except: pass
 
     # better do this before draw anything else, otherwise the drawmapboundary will be
     # called many times (by set_axes_limits, depending on the projection used)
@@ -447,7 +386,9 @@ class Vis(visCfg):
 
 
     if self.config['proj.continents_add']:
-      self.map.fillcontinents(ax=self.ax,**self.config['proj.continents'])
+      try: # may fail for high zooms
+        self.map.fillcontinents(ax=self.ax,**self.config['proj.continents'])
+      except: pass
 
 
     if self.config['proj.countries_add']:
@@ -478,6 +419,8 @@ class Vis(visCfg):
       else: parallels=self.config['proj.parallels_vals']
       self.map.drawparallels(parallels,ax=self.ax,**self.config['proj.parallels'])
 
+    for k in self.ax.spines:
+      self.ax.spines[k].set_zorder(999.5)
 
   def _convCoord(self,x,y):
     if x.size!=y.size: x,y=np.meshgrid(x,y)
@@ -495,7 +438,7 @@ class Vis(visCfg):
     if self.config['field.cmap']:
       # accepted cmap: cmapname; list of colors, or one color for contours
 
-      if isinstance(self.config['field.cmap'],basestring):
+      if cb.isstr(self.config['field.cmap']):
         try:
           # wont work for one color, like field.cmap='k'
           cmap=eval('pl.cm.'+self.config['field.cmap'])
@@ -513,10 +456,21 @@ class Vis(visCfg):
     x,y=self._convCoord(x,y)
     meth=eval('self.ax.'+self.config['field.plot'])
 
-    if self.config['field.clim']:
-      vmin,vmax=self.config['field.clim']
-      args['vmin']=vmin
-      args['vmax']=vmax
+#    if self.config['field.clim']:
+#      vmin,vmax=self.config['field.clim']
+#      args['vmin']=vmin
+#      args['vmax']=vmax
+
+    if self.config['field.clim'] is False:
+       if self.config['field.cvals'] is False:
+          self.config['field.clim']=v.min(),v.max()
+       else:
+         if isinstance(self.config['field.cvals'],int):
+           self.config['field.clim']=v.min(),v.max()
+         else:
+           self.config['field.clim']=self.config['field.cvals'][0],self.config['field.cvals'][-1]
+
+    args['vmin'],args['vmax']=self.config['field.clim']
 
 #    if self.config['field.linecolors']:
 #      args['colors']=self.config['field.linecolors']
@@ -526,6 +480,11 @@ class Vis(visCfg):
     if self.config['field.extend']:
       args['extend']=self.config['field.extend']
 
+    args['zorder']=self.config['plot.zorder']
+    plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
+    args['label']=plabel
+    print('FIELD zorder=',args['zorder'])
+
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
       self.handles['mappable']+=[meth(x,y,v,**args)]
     elif self.config['field.plot'] in ('contour','contourf'):
@@ -534,8 +493,13 @@ class Vis(visCfg):
        if np.ma.isMA(x): x[x.mask]=x.mean()
        if np.ma.isMA(y): y[y.mask]=y.mean()
 
-       if self.config['field.cvals'] is False: vals=20
-       else: vals=self.config['field.cvals']
+#       if self.config['field.cvals'] is False: vals=20
+#       else: vals=self.config['field.cvals']
+       if self.config['field.cvals'] is False:
+         self.config['field.cvals']=np.linspace(v.min(),v.max(),20)
+
+       vals=self.config['field.cvals']
+
        self.handles['mappable']+=[meth(x,y,v,vals,**args)]
 
 
@@ -545,7 +509,11 @@ class Vis(visCfg):
       ny,nx=v.shape
       x,y=np.meshgrid(np.arange(nx,dtype=v.dtype),np.arange(ny,dtype=v.dtype))
 
-####    di,dj=self.config['vfield.dij']
+
+    # rotate u,v to projection angle:
+    if hasattr(self,'map'):# and self.map:
+###      print u.shape,v.shape,x.shape,y.shape
+      u,v=self.map.rotate_vector(u,v,x,y)
 
     x,y=self._convCoord(x,y)
 
@@ -565,7 +533,13 @@ class Vis(visCfg):
     else:
       args=x[m],y[m],u[m],v[m]
 
-    self.handles['quiver']+=[self.ax.quiver(*args,**self.config['vfield.options'])]
+    plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
+    kargs={}
+    kargs['label']=plabel
+    kargs['zorder']=self.config['plot.zorder']
+    kargs.update(self.config['vfield.options'])
+    self.handles['quiver']+=[self.ax.quiver(*args,**kargs)]
+    ########self.handles['quiver']+=[self.ax.quiver(*args,**self.config['vfield.options'])]
 
     X,Y,U=self.config['vfield.key_XYU']
     if U:
@@ -581,6 +555,9 @@ class Vis(visCfg):
       opts=self.config['colorbar.options']
       w,h=self.config['colorbar.ax_position'][2:]
       if w>h: opts['orientation']='horizontal'
+      else: opts['orientation']='vertical'
+##      print w,h, opts['orientation'], self.config['colorbar.ax_position']
+##      print '----'*10
       try:
         self.cb=pl.colorbar(self.handles['mappable'][-1],cax=self.cbax,**opts)
         if  self.cbbg: self.cbbg.set(visible=True)
@@ -595,16 +572,24 @@ class Vis(visCfg):
 #      args=self.config['d1_line.options']
 #      self.handles['d1']+=self.ax.plot(y,**args)
 #    else:
+
+    plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
+
     if 1:
       plt=self.config['d1.plot']
 
       if  plt=='fill':
         args=self.config['d1_fill.options']
+        args['label']=plabel
+        args['zorder']=self.config['plot.zorder']
         x,y=self._convCoord(x,y)
+        print('FILL zorder=',args['zorder'])
         self.handles['d1']+=[self.ax.fill(x,y,**args)]
 
       elif  plt=='fill_between':
         args=self.config['d1_fill.options']
+        args['label']=plabel
+        args['zorder']=self.config['plot.zorder']
 
         y0=self.config['d1.y0']
         if y0=='min': Y0=self.ax.get_ylim()[0]
@@ -616,6 +601,8 @@ class Vis(visCfg):
 
       elif plt=='plot':
         args=self.config['d1_line.options']
+        args['label']=plabel
+        args['zorder']=self.config['plot.zorder']
         x,y=self._convCoord(x,y)
         self.handles['d1']+=[self.ax.plot(x,y,**args)]
 
@@ -644,17 +631,17 @@ class Data(Vis):
     self.v=None
     self.msg=''
     self.extra=[]
-    self.alias=''
+    self.label=''
 
     if len(args)==1: self.v=args[0]
     if len(args)==2: self.x,self.v=args
     elif len(args)==3: self.x,self.y,self.v=args
     elif len(args)>3:
-      print 'bad len(args) !!'
-   
+      print('bad len(args) !!')
+
 
     for k in kargs.keys():
-      setattr(self,k,kargs[k]) 
+      setattr(self,k,kargs[k])
 
     self.info={}
     for k in ('x','y','d','z','t','tnum','v'):
@@ -667,16 +654,20 @@ class Data(Vis):
   def show(self):
     for i in ['x','y','d','z','t','tnum']:
       a=getattr(self,i)
-      try: print '%5s shape=%12s size=%d'%(i,str(a.shape),a.size)
-      except: print '%5s %s'%(i,str(a))
+      try: print('%5s shape=%12s size=%d'%(i,str(a.shape),a.size))
+      except: print('%5s %s'%(i,str(a)))
 
     if not self.msg: msg='EMPTY'
     else: msg=self.msg
-    print ' == msg == %s'%msg
+    print(' == msg == %s'%msg)
 
   def plot(self,coords='auto',proj='auto',labels=True,extras=True,isExtra=0,**kargs):
+    print('== plotting ... '+self.label+' zorder= %.2f'%self.config['plot.zorder'])
     ax=kargs.pop('ax',None)
+    cbax=kargs.pop('cbax',None)
+
     if ax: self.ax=ax
+    if cbax: self.cbax=cbax
 
     parent=kargs.pop('inherit',0)
     if parent:
@@ -714,7 +705,7 @@ class Data(Vis):
         elif not self.tnum is None and (self.tnum.ndim==2 or self.tnum.size==vshape[1]): x,xname=self.tnum,'tnum'
         elif not self.y    is None and (self.y.ndim==2    or self.y.size==vshape[1]):    x,xname=self.y,'y'
 
-        if   not self.y is None and (self.y.ndim==2 or self.y.size==vshape[0]):  y,yname=self.y,'y'
+        if   xname!='y' and not self.y is None and (self.y.ndim==2 or self.y.size==vshape[0]):  y,yname=self.y,'y'
         elif not self.z is None and (self.z.ndim==2 or self.z.size==vshape[0]):  y,yname=self.z,'z'
 
       elif ndim==1:
@@ -733,25 +724,33 @@ class Data(Vis):
     elif proj=='auto': proj=False
 
 
+    try:
+      isFig=pl.fignum_exists(self.fig.number)
+      isAxFig=pl.fignum_exists(self.ax.figure.number)
+    except:
+      isFig=True
+      isAxFig=True
 
-    if hasattr(self,'fig') and pl.fignum_exists(self.fig.number):
+###    print hasattr(self,'fig'), isFig
+    if hasattr(self,'fig') and isFig:
       if isExtra: pass
       else:
-        if debug_lev==2: print ' -> will clear axes'
+        if debug_lev==2: print(' -> will clear axes')
         self.clear_axes()
     else:
-      if hasattr(self,'ax') and pl.fignum_exists(self.ax.figure.number):
-        if debug_lev==2: print ' -> will use previous ax'
-        self.init_figure(ax=self.ax)
+      if hasattr(self,'ax') and isAxFig:
+        if debug_lev==2: print(' -> will use previous ax')
+        if hasattr(self,'cbax'): self.init_figure(ax=self.ax,cbax=self.cbax)
+        else: self.init_figure(ax=self.ax)
       else:
-        if debug_lev==2: print ' -> will create new fig'
+        if debug_lev==2: print(' -> will create new fig')
         self.init_figure()
 
     if proj and not isExtra:
       if not hasattr(self,'map') or self.map_info_get()!=self.map_info_current:
         # make a new projection:
         if not self.config['axes.axis'] and not x is None: self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
-        if debug_lev==2: print ' -> new projection needed'
+        if debug_lev==2: print(' -> new projection needed')
         self.init_projection(debug_level=debug_lev)
 ###        useProj=1
 
@@ -773,19 +772,19 @@ class Data(Vis):
 
 
     # vifield, 1d or 2d
-    if isinstance(self.v,tuple):
-      if debug_lev==2: print ' -> will draw vfield'
-      self.draw_vector_field(x,y,self.v[0],self.v[1])
+    if np.iscomplexobj(self.v):
+      if debug_lev==2: print(' -> will draw vfield')
+      self.draw_vector_field(x,y,np.real(self.v),np.imag(self.v))
 
     # sclar:
     else:
       if ndim==2:
-        if debug_lev==2: print ' -> will draw 2d'
+        if debug_lev==2: print(' -> will draw 2d')
         self.draw_scalar_field(x,y,self.v)
         if not isExtra: self.draw_colorbar()
 
       elif ndim==1:
-        if debug_lev==2: print ' -> will draw 1d'
+        if debug_lev==2: print(' -> will draw 1d')
         self.draw_1d(x,y)
 
     # add labels:
@@ -815,14 +814,14 @@ class Data(Vis):
 
 
     if proj and not isExtra:
-      if debug_lev==2: print ' -> will draw projection', self.info['v']
+      if debug_lev==2: print(' -> will draw projection', self.info['v'])
       self.draw_projection()
 
 
     if self.extra and extras:
       for e in self.extra:
         e.inherit(self)
-        if debug_lev==2: print ' -> will plot extras'
+        if debug_lev==2: print(' -> will plot extras')
         e.plot(isExtra=1,debug_level=debug_lev)
 
 #      for e in self.extra:
@@ -837,3 +836,93 @@ class Data(Vis):
 #
 #        if debug_lev==2: print ' -> will plot extras'
 #        e.plot(labels=False,isExtra=1)
+
+  def extra_find(self,lab=None):
+    '''
+    find extra obj by label in self.label
+    '''
+
+    if lab:
+      labs=[i.label for i in self.extra]
+      import fnmatch
+      m=fnmatch.filter(labs,lab)
+      return [self.extra[labs.index(i)] for i in m] # warning: labels must be different
+    else:
+      return {i.label:i for i in self.extra}
+
+
+class MData:##################(Data):
+  def __init__(self,obs,warnings=[]):
+    self._data=obs
+
+    self.errors=cb.unique([i.msg for i in obs])
+    self.warnings=cb.unique(warnings)
+
+    # remove empty:
+    self.errors=[i for i in self.errors if len(i)]
+    self.warnings=[i for i in self.warnings if len(i)]
+
+#    self.msg=[]
+#    for i in obs:
+#      self.msg+=i.msg.split('\n')
+#
+#    # remoe repeated messages:
+#    self.msg=cb.unique(self.msg)
+
+    '''
+    self.__dict__.update(obs[0].__dict__)
+
+    # same config, also for extras, which should have the same len (or less!)
+    for i in obs[1:]:
+      i.config=obs[0].config
+# not for extras ... test !
+#      for j,e in enumerate(i.extra):
+#        e.config=obs[0].extra[j].config
+
+    #self.extra+=obs[1:] # shoud not be used cos change is done in plce
+    # and self[0].extra will also be affected! thus:
+    self.extra=self.extra+obs[1:]
+    '''
+
+  def plot(self,**kargs):
+###    for i in self:
+###      print i.config['plot.zorder']
+
+    self[0].plot(**kargs)
+
+    for i in self[1:]:
+      i.plot(inherit=self[0],**kargs)
+
+    return
+
+    kargs['isExtra']=1
+#    kargs['debug_level']=2
+    for i in self[1:]:
+      i.inherit(self[0])
+      i.plot(**kargs)
+
+  def find(self,lab=None):
+    O=[]
+    for i in self:
+      O+=[i]+i.extra
+
+    if not lab: return O
+
+    import fnmatch
+    labs=[i.label for i in O]
+    if len(cb.unique(labs))==len(labs):
+      m=fnmatch.filter(labs,lab)
+      return [O[labs.index(i)] for i in m]
+    else: # allowing repeated labels:
+      out=[]
+      for i in range(len(O)):
+        if fnmatch.filter([labs[i]],lab): out+=[O[i]]
+
+      return out
+
+
+  def __getitem__(self,i):
+    return self._data[i]
+
+  def __len__(self): return len(self._data)
+

@@ -33,7 +33,7 @@ login LOGIN
 password PASSWORD\n
 To get access to the data, check the site:
 http://www.myocean.eu'''
-  print msg
+  print(msg)
 
 url='data.ncof.co.uk'
 path_nrt='SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001/#YEAR#/sst' # from 2007
@@ -58,7 +58,7 @@ class OSTIAdownload:
     p=path.replace('#YEAR#','%d'%year)
 ############    if version==1: p=p.replace('composite','Composite') #  sick !!
 
-    print 'entering folder %s'%p
+    print('entering folder %s'%p)
     res=''
     try:
       self.f.cwd(p)
@@ -68,16 +68,16 @@ class OSTIAdownload:
   def list(self,year,type):#######level=3,version=2):
     msg=self.goto(year,type)###########level,version)
     if msg:
-      print msh
+      print(msh)
       return
 
     res=self.f.nlst()
-    for r in res: print r
+    for r in res: print(r)
 
   def destination_folder(self,year,type,gen=True):##level=3,version=2,gen=True):
     dest=os.path.join(self.dest,'%d'%year,'%s'%type)#####level_%d_version_%d'%(level,version))
     if gen and not os.path.isdir(dest):
-        print 'creating folder %s'%dest
+        print('creating folder %s'%dest)
         os.makedirs(dest)
 
     return dest
@@ -85,7 +85,7 @@ class OSTIAdownload:
   def download(self,year,type):##########level=3,version=2):
     msg=self.goto(year,type)#########level,version)
     if msg:
-      print msg
+      print(msg)
       return
 
     files=self.f.nlst('*.nc')
@@ -94,9 +94,9 @@ class OSTIAdownload:
       destname=os.path.join(self.destination_folder(year,type),r)
 
       if os.path.isfile(destname):
-        print 'file %s already exists'%destname
+        print('file %s already exists'%destname)
       else:
-        print 'downloading %s'%r
+        print('downloading %s'%r)
         dest=open(destname,'wb')
         self.f.retrbinary('RETR '+r,dest.write)
 
@@ -115,7 +115,7 @@ class OSTIA:
     c=-1
     for f in files:
       c+=1
-      print ' -- extracting from %s'%f
+      print(' -- extracting from %s'%f)
       if c==0:
         lon=netcdf.use(f,'lon')
         lat=netcdf.use(f,'lat')
@@ -153,9 +153,9 @@ if __name__=='__main__':
     year=int(sys.argv[1])
     type=sys.argv[2]
   except:
-    print 'Usage: python ostia.py YEAR TYPE'
-    print 'TYPE: nrt or rep'
-    print 'Example: python ostia.py 2013 nrt'
+    print('Usage: python ostia.py YEAR TYPE')
+    print('TYPE: nrt or rep')
+    print('Example: python ostia.py 2013 nrt')
     sys.exit()
 
   a.download(year,type)#########level,version)

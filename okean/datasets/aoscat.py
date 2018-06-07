@@ -19,7 +19,7 @@ def source(date):
 
 def read_wind(grd,date,ij=False):
   f=source(date)
-  print '-- reading from %s'%f
+  print('-- reading from %s'%f)
   time=netcdf.nctime(f,'time')
 
   try:
@@ -36,9 +36,9 @@ def read_wind(grd,date,ij=False):
     xl0=np.asarray((g.lon.min(),g.lon.max()))
     xl=np.asarray((g.lon.min(),g.lon.max()))
     if np.any(xl>180) or np.any(xl<-180):
-      print 'ERROR: grid is supposed to be -180<x<180'
-      print 'Can be implemented with mpl_toolkits.basemap.shiftgrid ... TODO'
-      print '(http://matplotlib.org/basemap/api/basemap_api.html)'
+      print('ERROR: grid is supposed to be -180<x<180')
+      print('Can be implemented with mpl_toolkits.basemap.shiftgrid ... TODO')
+      print('(http://matplotlib.org/basemap/api/basemap_api.html)')
       return
 
     yl=g.lat.min(),g.lat.max()
@@ -137,7 +137,7 @@ def make_frc(frcname,grd,date0,date1):
     gen_frc(frcname,grd)
   else:
     last=netcdf.nctime(frcname,'wind_time',wind_time=-1)
-    print '-->found file %s with last time %s'%(frcname,last.isoformat())
+    print('-->found file %s with last time %s'%(frcname,last.isoformat()))
     date0=last+datetime.timedelta(1/4.) # 6h data
 
   dates=[date0]
@@ -161,11 +161,11 @@ def make_frc(frcname,grd,date0,date1):
     V=calc.griddata(x,y,v,g.lon,g.lat,extrap=True)
 
      # rotate wind,
-    print ' --> rot U,V'
+    print(' --> rot U,V')
     angle=g.use('angle')
     U,V=calc.rot2d(U,V,angle)
 
-    print '  filling %s'%d.isoformat(' ')
+    print('  filling %s'%d.isoformat(' '))
     fill_frc(frcname,d,U,V)
 
 
@@ -178,5 +178,5 @@ if __name__=='__main__':
     date1=dateu.parse_date(sys.argv[4])
     make_frc(fname,grd,date0,date1)
   else:
-     print 'USAGE: python aoscat.py roms_grd.nc  wind_frc.nc 20100101 20110101'
+     print('USAGE: python aoscat.py roms_grd.nc  wind_frc.nc 20100101 20110101')
 

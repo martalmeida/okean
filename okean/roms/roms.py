@@ -787,8 +787,8 @@ class His(Common,Derived):
     if 'd' in coords:
       d=calc.distance(x,y)
       if d[-1]-d[0]>1e4:
-        d=d/1000.
-        dunits='km'
+        d=d  #d/1000.
+        dunits'm'   #='km'
       else: dunits='m'
 
       if v.ndim==2: d=np.tile(d,(v.shape[0],1))
@@ -854,8 +854,8 @@ class His(Common,Derived):
     if 'd' in coords:
       d=calc.distance(x,y)
       if d[-1]-d[0]>1e4:
-        d=d/1000.
-        dunits='km'
+        d=d  #d/1000.
+        dunits'm'   #='km'
       else: dunits='m'
 
       if v.ndim==2: d=np.tile(d,(v.shape[0],1))
@@ -924,16 +924,16 @@ class His(Common,Derived):
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
-         out.x=x/1000.
-         out.info['x']=dict(name='Distance',units='km')
+         out.x=x #/1000.
+         out.info['x']=dict(name='Distance',units='m')
          
     if 'y' in coords:
        if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
-         out.y=y/1000.
-         out.info['y']=dict(name='Distance',units='km')
+         out.y=y#/1000.
+         out.info['y']=dict(name='Distance',units='m')
 
     if 't' in coords and self.hast(varname): out.t=self.time[time]
 
@@ -989,16 +989,16 @@ class His(Common,Derived):
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
-         out.x=x/1000.
-         out.info['x']=dict(name='Distance',units='km')
+         out.x=x#/1000.
+         out.info['x']=dict(name='Distance',units='m')
 
     if 'y' in coords:
        if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
-         out.y=y/1000.
-         out.info['y']=dict(name='Distance',units='km')
+         out.y=y#/1000.
+         out.info['y']=dict(name='Distance',units='m')
 
     if 'z' in coords:
       out.z=ind+np.zeros(out.v.shape)
@@ -1250,16 +1250,16 @@ class His(Common,Derived):
          out.x=x
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
        else:
-         out.x=x/1000.
-         out.info['x']=dict(name='Distance',units='km')
+         out.x=x#/1000.
+         out.info['x']=dict(name='Distance',units='m')
 
     if 'y' in coords:
        if self.grid.is_spherical:
          out.y=y
          out.info['y']=dict(name='Latitude',units=r'$\^o$N')
        else:
-         out.y=y/1000.
-         out.info['y']=dict(name='Distance',units='km')
+         out.y=y#/1000.
+         out.info['y']=dict(name='Distance',units='m')
 
     if 'z' in coords:
       # makes no sense... v is the depth!
@@ -1381,16 +1381,16 @@ class His(Common,Derived):
       if self.grid.is_spherical:
          out.info['x']=dict(name='Longitude',units=r'$\^o$E')
       else:
-        out.x=x/1000.
-        out.info['x']=dict(name='X-position',units='km')
+        out.x=x#/1000.
+        out.info['x']=dict(name='X-position',units='m')
 
     if 'y' in coords:
       out.y=lat[i,j]
       if self.grid.is_spherical:
         out.info['y']=dict(name='Latitude',units=r'$\^o$N')
       else:
-        out.y=y/1000.
-        out.info['y']=dict(name='Y-position',units='km')
+        out.y=y#/1000.
+        out.info['y']=dict(name='Y-position',units='m')
 
 
     out.coordsReq=','.join(sorted(coords))

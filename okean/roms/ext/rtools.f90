@@ -35,7 +35,7 @@ c f2py -c rtools.f -m rtools --fcompiler=pg
       real ( kind=8 ) :: z_w(0:Nr,Ny,Nx),h(Ny,Nx),zeta(Ny,Nx),
      &     z_r(Nr,Ny,Nx),hc,tts,ttb, v(N,Ny,Nx), s(Ny,Nx),
      &     lev(Ny,Nx), interp_lin,interp_spl
-      logical :: SN  ! nans near surface
+      logical :: SN  ! masked near surface
       logical :: SPL ! use spline instead of linear interpolation
 
 Cf2py intent(out) s

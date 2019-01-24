@@ -314,10 +314,11 @@ def cfsr_file_data(files,quiet=False):
     else:
       print('time is NOT OK. Please check !!')
       return
-  # ROMS convention: positive upward
+  # ROMS (agrif, used to be!) convention: positive upward
   out['radlw']=Data(x,y,-lw_net,'W m-2',info='positive upward')
   # downward lw:
   out['dlwrf']=Data(x,y,-lw_down,'W m-2',info='negative... downward')
+  # signs convention is better explained in wrf.py
 
 
   # U and V wind speed 10m

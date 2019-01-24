@@ -1,6 +1,5 @@
 from glob import glob
 import os
-from string import join as sjoin
 import numpy as np
 from okean import calc
 
@@ -27,7 +26,7 @@ def parse_locations(files):
       for j in range(len(tmp)):
         if tmp[j].isdigit(): break
 
-      country=sjoin(tmp[:j])
+      country=' '.join(tmp[:j])
 
       lat=float(tmp[j])+float(tmp[j+1])/60.
       slat=tmp[j+2]

@@ -82,7 +82,11 @@ def varnames(fname,interface='auto'):
 
 def num2date(tnum,tunits,calendar='standard'):
   from netcdftime import utime
-  return utime(tunits,calendar).num2date(tnum)
+
+  #return utime(tunits,calendar).num2date(tnum)
+  # for numpy 1.15.3 there are problems with masked arrays without mask!
+  # for some reason, removing mask or dividing by 1 solves the problem!!!
+  return utime(tunits,calendar).num2date(tnum/1)
 
 def date2num(tdate,tunits,calendar='standard'):
   from netcdftime import utime
@@ -105,6 +109,7 @@ def nctime(filename,varname,interface='auto',**kargs):
 
   units=units.replace('T',' ').replace('Z',' ')
   units=' '.join(units.split())
+
   return num2date(time,units,cal)
 
 

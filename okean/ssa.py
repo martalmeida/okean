@@ -1,9 +1,6 @@
-from numpy import zeros, array, outer, rot90, mean, diag, unique, any, sum
 import numpy as np
 from numpy.linalg import svd
-
 import pylab as pl
-
 
 class ssa:
   '''
@@ -52,7 +49,7 @@ class ssa:
     Load text data file to be used by SSA
     '''
     s=open(self.fname).readlines()
-    self.__data=array(map(float,s))
+    self.__data=np.array(map(float,s))
     self.range=0,len(self.__data)
     self.dtype=self.__data.dtype
 
@@ -95,7 +92,7 @@ class ssa:
       return
 
     K=N-win+1
-    X=zeros((win,K),self.dtype)
+    X=np.zeros((win,K),self.dtype)
     for j in range(K):
       for i in range(win):
          X[i,j]=data[i+j]
@@ -128,9 +125,9 @@ class ssa:
     Last  = min(L,K) # L, always
     Kast  = max(L,K) # K, always
 
-    A=zeros((Last,Kast,Last),self.dtype)
+    A=np.zeros((Last,Kast,Last),self.dtype)
     for i in range(Last):
-      A[:,:,i] = self.svd_lambda[i]*outer(self.svd_U[:,i],self.svd_V[:,i])
+      A[:,:,i] = self.svd_lambda[i]*np.outer(self.svd_U[:,i],self.svd_V[:,i])
 
     self.group_A=A
 
@@ -147,18 +144,18 @@ class ssa:
     F=self.data()
     Nt=len(F)
 
-    G=zeros((Nt,Last),self.dtype)
+    G=np.zeros((Nt,Last),self.dtype)
     for i in range(Last):
       aux=self.group_A[:,:,i]
       if L<K: # always !
-        aux=rot90(aux)
+        aux=np.rot90(aux)
       else:
-        aux=rot90(aux.T)
+        aux=np.rot90(aux.T)
 
       j=-1
       for n in range(-Kast+1,Last):
         j+=1
-        G[j,i] = mean(diag(aux,n))
+        G[j,i] = np.mean(np.diag(aux,n))
 
     self.diagAvg=G
 
@@ -207,13 +204,13 @@ class ssa:
     F=self.data()
     Nt=len(F)
 
-    eigentriples=unique(eigentriples)
+    eigentriples=np.unique(eigentriples)
     if any(map(lambda i: i>Last or i<0, eigentriples)):
        print('error: eigentriples indice must be < %d' % Last)
        return
 
     auxi=self.diagAvg[:,eigentriples]
-    FR    = sum(auxi,1)
+    FR    = np.sum(auxi,1)
     Resid = F-FR
 
     self.eigentriples = eigentriples

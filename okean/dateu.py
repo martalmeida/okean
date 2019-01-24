@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 '''dates utilities'''
 
+try: basestring
+except NameError: basestring=str # for python 3
+
 import datetime
 import operator
 
@@ -86,7 +89,7 @@ def next_date(date,n=1,samefmt=True):
 
 
 def next_month(y,m,n=1):
-  y1,m1=y+(m+n)/12,(m+n)%12
+  y1,m1=y+(m+n)//12,(m+n)%12
   if m1==0: y1,m1=y1-1,12
   return y1,m1
 
@@ -157,7 +160,10 @@ def month_names(m,lang='en',abb=True):
   m is the month number (Jan is 1)
   '''
 
-  mpt='Janeiro','Fevereiro',unicode('Março','utf8'),'Abril','Maio','Junho',\
+  try:    pt_mar=unicode('Março','utf8') # python 2
+  except: pt_mar='Março'
+
+  mpt='Janeiro','Fevereiro',pt_mar,'Abril','Maio','Junho',\
       'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
 
   men='January','February','March','April','May','June','July','August',\

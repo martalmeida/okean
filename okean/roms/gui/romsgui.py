@@ -1,5 +1,16 @@
-import Tkinter as tk
-import tkFileDialog
+try:
+  import Tkinter as tk
+  import tkFileDialog as filedialog
+  import tkMessageBox as messagebox
+except:
+  import tkinter as tk
+  from tkinter import filedialog
+  from tkinter import messagebox
+  
+
+try: basestring
+except: basestring=str
+
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
@@ -8,7 +19,10 @@ import pylab
 from mpl_toolkits.basemap import Basemap
 from mpl_toolkits. basemap import cm as basemap_cm
 
-from okean import calc, netcdf, ticks, cookbook as cbk, pl_tools, locations
+from collections import OrderedDict
+from . import gui_tools
+
+from okean import calc, netcdf, ticks, pl_tools, locations
 
 from okean.roms import roms
 #import roms
@@ -37,7 +51,7 @@ def readrc(rcname='romsguirc'):
     return v
     
 
-  res=cbk.odict()
+  res=OrderedDict()
   for sec in rc.sections():
     tmp=dict(rc.items(sec))
     for i in tmp.keys():
@@ -112,7 +126,7 @@ def get_colormaps():
    'qualitative': 'Accent Dark2 Paired Pastel1 Pastel2 Set1 Set2 Set3'.split()}
 
 
-  res=cbk.odict()
+  res=OrderedDict()
   res['matlab like']=[]
   res['gist']=[]
   res['colorbrewer']={'sequencial':[],'diverging':[],'qualitative':[]}
@@ -168,17 +182,21 @@ def get_derived(derived_cfg='auto'):
   if derived_cfg=='auto':
     p=os.path.dirname(os.path.abspath(__file__))
     derived_cfg=os.path.join(p,'romsgui.derived')
-    
-  import ConfigParser
+
+  try:
+    import ConfigParser
+  except:
+    import configparser as ConfigParser
+
   c=ConfigParser.RawConfigParser()
   c.read(derived_cfg)
 
-  res=cbk.odict()
-  req=cbk.odict() # required vars
+  res=OrderedDict()
+  req=OrderedDict() # required vars
   vnames=c.sections()
   for v in vnames:
     tmp=dict(c.items(v))
-    if tmp.has_key('req'):
+    if 'req' in tmp:
       req[v]=tmp['req'].split(',')
       tmp.pop('req')
 
@@ -473,7 +491,7 @@ class rgui:
 
 
     optmenu.add_separator()
-    optmenu.add_checkbutton(label='zslice surf NaNs',command=self.show,variable=self.options['zslice_SN'])
+    optmenu.add_checkbutton(label='zslice surf masked',command=self.show,variable=self.options['zslice_SN'])
 
 
     # vertical slice number of points:
@@ -557,7 +575,8 @@ class rgui:
     # frame at center (Figure):
     f = Figure(frameon=True,facecolor=self.bg)
     canvas = FigureCanvasTkAgg(f,master=root)
-    canvas.show()
+#    canvas.show()
+    canvas.draw()
     canvas.get_tk_widget().place(relx=Ll,rely=Ht,relwidth=Lc,relheight=Hm)
 #####    canvas.get_tk_widget().pack()
     self.figure=f
@@ -808,7 +827,6 @@ class rgui:
 
 # NEW
     y=10*h
-    import gui_tools
     gtools=gui_tools.rgui_tools(self.widgets['fright'])
     gtools['base'].place(relx=relw/2,y=y,anchor='n')#,relwidth=relw,height=h
 
@@ -1146,7 +1164,7 @@ class rgui:
 
     zd=zd.tolist()
 
-    if self.files.has_key('His'):
+    if 'His' in self.files:
       ns=range(self.files['His'].S_RHO)
     else:
       ns=[]
@@ -1302,7 +1320,7 @@ class rgui:
     self.chtime(-1)
 
   def time_show(self):
-     if self.files.has_key('His'):
+     if 'His' in self.files:
        self.reset_file('his')
 ##       self.widgets['ttime'].config(text=self.files['His'].TIME-1)
        self.widgets['ttime'].config(text=self.files['His'][0].TIME-1)
@@ -1311,7 +1329,7 @@ class rgui:
 
   def __set_grid_lims(self,show=False,lims=False):
     if lims is False:
-      grd=self.files['Grid']
+      grd=self.files['Grid'][0]
       lonlims=grd.lon.min(),grd.lon.max()
       latlims=grd.lat.min(),grd.lat.max()
     else:
@@ -1375,7 +1393,7 @@ class rgui:
      else:  return s+' <'+f+'>'
 
     if not f:
-      f=tkFileDialog.askopenfilename(parent=self.root,title='Choose a file',
+      f=filedialog.askopenfilename(parent=self.root,title='Choose a file',
          initialdir='/home/mma/longRun_down/spring_2001/',
          defaultextension = ".nc", filetypes=[("All Types", ".*"),
          ("NC", ".nc")])
@@ -1408,9 +1426,9 @@ class rgui:
       self.files['his']=f
       self.files['his_finfo']=finfo(f)
 
-      if netcdf.fatt(f).has_key('grd_file') and os.path.isfile(netcdf.fatt(f,'grd_file')):
+      if 'grd_file' in netcdf.fatt(f) and os.path.isfile(netcdf.fatt(f,'grd_file')):
         grd=netcdf.fatt(f,'grd_file')
-      elif self.files.has_key('grid') and os.path.isfile(self.files['grid']):
+      elif 'grid' in self.files and os.path.isfile(self.files['grid']):
         grd=self.files['grid']
       else:
         grd=''
@@ -1445,12 +1463,10 @@ class rgui:
 
   def reset_file(self,type):
     Type=type[0].upper()+type[1:]
-    ob=eval('roms.'+Type)
-    if type!='grid' and self.files.has_key('grid'):
-##      self.files[Type]=ob(self.files[type],grd=self.files['grid'])
-
-      ob=eval('roms.M'+Type)
-      self.files[Type]=ob(self.files[type])###,grd=self.files['grid'])
+    #ob=eval('roms.'+Type)
+    ob=eval('roms.M'+Type)
+    if type!='grid' and 'grid' in self.files:
+      self.files[Type]=ob(self.files[type],grd=self.files['grid'])
     else:
       self.files[Type]=ob(self.files[type])
 
@@ -1514,7 +1530,7 @@ class rgui:
     self.swapp['ftitle']={}
     for v in vars:
       f=self.variables[v]
-      if not self.swapp['ftitle'].has_key(f):
+      if not f in self.swapp['ftitle']:
         print(f,v)
         try:
           ftitle=netcdf.fatt(f,'title')
@@ -1624,7 +1640,7 @@ class rgui:
       return False
 
   def __init_depths(self):#auto_hvals(self):
-    h=self.files['Grid'].use('h')
+    h=self.files['Grid'][0].use('h')
 
     # set isobaths values:
     if  self.widgets['hvals'].get()=='auto':
@@ -1694,11 +1710,10 @@ class rgui:
       v.selection_set(ind)
 
 
-  def __show_vinfo(self,varname=False):
+  def __show_vinfo(self,f,varname=False):
     if not varname:  varname = self.__get_varname()
     ########f=self.variables[varname] will not work cos of the derived vars.... maybe fix this later !!! TODO
-    f=self.files['his']
-    
+    #f=self.files['his']
 
     info=self.swapp['vinfo'][varname]
     ftitle=self.swapp['ftitle'][f]
@@ -1731,88 +1746,88 @@ class rgui:
 
     return False
 
-  def __start_proj(self):
-    # current proj settings:
-    lonlims,latlims=self.__get_grid_lims()
-    resolution=self.options['coastline_res'].get()[0]
-    if resolution=='n': resolution='l' # when using none
+##  def __start_proj(self):
+##    # current proj settings:
+##    lonlims,latlims=self.__get_grid_lims()
+##    resolution=self.options['coastline_res'].get()[0]
+##    if resolution=='n': resolution='l' # when using none
+##
+##    curr_proj={}
+##    curr_proj['proj']=self.options['projection'].get()
+##    curr_proj['resolution']=resolution
+##    curr_proj['lonlims']=lonlims
+##    curr_proj['latlims']=latlims
+##
+##    if self.swapp['last_proj']!=curr_proj:
+##      self.swapp['last_proj']=curr_proj
+##
+##      if curr_proj['proj'] in ['lcc','stere']:
+##        # setup lambert conformal basemap.
+##        # lat_1 is first standard parallel.
+##        # lat_2 is second standard parallel (defaults to lat_1).
+##        # lon_0,lat_0 is central point.
+##        r10=6380e3*np.cos(latlims[0]*np.pi/180)
+##        r11=6380e3*np.cos(latlims[1]*np.pi/180)
+##        r1=np.max([r10,r11])
+##        dx=(lonlims[1]-lonlims[0])*np.pi/180
+##        dy=(latlims[1]-latlims[0])*np.pi/180
+##        w=r1*dx
+##        h=6380e3*dy*1.2
+##        map = Basemap(projection=curr_proj['proj'],
+##                      resolution=curr_proj['resolution'],
+##                      lon_0=0.5*(lonlims[0]+lonlims[1]),
+##                      lat_0=0.5*(latlims[0]+latlims[1]),
+##                      lat_1=0.5*(latlims[0]+latlims[1]),
+##                      width=w,
+##                      height=h)
+##
+##      elif True:#curr_proj['proj']=='merc':
+##        map = Basemap(projection=curr_proj['proj'], #lat_ts=0.0,
+##                      resolution=curr_proj['resolution'],
+##                      urcrnrlon=lonlims[1], urcrnrlat=latlims[1],
+##                      llcrnrlon=lonlims[0], llcrnrlat=latlims[0],
+##                      lon_0=0.5*(lonlims[0]+lonlims[1]),
+##                      lat_0=0.5*(latlims[0]+latlims[1]))
+##      else: map=False
+##      self.map=map
+##
 
-    curr_proj={}
-    curr_proj['proj']=self.options['projection'].get()
-    curr_proj['resolution']=resolution
-    curr_proj['lonlims']=lonlims
-    curr_proj['latlims']=latlims
-
-    if self.swapp['last_proj']!=curr_proj:
-      self.swapp['last_proj']=curr_proj
-
-      if curr_proj['proj'] in ['lcc','stere']:
-        # setup lambert conformal basemap.
-        # lat_1 is first standard parallel.
-        # lat_2 is second standard parallel (defaults to lat_1).
-        # lon_0,lat_0 is central point.
-        r10=6380e3*np.cos(latlims[0]*np.pi/180)
-        r11=6380e3*np.cos(latlims[1]*np.pi/180)
-        r1=np.max([r10,r11])
-        dx=(lonlims[1]-lonlims[0])*np.pi/180
-        dy=(latlims[1]-latlims[0])*np.pi/180
-        w=r1*dx
-        h=6380e3*dy*1.2
-        map = Basemap(projection=curr_proj['proj'],
-                      resolution=curr_proj['resolution'],
-                      lon_0=0.5*(lonlims[0]+lonlims[1]),
-                      lat_0=0.5*(latlims[0]+latlims[1]),
-                      lat_1=0.5*(latlims[0]+latlims[1]),
-                      width=w,
-                      height=h)
-
-      elif True:#curr_proj['proj']=='merc':
-        map = Basemap(projection=curr_proj['proj'], #lat_ts=0.0,
-                      resolution=curr_proj['resolution'],
-                      urcrnrlon=lonlims[1], urcrnrlat=latlims[1],
-                      llcrnrlon=lonlims[0], llcrnrlat=latlims[0],
-                      lon_0=0.5*(lonlims[0]+lonlims[1]),
-                      lat_0=0.5*(latlims[0]+latlims[1]))
-      else: map=False
-      self.map=map
-
-
-  def _get_field(self,romsobj,varname,time,zlev,surf_nans):
+  def _get_field(self,romsobj,varname,time,zlev,surf_mask):
     if zlev>=0: zlev=int(zlev)
 
     if varname[0]=='*':
-      data=romsobj.slice_derived(varname[1:],zlev,time,surf_nans=surf_nans)
+      data=romsobj.slice_derived(varname[1:],zlev,time,surf_mask=surf_mask)
     else:
       if zlev>=0:
         data=romsobj.slicek(varname,zlev,time,msg=True)
       else:
-        data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        data=romsobj.slicez(varname,zlev,time,msg=True,surf_mask=surf_mask)
 
     curr_slice={}
     curr_slice['varname']   = varname
 #    curr_slice['romsobj']   = romsobj
     curr_slice['time']      = time
     curr_slice['zlev']      = zlev
-    if zlev<0:   curr_slice['zslice_SN'] = surf_nans
+    if zlev<0:   curr_slice['zslice_SN'] = surf_mask
 
     return data
 
 
-  def _get_vfield(self,romsobj,varname,time,zlev,surf_nans):
+  def _get_vfield(self,romsobj,varname,time,zlev,surf_mask):
     if varname in ('zeta','ubar','vbar'): vel_zlev='bar'
     else: vel_zlev=zlev
 
-    data=romsobj.sliceuv(vel_zlev,time,surf_nans=surf_nans)
+    data=romsobj.sliceuv(vel_zlev,time,surf_mask=surf_mask)
     return data
 
-  def __get_slice(self,romsobj,varname,time,zlev,surf_nans,currents=False):
+  def __get_slice(self,romsobj,varname,time,zlev,surf_mask,currents=False):
     curr_slice={}
     curr_slice['varname']   = varname
     curr_slice['romsobj']   = romsobj
     curr_slice['time']      = time
     curr_slice['zlev']      = zlev
 
-    if zlev<0:   curr_slice['zslice_SN'] = surf_nans
+    if zlev<0:   curr_slice['zslice_SN'] = surf_mask
     if currents: curr_slice['currents']  = True
 
     for i in range(len(self.swapp['last_slices'])):
@@ -1827,7 +1842,7 @@ class rgui:
     if zlev>=0: zlev=int(zlev)
     if varname[0]=='*':
       #x,y,z,v,msg=romsobj.slice_derived(varname[1:],zlev,time,msg=True,surf_nans=surf_nans)
-      data=romsobj.slice_derived(varname[1:],zlev,time,surf_nans=surf_nans)
+      data=romsobj.slice_derived(varname[1:],zlev,time,surf_mask=surf_mask)
       x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
     else:
       if zlev>=0:
@@ -1837,7 +1852,7 @@ class rgui:
         x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
       else:
         #x,y,z,v,msg=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
-        data=romsobj.slicez(varname,zlev,time,msg=True,surf_nans=surf_nans)
+        data=romsobj.slicez(varname,zlev,time,msg=True,surf_mask=surf_mask)
         return data
         x,y,z,v,msg=data.x,data.y,data.z,data.v,data.msg
 
@@ -1951,17 +1966,14 @@ class rgui:
     try: what=kargs['what']
     except: what=False
 
-    if not self.files.has_key('his') and  self.files.has_key('grid'): what='grid'
-
-    ######graf='contourf'
-    ######if kargs.has_key('graf'): graf=kargs['graf']
+    if not 'his' in self.files and  'grid' in self.files: what='grid'
 
     varname=''
     currents=False
     t0=pytime.time()
 
     print('MM1')
-    if what !='grid':
+    if True:#what !='grid':
       # varname, itime, zlevel:
       varname = self.__get_varname(derived=derived)
 
@@ -1974,7 +1986,12 @@ class rgui:
       self.swapp['last_varname']=varname
 
       #q=self.__get_romsobj(varname) isto j n pode ser usado devido as variaveis derived !!!
-      q=self.files['His']
+      if what!='grid':
+        q=self.files['His']
+        f=self.files['his']
+      else:
+        q=self.files['Grid']
+        f=self.files['grid']
 
       print('MM3')
       if not q:
@@ -1987,24 +2004,32 @@ class rgui:
 
       t0=pytime.time()
       # show v info:
-      self.__show_vinfo(varname)
+      self.__show_vinfo(f,varname)
 ###      print '1 vinfo===',pytime.time()-t0
       t0=pytime.time()
 
       # surface nans options for zslice:
-      surf_nans=int(self.options['zslice_SN'].get())
+      surf_mask=int(self.options['zslice_SN'].get())
 
-      # field:
-    #  data=self.__get_slice(q,varname,time,zlev,surf_nans,currents)
-      data=self._get_field(q,varname,time,zlev,surf_nans)
+      if what!='grid':
+        # field:
+      #  data=self.__get_slice(q,varname,time,zlev,surf_nans,currents)
+        data=self._get_field(q,varname,time,zlev,surf_mask)
 
-      # vfield:
-      dvec,svec=self.__get_vec()
-      if dvec!=0:
-        datav=self._get_vfield(q,varname,time,zlev,surf_nans)
-      else: datav=False
+        # vfield:
+        dvec,svec=self.__get_vec()
+        if dvec!=0:
+          datav=self._get_vfield(q,varname,time,zlev,surf_mask)
+        else: datav=False
+      else:
+        data=q.plot_data()
+#        x,y,v,mask=self.files['Grid'][0].vars()
+#        from okean import vis
+#        data=vis.Data(x,y,v)
+        data.errors=''
+        data.warnings=''
+        datav=False
 
-      print('MM4')
       #-------------------
 #      import roms
 #      #print self.files
@@ -2244,15 +2269,36 @@ class rgui:
     # bathy contours:
     ob=data.find('bathy')
     for o in ob:
-      o.config['field.cvals']=self.__get_hvals()
+      hvals=self.__get_hvals()
+      if not hvals: hvals=False
+      o.config['field.cvals']=hvals
       o.config['field.cmap']='k'
       o.config['field.linewidths']=.5
 
     # proj:
-    data[0].config['proj.name']=self.options['projection'].get()
+    if data[0].config['proj.name']=='auto':
+      data[0].config['proj.name']=self.options['projection'].get()
+    else:
+      self.options['projection'].set(data[0].config['proj.name'])
 
     lonlims,latlims=self.__get_grid_lims()
     data[0].config['axes.axis']=lonlims+latlims
+    # ------ proj options:
+    xlim,ylim=lonlims,latlims
+    lon_0=0.5*(xlim[0]+xlim[1])
+    lat_0=0.5*(ylim[0]+ylim[1])
+    dlat=(ylim[1]-ylim[0])
+    lat_1=lat_0-dlat/4.
+    lat_2=lat_0+dlat/4.
+
+    W=110*np.cos(lat_0*np.pi/180)*(xlim[1]-xlim[0])*1e3
+    H=110*(ylim[1]-ylim[0])*1e3
+    W*=1.3
+    H*=1.3
+    popt=data[0].config['proj.options']
+    for n,v in [('width',W),('height',H),('lon_0',lon_0),('lat_0',lat_0),('lat_1',lat_1),('lat_2',lat_2)]:
+      if n in popt: popt[n]=v
+    #--------------------
 
     resolution=self.options['coastline_res'].get()[0]
     if resolution=='n':
@@ -2276,7 +2322,8 @@ class rgui:
       data[0].fig.show()
     else:
       data.plot(ax=self.axes,cbax=self.cbar)
-      self.canvas.show()
+#      self.canvas.show()
+      self.canvas.draw()
 
     self.map=data[0].map
 
@@ -2611,14 +2658,13 @@ class rgui:
 
   def savefig(self,fname=False):
     if not fname:
-      import tkFileDialog
       Formats = (
       ('PNG','*.png'),
       ('Encapsulated PostScript','*.eps'),
       ('PostScript','*.ps'),
       ('PDF','*.pdf'))
 
-      fname = tkFileDialog.asksaveasfilename(
+      fname = filedialog.asksaveasfilename(
       parent=self.root,filetypes=Formats ,
       title="Save figure as...",
       defaultextension='.png')
@@ -2631,8 +2677,7 @@ class rgui:
     self.savefig(fname=self.swapp['last_savename'])
 
   def closegui(self):
-    import tkMessageBox
-    res=tkMessageBox.askokcancel(title='close romsgui?',
+    res=messagebox.askokcancel(title='close romsgui?',
                              message='are you sure you want to close?')
 
     if res:
@@ -2649,7 +2694,6 @@ class rgui:
       print(rGUIS)
 
   def __about(self):
-    import tkMessageBox
     msg='''
     Python romsgui
     Visualization interface for ocean model ROMS
@@ -2657,7 +2701,7 @@ class rgui:
     author: mma
     m.martalmeida@gmail.com
     '''
-    tkMessageBox.showinfo('python romsgui',msg)
+    messagebox.showinfo('python romsgui',msg)
 
   def __homepage(self):
     import webbrowser
@@ -2756,13 +2800,13 @@ class rgui:
   def interactive_hovmuller(self,chstate=True):   self.__interactive_tool('hovmuller',chstate)
 
   def __interactive_tool(self,tool,chstate):
-    if not self.files.has_key('His'): return
+    if not 'His' in self.files: return
 
     # stop any active tool:
     if self.active_tool and self.active_tool!=tool:  eval('self.interactive_'+self.active_tool)()
 
     # init tool cache data:
-    if not self.cache.has_key(tool):
+    if not tool in self.cache:
       self.cache[tool]={'obj':False}
 
     # button relief:

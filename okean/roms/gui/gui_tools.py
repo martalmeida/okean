@@ -1,4 +1,7 @@
-import Tkinter as tk
+try:
+  import Tkinter as tk
+except:
+  import tkinter as tk
 
 
 class bButton():

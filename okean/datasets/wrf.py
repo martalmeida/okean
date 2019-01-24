@@ -146,8 +146,12 @@ def wrf_file_data(file,quiet=False):
 
   # R humidity [kg/kg --> 0--1]
   if not quiet: print(' --> R humidity from QV at 2m')
-  wv=netcdf.use(file,'Q2') # water vapor mixing ratio at 2m
-  rhum=wv/air_sea.qsat(tair)
+  w=netcdf.use(file,'Q2') # water vapor mixing ratio at 2m
+  # RH=q/qs , q=specific humidity=mv/(md+mv)
+  # w=mv/md, mixing ratio
+  # thus q=w/(1+w)
+  q=w/(1+w)
+  rhum=q/air_sea.qsat(tair)
   rhum[rhum>1]=1
   out['rhum']=Data(x,y,rhum,'0--1')
 

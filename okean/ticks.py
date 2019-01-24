@@ -13,10 +13,6 @@ http://tog.acm.org/resources/GraphicsGems/
 
 Author homepage:
 http://www.glassner.com
-
-
-Martinho MA, oct2009
-mma@ua.pt
 '''
 
 import numpy as np
@@ -44,14 +40,14 @@ def nicenum(x,rnd):
   return nf*10**exp
 
 
-def loose_label(min,max,ntick=5,labels=False):
+def loose_label(vmin,vmax,ntick=5,labels=False):
   '''
   Label the data range from min to max loosely
   (tight method is similar)
 
   Inputs:
 
-  min, max: data range
+  vmin, vmax: data range
 
   ntick: desired number of tick marks (may not be real number of
          ticks returned
@@ -68,10 +64,12 @@ def loose_label(min,max,ntick=5,labels=False):
   ['2.00', '2.05', '2.10', '2.15', '2.20'])
   '''
 
-  range=nicenum(max-min,False)
+  if vmin==vmax: vmin,vmax=vmin-1,vmax+1
+ 
+  range=nicenum(vmax-vmin,False)
   d=nicenum(range/(ntick-1),True)
-  graphmin=np.floor(min/d)*d
-  graphmax=np.ceil(max/d)*d
+  graphmin=np.floor(vmin/d)*d
+  graphmax=np.ceil(vmax/d)*d
   nfrac=int(np.max((-np.floor(np.log10(d)),0))) # number of fractional digits to show
 
   if not labels:
@@ -116,10 +114,13 @@ def loose_label_n(min,max,ntick=5,labels=False):
   tk=[]
   n0=ntick
   while len(tk)< ntick:
-    tk=loose_label(min,max,ntick=n0)
+    tk=loose_label(min,max,ntick=n0,labels=labels)
+    if labels: tk,stk=tk
     n0+=1
 
-  return tk
+  if labels: return tk,stk
+  else: return tk
+
 
 def nice_bounds(arr):
   '''nice bounds for n-d array values'''

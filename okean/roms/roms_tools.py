@@ -33,7 +33,7 @@ def depthof(v,z,val):
   return np.ma.masked_where((zz==999)|(zz==9999),zz)
 
 
-def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
+def slicez(v,maskv,h,zeta,sparams,level,surface_masked=True,spline=True):
   tts,ttb,hc,Nr,vt,vs=sparams
 
   from . import rtools
@@ -43,7 +43,7 @@ def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
 
   N,Ny,Nx=v.shape
   res=rtools.roms_slicez(v,h,zeta, tts,ttb,hc,Nr,vt,vs,
-                         level,surface_nans,spline,
+                         level,surface_masked,spline,
                          N,Ny,Nx)
 
   mask=np.where(res==-99.,0,1)*maskv==0
@@ -51,12 +51,16 @@ def slicez(v,maskv,h,zeta,sparams,level,surface_nans=True,spline=True):
   return res
 
 
-def s_levels(h,zeta,sparams,rw=False):
+def s_levels(h,zeta,sparams,rw=False,nomask=True):
   '''
   returns z_r and/or z_w
   '''
   tts,ttb,hc,n,vt,vs=sparams
 
+  if nomask:
+    if np.ma.isMA(h): h=np.where(h.mask,999,h)
+    if np.ma.isMA(zeta): zeta=np.where(zeta.mask,0,zeta)
+    
   # to deal with WET_DRY (See Nonlinear/set_depth.F)
   # h cannot be zero, at least with vt==1
   h=np.where(h==0.,1e-14,h)
@@ -64,31 +68,56 @@ def s_levels(h,zeta,sparams,rw=False):
   from . import rtools
   zr,zw=rtools.s_levels(h,zeta,tts,ttb,hc,n,vt,vs)
 
-  # add zeta mask to z levels:
-  if np.ma.isMA(zeta):
-    if 1 in zr.shape:
-      maskr=np.tile(np.squeeze(zeta).mask,(zr.shape[0],1))
-      maskw=np.tile(np.squeeze(zeta).mask,(zw.shape[0],1))
-      zr=np.squeeze(zr)
-      zw=np.squeeze(zw)
-    else:
-      maskr=np.tile(zeta.mask,(zr.shape[0],1,1))
-      maskw=np.tile(zeta.mask,(zw.shape[0],1,1))
+  zr=np.squeeze(zr)
+  zw=np.squeeze(zw)
 
+  if not nomask: # add zeta|h mask to z levels
+    if np.ma.is_masked(zeta): mzeta=zeta.mask
+    else: mzeta=np.zeros_like(zeta,'bool')
 
-    if rw==False:
+    if np.ma.is_masked(h): mh=h.mask
+    else: mh=np.zeros_like(h,'bool')
+
+    mask=mh|mzeta
+    if np.any(mask):
+      maskr=np.tile(mask,(n,)+(1,)*mask.ndim)
+      maskw=np.tile(mask,(n+1,)+(1,)*mask.ndim)
+    
       zr=np.ma.masked_where(maskr,zr)
       zw=np.ma.masked_where(maskw,zw)
-      return zr,zw
-    elif rw=='w':
-      return np.ma.masked_where(maskw,zw)
-    else: # r
-      return np.ma.masked_where(maskr,zr)
 
-  else: # zeta has no mask, like in clm or ini files
-    if rw==False: return zr,zw
-    elif rw=='w': return zw
-    else: return zr
+  if rw==False: return zr,zw
+  elif rw=='w': return zw
+  else: return zr
+
+
+
+  # add zeta mask to z levels:
+#  if np.ma.isMA(zeta):
+#  if np.ma.is_masked(zeta):
+#    if 1 in zr.shape:
+#      maskr=np.tile(np.squeeze(zeta).mask,(zr.shape[0],1))
+#      maskw=np.tile(np.squeeze(zeta).mask,(zw.shape[0],1))
+#      zr=np.squeeze(zr)
+#      zw=np.squeeze(zw)
+#    else:
+#      maskr=np.tile(zeta.mask,(zr.shape[0],1,1))
+#      maskw=np.tile(zeta.mask,(zw.shape[0],1,1))
+#
+#
+#    if rw==False:
+#      zr=np.ma.masked_where(maskr,zr)
+#      zw=np.ma.masked_where(maskw,zw)
+#      return zr,zw
+#    elif rw=='w':
+#      return np.ma.masked_where(maskw,zw)
+#    else: # r
+#      return np.ma.masked_where(maskr,zr)
+#
+#  else: # zeta has no mask, like in clm or ini files
+#    if rw==False: return zr,zw
+#    elif rw=='w': return zw
+#    else: return zr
 
 
 #def ll_rho2uvp(lonr,latr,Type=None):
@@ -166,8 +195,8 @@ def rho2uvp3d(*pargs):
   return pargs
 
 
-#def psi2rho(vp): return psi2uvr(vp,'r')
-#
+def psi2rho(vp): return psi2uvr(vp,'r')
+
 
 def psi2uvr(vp,pt):
   '''
@@ -498,9 +527,15 @@ def grid_vicinity(grid,x,y,margin=5,rect=False,retinds=False):
 
   mma, TAMU 2011
   '''
+  try:
+    xg=grid.lon
+    yg=grid.lat
+    isGrid=True
+  except:
+    xg=netcdf.use(grid,'lon_rho')
+    yg=netcdf.use(grid,'lat_rho')
+    isGrid=False
 
-  xg=netcdf.use(grid,'lon_rho')
-  yg=netcdf.use(grid,'lat_rho')
   xlim=xg.min(),xg.max()
   ylim=yg.min(),yg.max()
 
@@ -511,8 +546,11 @@ def grid_vicinity(grid,x,y,margin=5,rect=False,retinds=False):
     i1,i2,j1,j2=calc.ij_limits(x,y,xlim,ylim,margin)
     out[j1:j2,i1:i2]=1
   else:
-    from roms import Grid
-    g=Grid(grid)
+    if not isGrid:
+      from roms import Grid
+      g=Grid(grid)
+    else: g=grid
+
     xb,yb=g.border(margin=-margin)
     out=calc.inpolygon(x,y,xb,yb)
 

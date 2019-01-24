@@ -5,6 +5,9 @@ isstr=lambda s: isinstance(s,(''.__class__,u''.__class__))
 
 
 def ncopen(f,mode='r'):
+  if isinstance(f,netCDF4.Dataset) or isinstance(f,netCDF4.MFDataset):
+    return f
+
   if not isstr(f) or any([i in f for i in '*?']):
     nc=netCDF4.MFDataset(f)
   else:
@@ -41,7 +44,10 @@ def ncshow(f,**kargs):
   nc=ncopen(f)
 
   print('\n# Contents of the NetCDF file')
-  print('   '+f)
+  try:
+    print('   '+f)
+  except: 
+    print('   '+str(f.__class__))
 
   print('\n:: Global Attributes:')
   atn=list(nc.ncattrs())

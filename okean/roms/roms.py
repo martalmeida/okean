@@ -83,7 +83,7 @@ class Common():
     ats=netcdf.fatt(self.nc)
     if not grd:
       if 'grd_file' in ats: grd=ats['grd_file'].value
-      if grd and not os.path.isfile(grd): grd=False
+      if grd and not grd.startswith('http') and not os.path.isfile(grd): grd=False
 
     if grd: self.grid=Grid(grd,self.quiet)
     else:
@@ -92,7 +92,7 @@ class Common():
       except:
         self.grid=False
 
-  def show(self): netcdf.show(self.nc)
+  def show(self): netcdf.show(self.nc._nc)
 
   def showvar(self,vname): netcdf.showvar(self.nc,vname)
 
@@ -168,6 +168,84 @@ class Grid(Common):
     if 0: self.load_uvp()
     self.load_atts()
 
+    # about proj:
+    self.load_proj()
+
+
+  def load_proj(self):
+    # load and parse attrs needed for basemap projection
+
+    self.proj_info={}
+    for i in ['proj4string','basemap_opts']:
+      if i in netcdf.fatt(self.nc):
+        self.proj_info[i]=netcdf.fatt(self.nc,i)
+      else:
+        self.proj_info[i]=''
+
+    o={}
+    if self.proj_info['basemap_opts']: # parse it
+      for i in self.proj_info['basemap_opts'].split():
+        name,val=i[1:].split('=')
+        try:
+          val=float(val)
+        except: pass
+        o[name]=val
+
+    self.proj_info['basemap_opts0']=o
+
+    # Now let ys make sure the projection is well centered (may not be
+    # at grid creation):
+    # - build a set of reasonable options;  user can always change them
+    # after. Let us consider only the lcc and merc projections, and use
+    # lcc by default if none is provided at grid atts
+    if o: prj=o['projection']
+    else: prj='lcc'
+
+    if self.spherical:
+      xlim=self.lon.min(),self.lon.max()
+      ylim=self.lat.min(),self.lat.max()
+      dlon=xlim[1]-xlim[0]
+      dlat=ylim[1]-ylim[0]
+
+      if prj=='lcc':
+        lon_0=0.5*(xlim[0]+xlim[1])
+        lat_0=0.5*(ylim[0]+ylim[1])
+        lat_1=lat_0-dlat/4.
+        lat_2=lat_0+dlat/4.
+
+        W=110*np.cos(lat_0*np.pi/180)*(xlim[1]-xlim[0])*1e3
+        H=110*(ylim[1]-ylim[0])*1e3
+        W*=1.2
+        H*=1.2
+
+        o=dict(resolution='i',projection=prj,
+               lat_1=lat_1,lat_2=lat_2,lat_0=lat_0,lon_0=lon_0,
+               width=W,height=H)
+
+      elif prj=='merc':
+        dlon_=dlon_/10
+        dlat_=dlat_/10
+        o=dict(resolution='c',projection=prj,
+               llcrnrlon=xlim[0]-dlon_, llcrnrlat=ylim[0]-dlat_,
+               urcrnrlon=xlim[1]+dlon_, urcrnrlat=ylim[1]+dlat_,
+               lon_0=0.5*(xlim[0]+xlim[1]),
+               lat_0=0.5*(ylim[0]+ylim[1]))
+
+      self.proj_info['basemap_opts']=o
+
+
+  def get_projection(self,prjtype='nice'):
+    '''
+    prjtype, proj type, if 'nice', a set of reasonable options are used,
+      else if 'original', the original basemap_opts0 is used
+    '''
+
+    if prjtype=='nice': opts=self.proj_info['basemap_opts']
+    elif prjtype=='original': opts=self.proj_info['basemap_opts0']
+    else: return 'unknown prjtype'
+
+    if opts: return Basemap(**opts)
+
 
   def load(self):
     # if grid file is remote (opendap) we could load less variables. But since
@@ -192,7 +270,11 @@ class Grid(Common):
     sph=self.spherical
     trueVals=[1,'T','',None]
     try:
-      sph=''.join(sph).strip()
+      try:
+        sph=''.join(sph).strip()
+      except TypeError:
+        sph=b''.join(sph).strip().decode() # bytes type needed for python3
+
       if len(sph): sph=sph[0]
     except: pass
     self.spherical=sph in trueVals
@@ -315,7 +397,10 @@ class Grid(Common):
     if j is False: j=slice(None)
     if i is False: i=slice(None)
 
+    x,y,h,m=[i.data for i in [x,y,h,m] if np.ma.isMA(i)]
+
     return x[j,i],y[j,i],h[j,i],m[j,i]
+
 
   def s_levels(self,sparams,zeta=0,h=False,loc='rr',i=False,j=False,k=False):
     hLoc,vLoc=loc
@@ -336,7 +421,8 @@ class Grid(Common):
     if j is False: j=slice(None)
     if i is False: i=slice(None)
 
-    return np.squeeze(z[k,j,i])
+########################    return np.squeeze(z[k,j,i])
+    return z[k,j,i]
 
 
   def ingrid(self,x,y,**kargs):#,retInds=False):
@@ -412,8 +498,8 @@ class Grid(Common):
       ax.contour3D(self.lon,self.lat,self.mask,[.5])
       return ax
 
-
-  def plot(self,**kargs):
+  def plot_data(self,**kargs):
+    prjtype=kargs.pop('prjtype','nice')
     from matplotlib.cm import gist_earth_r
     h=np.ma.masked_where(self.mask==0,self.h)
     a=vis.Data(x=self.lon,y=self.lat,v=h)
@@ -427,8 +513,20 @@ class Grid(Common):
     b.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
     a.extra=[b]
 
-    a.plot(labels=0)
+    # about projection:
+    if prjtype=='original' and self.proj_info['basemap_opts0']: d=self.proj_info['basemap_opts0']
+    elif prjtype=='nice': d=self.proj_info['basemap_opts']
 
+    a.set_projection(d)
+
+    return a
+
+
+  def plot(self,**kargs):
+    a=self.plot_data(**kargs)
+    labels=kargs.pop('labels',0)
+    kargs.pop('prjtype',0)
+    a.plot(labels=labels,**kargs)
     return a
 
 
@@ -457,14 +555,12 @@ class MGrid():
 
   def _set_ingrid(self,ruvp='r'):
     for i in range(len(self)):
-###########      self[i].ingrd=[]
       aname='ingrd_'+ruvp
       setattr(self[i],aname,[])
       ob=getattr(self[i],aname)
       if i<len(self)-1:
         x,y=self[i].vars(ruvp)[:2]
         for j in range(i+1,len(self)):
-##########          self[i].ingrd+=[self[j].ingrid(x,y)]
           ob+=[self[j].ingrid(x,y)]
 
   def border(self,**kargs):
@@ -486,7 +582,9 @@ class MGrid():
 
     return X,Y
 
-  def plot(self,**kargs):
+  def plot_data(self,**kargs):
+    prjtype=kargs.pop('prjtype','nice')
+
     from matplotlib.cm import gist_earth_r
 
     if 0:
@@ -498,6 +596,7 @@ class MGrid():
     if len(self)>1:
       ht2=ticks.loose_label_n(ht[0],ht[1]/2,5)[1:]
       ht=np.concatenate(([ht[0]],ht2,ht[1:]))
+      ht=np.unique(np.sort(ht))
 
     ht=kargs.get('field__cvals',ht)
     ht=kargs.get('cvals',ht)
@@ -519,6 +618,7 @@ class MGrid():
       c=vis.Data(x=i.lon,y=i.lat,v=h)
       c.set_param(field__plot='contour',field__cvals=ht,field__cmap=next(colors)['color'],
                   field__linewidths=0.5,plot__zorder=2) # show above everything else
+      c.label='bathy'
       a.extra+=[c]
 
     # show all borders:
@@ -528,8 +628,20 @@ class MGrid():
       c.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
       a.extra+=[c]
 
+
+    # about projection:
+    if prjtype=='original' and self[0].proj_info['basemap_opts0']: d=self[0].proj_info['basemap_opts0']
+    elif prjtype=='nice': d=self[0].proj_info['basemap_opts']
+
+    a.set_projection(d)
+
+    return vis.MData([a])
+
+
+  def plot(self,**kargs):
+    a=self.plot_data(**kargs)
+    kargs.pop('prjtype',0)
     a.plot(**kargs)
-    return a
 
 
 class His(Common,Derived):
@@ -583,7 +695,12 @@ class His(Common,Derived):
       m=m[j0:j1,i0:i1]
       zeta= zeta[j0:j1,i0:i1]
 
-    if np.ma.isMA(zeta): h=np.ma.masked_where(zeta.mask,h)
+    if np.ma.is_masked(zeta):
+      # h=np.ma.masked_where(zeta.mask,h)
+      # comment above in order to keep right depth inside the domain
+      # on masked regions
+      pass
+
     else:# probably a clm/ini file. Mask maskc point (pygridgen complex grid):
       if 'maskc' in netcdf.varnames(self.grid.nc):
         mc=self.grid.use('maskc')
@@ -594,9 +711,17 @@ class His(Common,Derived):
     h    = calc.griddata(xr,yr,h,x,y,extrap=False)
     zeta = calc.griddata(xr,yr,zeta,x,y,extrap=False)
 
-    z=rt.s_levels(h,zeta,self.s_params,rw=rw)
-    z=np.squeeze(z)
-    return np.ma.masked_where(np.isnan(z),z)
+    # better interpolate the gaps, otherwise s_levels will use default
+    # values for zeta and h:
+    X=np.arange(h.size)
+    if np.ma.is_masked(h): h=np.interp(X,X[~h.mask],h[~h.mask])
+    if np.ma.is_masked(zeta): zeta=np.interp(X,X[~zeta.mask],zeta[~zeta.mask])
+    
+
+###    return h,zeta,self.s_params,rw
+    return rt.s_levels(h,zeta,self.s_params,rw=rw)
+###    z=np.squeeze(z)
+###    return np.ma.masked_where(np.isnan(z),z)
 
 
   def s_levels(self,time,loc='rr',i=False,j=False,k=False,extrapZeta=False):
@@ -609,12 +734,12 @@ class His(Common,Derived):
     zeta=self.use('zeta',SEARCHtime=time)
 
     if extrapZeta:
-      if not calc.ismarray(zeta): zeta=np.ma.masked_where(self.grid.mask==0,zeta)
+      #if not calc.ismarray(zeta): zeta=np.ma.masked_where(self.grid.mask==0,zeta)
+      if not np.ma.is_masked(zeta): zeta=np.ma.masked_where(self.grid.mask==0,zeta)
       zeta=calc.mask_extrap(self.grid.lon,self.grid.lat,zeta)
 
     h=rt.rho2uvp(h,hLoc)
     zeta=rt.rho2uvp(zeta,hLoc)
-
     z=rt.s_levels(h,zeta,self.s_params,rw=vLoc)
 
     if k is False: k=slice(None)
@@ -697,6 +822,7 @@ class His(Common,Derived):
 
     out.v=v
     out.info['v']['name']=varname
+    out.info['v']['slice']='i=%d'%ind
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
@@ -842,16 +968,12 @@ class His(Common,Derived):
 
 
     # coords:
-########    if 'z' in coords and self.hasz(varname):
     if 'z' in coords and 'z' in self.vaxes(varname):
-#####      out.z=self.s_levels(time,k=ind,ruvpw=self.var_at(varname))
-###      out.z=self.s_levels(time,k=ind,loc=self.var_at(varname))
       out.z=self.s_levels(time,k=ind,loc=self.vloc(varname))
       out.info['z']=dict(name='Depth',units='m')
 
 
     if any([i in coords for i in 'xy']):
-###      x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
       x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
 
     if 'x' in coords:
@@ -887,22 +1009,25 @@ class His(Common,Derived):
 
 
     out.coordsReq=','.join(sorted(coords))
+
+    # about projection:
+    out.set_projection(self.grid.proj_info['basemap_opts'])
+
     return out
 
 
   def slicez(self,varname,ind,time=0,**opts):
-###    if not self.hasz(varname):
-    if not 'z' in self.vaxes(varname):
-      return self.slicek(varname,ind,time,**opts)
-
-    surf_nans=opts.get('surf_nans',True)
+    surf_mask=opts.get('surf_mask',True)
     spline=opts.get('spline',True)
     coords=opts.get('coords',self._default_coords('slicez')).split(',')
 
     out=vis.Data()
     out.label='slicez'
     out.msg=self.check_slice(varname,t=time)
-    if out.msg: return out##None,au
+    if out.msg: return out
+
+    if not 'z' in self.vaxes(varname):
+      return self.slicek(varname,ind,time,**opts)
 
     v=self.use(varname,SEARCHtime=time)
 ###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
@@ -910,7 +1035,7 @@ class His(Common,Derived):
     zeta=self.use('zeta',SEARCHtime=time)
     zeta=rt.rho2uvp(zeta,varname)
 
-    out.v=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_nans,spline)
+    out.v=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_mask,spline)
 
     out.info['v']['name']=varname
     if calc.isarray(ind):
@@ -959,6 +1084,10 @@ class His(Common,Derived):
 
 
     out.coordsReq=','.join(sorted(coords))
+
+    # about projection:
+    out.set_projection(self.grid.proj_info['basemap_opts'])
+
     return out
 
 
@@ -993,7 +1122,7 @@ class His(Common,Derived):
 
       x=x[j0:j1,i0:i1]
       y=y[j0:j1,i0:i1]
-      #h=h[j0:j1,i0:i1] # not used
+      h=h[j0:j1,i0:i1]
       m=m[j0:j1,i0:i1]
 
     else:
@@ -1017,23 +1146,49 @@ class His(Common,Derived):
       inds=dict(xi=(i0,i1),eta=(j0,j1))
 #########      out.z=self.path_s_levels(time,X,Y,rw=varname[0],inds=inds)
 ###      out.z=self.path_s_levels(time,X,Y,rw=self.var_at(varname)[1],inds=inds)
+###
+#######      out.z,zw=self.path_s_levels(time,X,Y,rw=False,inds=inds)
+#######      if self.vloc(varname)[1]=='w': out.z=zw
       out.z=self.path_s_levels(time,X,Y,rw=self.vloc(varname)[1],inds=inds)
+      out.info['z']=dict(name='Depth',units='m')
 
     if 'd' in coords:
       d=calc.distance(X,Y)
+      if d[-1]-d[0]>1e4:
+        d=d/1000.
+        dunits='km'
+      else: dunits='m'
+
       if v.ndim==2: d=np.tile(d,(v.shape[0],1))
       out.d=d
+      out.info['d']=dict(name='Distance',units=dunits)
 
     if 'x' in coords:
       if v.ndim==2: X=np.tile(X,(v.shape[0],1))
       out.x=X
+      out.info['x']=dict(name='Longitude',units=r'$\^o$E')
 
     if 'y' in coords:
       if v.ndim==2: Y=np.tile(Y,(v.shape[0],1))
       out.y=Y
+      out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
 #######    if 't' in coords and self.hast(varname): out.t=self.time[time]
     if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
+
+    if v.ndim==2: ################3 and not out.z is None: # zeta and bottom already calculated
+      out.extra=[vis.Data()]
+      if 'd' in coords: out.extra[0].x=out.d[0]
+      if 'x' in coords: out.extra[0].y=out.x[0]
+      if 'y' in coords: out.extra[0].x=out.y[0]
+####      #h=-zw[0]
+      h    = calc.griddata(x,y,h,X,Y,extrap=False)
+      out.extra[0].v=-h # bottom
+      out.extra[0].config['d1.plot']='fill_between'
+      out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
+      out.extra[0].label='bottom'
+
+
 
     out.coordsReq=','.join(sorted(coords))
     return out
@@ -1049,7 +1204,6 @@ class His(Common,Derived):
     elif ind>=0:
       slc,uname,vname,ind = self.slicek,  'u','v', ind
     elif ind <0:
-      isK=False
       slc,uname,vname,ind = self.slicez, 'u','v', ind
 
     outu=slc(uname,ind,time,**opts)
@@ -1168,6 +1322,10 @@ class His(Common,Derived):
       out.extra[0].label='bathy'
 
     out.coordsReq=','.join(sorted(coords))
+
+    # about projection:
+    out.set_projection(self.grid.proj_info['basemap_opts'])
+
     return out
 
 
@@ -1176,7 +1334,7 @@ class His(Common,Derived):
 
     if times is None: times=range(0,self.time.size)
 
-    # depth or s_level: check is is float or if is negative!
+    # depth or s_level: check if is float or if is negative!
     isDepth=False
     if not depth is None:
        if calc.isiterable(depth): depth=np.asarray(depth)
@@ -1233,12 +1391,11 @@ class His(Common,Derived):
           nt=len(times)
           land_mask=np.ones((nt,1),dtype=v.dtype) # needed for slicez... not used here!        
 
-          v,vm=rt.slicez(v[...,np.newaxis],land_mask,
+          v=rt.slicez(v[...,np.newaxis],land_mask,
                self.grid.h[i,j]*np.ones((nt,1),dtype=v.dtype), # bottom depth
-               zeta[:,np.newaxis],self.s_params,depth,spline=opts.get('spline',True))
-
-          v=np.ma.masked_where(vm,v)
-          v=v[...,0]
+               zeta[:,np.newaxis],self.s_params,depth,
+               surface_masked=opts.get('surf_mask',True),
+               spline=opts.get('spline',True))[...,0]
 
       else: # one time only
         v=np.interp(depth,z,v,left=np.nan,right=np.nan)
@@ -1314,16 +1471,26 @@ class His(Common,Derived):
 #    return v
 
 class MHis():
-  def __init__(self,name):
+  def __init__(self,name,grd=False):
+    import glob
     if cb.isstr(name):
-      import glob
       f=os.path.splitext(name)[0][:-1]+'*'+os.path.splitext(name)[1]
       files=glob.glob(f)
       files.sort()
     else:
       files=name
 
-    self._his=[His(i) for i in files]
+    if cb.isstr(grd):
+      f=os.path.splitext(grd)[0][:-1]+'*'+os.path.splitext(grd)[1]
+      gfiles=glob.glob(f)
+      gfiles.sort()
+
+    if grd:
+      self._his=[]
+      for i in range(len(files)):
+        self._his+=[His(files[i],gfiles[i])]
+    else:
+      self._his=[His(i) for i in files]
 
     ###self.grid=MGrid([i.grid.name for i in self._his])
     self.grid=MGrid([i.grid for i in self._his])
@@ -1443,8 +1610,9 @@ class MHis():
         if e.label==lab and not e.v is None:
           field=e.get_param('field')
           if field['clim'] is False: field['clim']=e.v.min(),e.v.max()
-          if field['cvals'] is False:
-            tk=ticks.loose_label_n(field['clim'][0],field['clim'][1],7)
+          if field['cvals'] is False or  not calc.isiterable(field['cvals']):
+            # the isiterable here is because it can be an integer (nof fixed set)
+            tk=ticks.loose_label_n(field['clim'][0],field['clim'][1],3)
             field['cvals']=tk
 
       for i in o:
@@ -1513,3 +1681,5 @@ class MHis():
 #    opts['border']=0
     return self._slice('uv','',ind,time,**opts)
 
+  def slice_derived(self,varname,ind,time,**opts):
+    return self._slice('_derived',varname,ind,time,**opts)

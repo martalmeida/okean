@@ -3,7 +3,8 @@ import datetime
 
 from okean import calc, cookbook as cb, dateu as dts, netcdf, air_sea
 from okean.roms import roms, roms_tools as rt
-import gennc
+from . import gennc
+from collections import OrderedDict
 
 
 def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
@@ -17,11 +18,11 @@ def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
   else:
     data,miss=a.data_forecast(date0,nforec,quiet=quiet)
 
-  out=cb.odict()
+  out=OrderedDict()
   time=data.keys()
   for t in time:
     out[t]={}
-    for k in data[t].keys():
+    for k in data[t]:
 
       if  k.startswith('INFO'):
         out[t][k]=data[t][k]
@@ -29,7 +30,7 @@ def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
         out[t][k]=data[t][k].data
 
         # x and y may change with time, but should be the same for each time (gfs file)
-        if not out[t].has_key('x'):
+        if 'x' not in out[t]:
           out[t]['x']=data[t][k].x
           out[t]['y']=data[t][k].y
 
@@ -41,7 +42,7 @@ def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=Tr
   a=wrf.WRFData(wrfpath,wrffiles)
   data=a.data(date0,date1,quiet)
 
-  out=cb.odict()
+  out=OrderedDict()
   if not data:
     print('no data found !')
     return out
@@ -49,10 +50,10 @@ def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=Tr
   time=data['time']
   for it in range(len(time)):
     # be sure time increases!
-    if out.keys() and time[it]<=out.keys()[-1]: continue
+    if out.keys() and time[it]<=list(out.keys())[-1]: continue
 
     out[time[it]]={}
-    for k in data.keys():
+    for k in data:
 
       if k in ('time',): continue
       elif  k.startswith('INFO'):
@@ -61,7 +62,7 @@ def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=Tr
         out[time[it]][k]=data[k].data[it,...]
 
         # x and y should be the same, so:
-        if not out[time[it]].has_key('x'):
+        if 'x' not in out[time[it]]:
           out[time[it]]['x']=data[k].x
           out[time[it]]['y']=data[k].y
 
@@ -77,17 +78,17 @@ def load_blkdata_narr(date0,date1,quiet=True):
   a=narr.NARRData()
   data,miss=a.data(date0,date1,quiet=quiet)
 
-  out=cb.odict()
+  out=OrderedDict()
   time=data.keys()
   for t in time:
     out[t]={}
-    for k in data[t].keys():
+    for k in data[t]:
 
       if  k.startswith('INFO'):
         out[t][k]=data[t][k]
       else:
         out[t][k]=data[t][k].data
-        if not out[t].has_key('x'):
+        if 'x' not in out[t]:
           out[t]['x']=data[t][k].x
           out[t]['y']=data[t][k].y
 
@@ -108,11 +109,11 @@ def load_blkdata_interim(interimpath,date0=False,date1=False,quiet=True,past=Fal
   a=interim.INTERIMData(interimpath)
   data=a.data(date0,date1,quiet)
 
-  out=cb.odict()
+  out=OrderedDict()
   time=data['time']
   for it in range(len(time)):
     out[time[it]]={}
-    for k in data.keys():
+    for k in data:
 
       if k in ('time',): continue
       elif  k.startswith('INFO'):
@@ -121,7 +122,7 @@ def load_blkdata_interim(interimpath,date0=False,date1=False,quiet=True,past=Fal
         out[time[it]][k]=data[k].data[it,...]
 
         # x and y should be the same, so:
-        if not out[time[it]].has_key('x'):
+        if 'x' not in out[time[it]]:
           out[time[it]]['x']=data[k].x
           out[time[it]]['y']=data[k].y
 
@@ -133,11 +134,11 @@ def load_blkdata_cfsr(cfsrpath,date0=False,date1=False,quiet=True):
   a=cfsr.CFSRData(cfsrpath)
   data=a.data(date0,date1,quiet)
 
-  out=cb.odict()
+  out=OrderedDict()
   time=data['time']
   for it in range(len(time)):
     out[time[it]]={}
-    for k in data.keys():
+    for k in data:
 
       if k in ('time',): continue
       elif  k.startswith('INFO'):
@@ -146,7 +147,7 @@ def load_blkdata_cfsr(cfsrpath,date0=False,date1=False,quiet=True):
         out[time[it]][k]=data[k].data[it,...]
 
         # x and y should be the same, so:
-        if not out[time[it]].has_key('x'):
+        if 'x' not in out[time[it]]:
           out[time[it]]['x']=data[k].x
           out[time[it]]['y']=data[k].y
 
@@ -154,6 +155,30 @@ def load_blkdata_cfsr(cfsrpath,date0=False,date1=False,quiet=True):
   return out
 
 
+def load_blkdata_cordex(cordexClim,date0=False,date1=False,quiet=True,grd=False):
+  from okean.datasets import cordex
+  a=cordex.CORDEXData(cordexClim) # if grd, then just a portion of the data is extracted
+  data=a.data(date0,date1,quiet,grd=grd)
+
+  out=OrderedDict()
+  time=data['time']
+  for it in range(len(time)):
+    out[time[it]]={}
+    for k in data:
+
+      if k in ('time',): continue
+      elif  k.startswith('INFO'):
+        out[time[it]][k]=data[k]
+      else:
+        out[time[it]][k]=data[k].data[it,...]
+
+        # x and y should be the same, so:
+        if 'x' not in out[time[it]]:
+          out[time[it]]['x']=data[k].x
+          out[time[it]]['y']=data[k].y
+
+
+  return out
 
 
 def conv_units(data,model,quiet=True):
@@ -192,35 +217,57 @@ def conv_units(data,model,quiet=True):
 
 
 def data2romsblk(data,grd,**kargs):
-  quiet        = True
-  keepOriginal = 2 # if 2, will keep data only inside rt.grid_vicinity rectange
-                   # if 1, all original data is kept
-  Margin       = 4 # for griddata and for original data to keep
+  quiet=kargs.get('quiet',True)
+  Margin=kargs.get('margin',4) # for griddata and for original data to keep
+                               # if margin is 'no calc', no extraction of
+                               # a domain portion is done
 
-  for k in kargs.keys():
-    if k=='quiet': quiet=kargs[k]
-    elif k.lower().startswith('keepor'): keepOriginal=kargs[k]
-    elif k=='margin': Margin=kargs[k]
+  # about projection:
+  # - if auto will use grid default projection
+  # - if False, no projection is used
+  # - any Basemap projection can be used
+  proj=kargs.get('proj','auto')
 
+  # about origina data to keep:
+  # - if 2, will keep data only inside rt.grid_vicinity rectange
+  # - if 1, all original data is kept
+  keepOriginal = 2
+  for k in kargs:
+    if k.lower().startswith('keepor'): keepOriginal=kargs[k]
 
-  g=roms.Grid(grd)
+  if cb.isstr(grd): g=roms.Grid(grd)
+  else: g=grd
+
+  if proj=='auto': proj=g.get_projection()
+
+  if proj:
+    data_x,data_y=proj(data['x'],data['y'])
+    grd_x,grd_y=proj(g.lon,g.lat)
+  else:
+    data_x,data_y=data['x'],data['y']
+    grd_x,grd_y=g.lon,g.lat
 
   cond=False
   out={}
 
-  for vname in data.keys():
+  for vname in data:
     if vname.startswith('INFO') or vname in 'xy': continue
     # vnames starting with INFO are an info key, without data
 
     if not quiet: print('  interp %s' % vname)
 
     if cond is False:
-      cond,inds=rt.grid_vicinity(grd,data['x'],data['y'],
-                                 margin=Margin,rect=True,retinds=True)
-      i1,i2,j1,j2=inds
+      if Margin=='no calc':
+        cond=np.ones_like(data['x'],'bool')
+        i1,i1=0,0
+        j2,i2=data['x'].shape
+      else:
+        cond,inds=rt.grid_vicinity(grd,data['x'],data['y'],
+                                   margin=Margin,rect=True,retinds=True)
+        i1,i2,j1,j2=inds
 
-    out[vname]=calc.griddata(data['x'][cond],data['y'][cond],
-                           data[vname][cond],g.lon,g.lat,extrap=True)
+    out[vname]=calc.griddata(data_x[cond],data_y[cond],
+                           data[vname][cond],grd_x,grd_y,extrap=True)
 
     if keepOriginal:
       # keep original data:
@@ -229,7 +276,7 @@ def data2romsblk(data,grd,**kargs):
       elif keepOriginal==2:
         out[vname+'_original']=data[vname][j1:j2,i1:i2] # keep data only inside vicinity rectangle
 
-      if not out.has_key('x_original'):
+      if 'x_original' not in out:
         if keepOriginal==1:
           out['x_original']=data['x']
           out['y_original']=data['y']
@@ -239,13 +286,11 @@ def data2romsblk(data,grd,**kargs):
 
   # about wind:
   if not quiet: print(' --> rot U,V wind and U,V wind stress')
-  angle=g.use('angle')
-  out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],angle)
-  out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],angle)
+  out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],g.angle)
+  out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],g.angle)
 
   out['sustr']=rt.rho2uvp(out['sustr'],'u')
   out['svstr']=rt.rho2uvp(out['svstr'],'v')
-
 
   return out
 
@@ -260,6 +305,7 @@ def make_blk_interim(interimpath,grd,bulk,date0=False,date1=False,**kargs):
     title
     keeporiginal, save original data in nc file
     margin, for original data to be saved)
+    proj, use a map projection for the interpolations (grid default proj is used if auto)
     attr, additional global arguments, ex: attr={'some_info': 'abc','what': 123}
     past,  use True for old data server data, default False
     ...
@@ -269,23 +315,28 @@ def make_blk_interim(interimpath,grd,bulk,date0=False,date1=False,**kargs):
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
   past   = kargs.get('past',False) # use True for old data server data
+  proj   = kargs.get('proj','auto')
 
   data=load_blkdata_interim(interimpath,date0,date1,quiet,past)
 
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
+
   # about original data, run data2romsblk once to test for x_original:
-  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+  tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
   else: original=False
 
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create: q.create(model,original)
 
-  for d in data.keys():
+  for d in data:
     if model=='roms':
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
-    D=data2romsblk(data[d],grd,**kargs)
+    D=data2romsblk(data[d],g,**kargs)
     D['date']=d
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
@@ -300,30 +351,34 @@ def make_blk_gfs(gfspath,grd,bulk,date0,date1=False,nforec=0,**kargs):
   quiet  = kargs.get('quiet',0)
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
+  proj   = kargs.get('proj','auto')
 
   data,miss=load_blkdata_gfs(gfspath,date0,date1,nforec=nforec,quiet=quiet)
 
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
   # about original data, run data2romsblk once to test for x_original:
-  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+  tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
   else: original=False
 
   # add gfs INFO to file global attributes:
-  if not 'attr' in kargs.keys(): kargs['attr']={}
+  if 'attr' not in kargs: kargs['attr']={}
   s=''
-  for k in data.keys(): s+=' # '+k.isoformat(' ')+' '+data[k]['INFO_file']+' isbest '+str(data[k]['INFO_isbest'])
+  for k in data: s+=' # '+k.isoformat(' ')+' '+data[k]['INFO_file']+' isbest '+str(data[k]['INFO_isbest'])
   kargs['attr']['sources']=s
 
   # common to interim----------------------
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create: q.create(model,original)
 
-  for d in data.keys():
+  for d in data:
     if model=='roms':
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
-    D=data2romsblk(data[d],grd,**kargs)
+    D=data2romsblk(data[d],g,**kargs)
     D['date']=d
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
@@ -340,19 +395,23 @@ def make_blk_narr(grd,bulk,date0,date1=False,**kargs):
   quiet  = kargs.get('quiet',0)
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
+  proj   = kargs.get('proj','auto')
 
   data,miss=load_blkdata_narr(date0,date1,quiet=quiet)
 
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
   # about original data, run data2romsblk once to test for x_original:
-  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+  tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
   else: original=False
 
   # add narr INFO to file global attributes:
-  if not 'attr' in kargs.keys(): kargs['attr']={}
+  if 'attr' not in kargs: kargs['attr']={}
   try:
     s=''
-    for k in data.keys(): s+=' # '+k.isoformat(' ')+' '+data[k]['INFO_file']+' isbest '+str(data[k]['INFO_isbest'])
+    for k in data: s+=' # '+k.isoformat(' ')+' '+data[k]['INFO_file']+' isbest '+str(data[k]['INFO_isbest'])
     kargs['attr']['sources']=s
   except: pass
 
@@ -360,12 +419,12 @@ def make_blk_narr(grd,bulk,date0,date1=False,**kargs):
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create: q.create(model,original)
 
-  for d in data.keys():
+  for d in data:
     if model=='roms':
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
-    D=data2romsblk(data[d],grd,**kargs)
+    D=data2romsblk(data[d],g,**kargs)
     D['date']=d
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
@@ -376,33 +435,38 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
   '''
   see make_blk_interim
 
-  ps: to not include original data in file, use kargg keepor=False
+  ps: to not include original data in file, use karg keepor=False
   '''
 
   quiet  = kargs.get('quiet',0)
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
+  proj   = kargs.get('proj','auto')
 
   data=load_blkdata_cfsr(cfsrpath,date0,date1,quiet) # unique diff from make_blk_interim !!
 
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
   # about original data, run data2romsblk once to test for x_original:
-  tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-  if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+  tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
   else: original=False
 
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create: q.create(model,original)
 
-  for d in data.keys():
+  for d in data:
     if model=='roms':
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
-    D=data2romsblk(data[d],grd,**kargs)
+    D=data2romsblk(data[d],g,**kargs)
     D['date']=d
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
+
 
 def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
   '''
@@ -415,22 +479,26 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
   model  = kargs.get('model','roms') # or roms-agrif
   wrffiles=kargs.get('wrffiles','wrfout*')
   dt     = kargs.get('dt',6)
+  proj   = kargs.get('proj','auto')
 
   data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,quiet)
 
   if not len(data): return
 
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create:
     # about original data, run data2romsblk once to test for x_original:
-    tmp=data2romsblk(data[data.keys()[0]],grd,**kargs)
-    if 'x_original' in tmp.keys(): original=tmp['x_original'].shape
+    tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+    if 'x_original' in tmp: original=tmp['x_original'].shape
     else: original=False
 
     q.create(model,original)
 
 
-  for d in data.keys():
+  for d in data:
 
     # be sure time increases. Note that in load_blkdata_wrf
     # we checked if time increases in the dataset... not if dates are higher
@@ -447,11 +515,55 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)
 
-    D=data2romsblk(data[d],grd,**kargs)
+    D=data2romsblk(data[d],g,**kargs)
     D['date']=d
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
+
+
+def make_blk_cordex(cordexClim,grd,bulk,date0=False,date1=False,**kargs):
+  '''
+  see make_blk_interim
+
+  ps: to not include original data in file, use karg keepor=False
+  '''
+
+  quiet  = kargs.get('quiet',0)
+  create = kargs.get('create',1)
+  model  = kargs.get('model','roms') # or roms-agrif
+  proj   = kargs.get('proj','auto')
+
+  kargs['margin']='no calc' # no need to extract a portion of the domain;
+                            # may be slow and is already done in cordex.py
+                            # besides, no need to do also for all variables as they share
+                            # the same domain
+
+  data=load_blkdata_cordex(cordexClim,date0,date1,quiet,grd) # unique diff from make_blk_cordex/interim !!
+  # grd is provided to extract just a portion of cordex domain, otherwise there is a memory error
+
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
+  # about original data, run data2romsblk once to test for x_original:
+  tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
+  else: original=False
+
+  q=gennc.GenBlk(bulk,grd,**kargs)
+  if create: q.create(model,original)
+
+  for d in data:
+    if model=='roms':
+       if not quiet: print('  converting units:'),
+       conv_units(data[d],model,quiet)
+
+    D=data2romsblk(data[d],g,**kargs)
+    D['date']=d
+
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
+    q.fill(D,quiet=quiet)
+
 
 
 # --------------------------- OLD stuff from here... to be removed soon --------
@@ -513,7 +625,7 @@ def update_wind_blended2(fname,datapaths,**kargs):
   time0.remove('x')
   time0.remove('y')
 
-  out=cb.odict()
+  out=OrderedDict()
   out['x']=x0
   out['y']=y0
   info=''

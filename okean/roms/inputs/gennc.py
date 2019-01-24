@@ -6,6 +6,9 @@ from okean import netcdf
 from okean import cookbook as cb
 from okean import dateu as dts
 
+try: basestring
+except NameError: basestring=str
+
 class GenCommon:
   '''
   Base class for model input netcdf files generation
@@ -237,7 +240,9 @@ class GenIni(GenCommon):
     # Global Attributes:
     nc.add_att('type',self.type)
     nc.add_att('title',self.title)
-    nc.add_att('grd_file',realpath(self.grid))
+    if self.grid.startswith('http'): grd=self.grid
+    else: grd=realpath(self.grid)
+    nc.add_att('grd_file',grd)
     nc.add_att('history','ROMS ini file, '+ctime())
     nc.add_att('author',cb.username()[1]+', '+cb.machinename())
 
@@ -472,7 +477,9 @@ class GenClm(GenCommon):
     # Global Attributes:
     nc.add_att('type',self.type)
     nc.add_att('title',self.title)
-    nc.add_att('grd_file',realpath(self.grid))
+    if self.grid.startswith('http'): grd=self.grid
+    else: grd=realpath(self.grid)
+    nc.add_att('grd_file',grd)
     nc.add_att('history','ROMS clm file, '+ctime())
     nc.add_att('author',cb.username()[1]+', '+cb.machinename())
 
@@ -756,7 +763,9 @@ class GenBry(GenCommon):
     # Global Attributes:
     nc.add_att('type',self.type)
     nc.add_att('title',self.title)
-    nc.add_att('grd_file',realpath(self.grid))
+    if self.grid.startswith('http'): grd=self.grid
+    else: grd=realpath(self.grid)
+    nc.add_att('grd_file',grd)
     nc.add_att('history','ROMS bry file, '+ctime())
     nc.add_att('obc',self.obc)
     nc.add_att('author',cb.username()[1]+', '+cb.machinename())

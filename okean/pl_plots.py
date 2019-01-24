@@ -66,7 +66,7 @@ def wind_rose(D,F,**kargs):
   nAngles     = kargs.get('n',           36)
   ri          = kargs.get('ri',          1/30.)
   quad        = kargs.get('quad',        0)
-  legType     = kargs.get('legtype',     0)
+  legType     = kargs.get('legtype',     2)
   percBg      = kargs.get('percbg',      'w')
   titStr      = kargs.get('title',       '')
   legStr      = kargs.get('legend',      '')
@@ -106,7 +106,7 @@ def wind_rose(D,F,**kargs):
   # calc instensity subdivisions:
   if Ag is False:
     from okean import ticks
-    Ag=ticks.loose_label_n(F.min(),F.max(),ntick=7)
+    Ag,sAg=ticks.loose_label_n(F.min(),F.max(),ntick=7,labels=True)
 
   E=np.zeros([len(Ay)-1,len(Ag)-1])
   for i in range(len(Ay)-1):
@@ -185,7 +185,7 @@ def wind_rose(D,F,**kargs):
 
   # calc colors:
   if not colors:
-    cor=range(len(Ag)-1)
+    cor=list(range(len(Ag)-1))
     q=pl.cm.ScalarMappable(cmap=cmap)
     q.set_clim([Ag[0], Ag[-2]])
     for j in range(len(Ag)-1):
@@ -240,7 +240,8 @@ def wind_rose(D,F,**kargs):
 
   if legType==1: # contimuous
     for j in range(len(Ag)-1):
-      lab=str(Ag[j])
+      #lab=str(Ag[j])
+      lab=sAg[j]
       if j==0 and hasL and IncHiLow:
         lab=''
 
@@ -254,12 +255,15 @@ def wind_rose(D,F,**kargs):
 
   elif legType==2:
      for j in range(len(Ag)-1):
-      lab=str(Ag[j])+ ' - '+ str(Ag[j+1])
+      #lab=str(Ag[j])+ ' - '+ str(Ag[j+1])
+      lab=sAg[j]+ ' - '+ sAg[j+1]
       if j==0 and hasL and  IncHiLow:
-        lab='<'+str(Ag[1])
+        #lab='<'+str(Ag[1])
+        lab='<'+sAg[1]
 
       if j==len(Ag)-2 and hasH and IncHiLow:
-        lab='>='+str(Ag[j])
+        #lab='>='+str(Ag[j])
+        lab='>='+sAg[j]
 
       y1=y0+h
       ax.fill([x0, x1, x1, x0],[y0+dy, y0+dy, y1, y1],facecolor=cor[j],linewidth=LineWidth)
@@ -272,7 +276,7 @@ def wind_rose(D,F,**kargs):
   y=np.mean([g+ri,g*rs])
   ax.text(x,y,titStr,horizontalalignment='center',fontsize=FontSize)
 
-  if legType in [0,1]:
+  if legType in [1,2]:
     x=x0
     y=y1+dy
     ax.text(x,y,legStr,horizontalalignment='left',verticalalignment='bottom',fontsize=FontSize)

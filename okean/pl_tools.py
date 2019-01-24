@@ -402,7 +402,7 @@ class InteractiveRect:
   def stop(self,e):
     events='mousedown','mousemove'
     for n in events:
-      if self.events.has_key(n): self.figure.canvas.mpl_disconnect(self.events[n])
+      if n in self.events: self.figure.canvas.mpl_disconnect(self.events[n])
 
     self.x=np.array(self.x)
     self.y=np.array(self.y)

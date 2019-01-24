@@ -8,87 +8,85 @@ from mpl_toolkits.basemap import Basemap
 from . import dateu as dts, ticks, cache, calc, cookbook as cb
 
 
-if 1:
-    default={}
-    default['plot.label']=''
-    default['plot.zorder']=1
+param={}
+param['plot.label']=''
+param['plot.zorder']=1
 
-    # figure and axes:
-    default['figure.figsize']=8,6
-    default['figure.edgecolor']=None
-    default['figure.facecolor']=None
-    default['axes.position']=.1,.1,.75,.8
-    default['axes.axis']=False # xlim ylim
-    default['axes.labels']={'fontsize':10}
-    default['colorbar.ax_position']=.875,.1,.03,.8
-    default['colorbar.options']={}
-    default['colorbar.bg_position']=False #.86,.08,.08,.84
-    default['colorbar.bg']={'edgecolor':'none','facecolor':'white','alpha':0.5,'linewidth':0}
+# figure and axes:
+param['figure.figsize']=None#8,6
+param['figure.edgecolor']=None
+param['figure.facecolor']=None
+param['axes.position']=.1,.1,.75,.8
+param['axes.axis']=False # xlim ylim
+param['axes.labels']={'fontsize':10}
+param['colorbar.ax_position']=.875,.1,.03,.8
+param['colorbar.options']={}
+param['colorbar.bg_position']=False #.86,.08,.08,.84
+param['colorbar.bg']={'edgecolor':'none','facecolor':'white','alpha':0.5,'linewidth':0}
 
-    # map projection:
-    default['proj.name']='auto'#'merc'
-    default['proj.resolution']='auto'#'i'
-    default['proj.options']={}
+# map projection:
+param['proj.name']='auto'
+param['proj.resolution']='auto'
+param['proj.options']={}
 
-    default['proj.coast_add']=True
-    default['proj.coast']={'color': '#999999', 'linewidth': 0.5, 'zorder':999}
+param['proj.coast_add']=True
+param['proj.coast']={'color': '#999999', 'linewidth': 0.5, 'zorder':999}
 
-    default['proj.continents_add'] = True
-    default['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
+param['proj.continents_add'] = True
+param['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
 
-    default['proj.oceans_add'] = False
-    default['proj.oceans'] = {'color': 'aqua', 'zorder':999}
+param['proj.oceans_add'] = False
+param['proj.oceans'] = {'color': 'aqua', 'zorder':999}
 
+param['proj.countries_add'] = True
+param['proj.countries']     = {'color': '#d4d4d4', 'zorder':999}
 
-    default['proj.countries_add'] = True
-    default['proj.countries']     = {'color': '#d4d4d4', 'zorder':999}
+param['proj.meridians_add'] = True
+param['proj.meridians_vals'] = 'auto'
+param['proj.meridians']     = {'labels':[0,0,0,1],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
 
-    default['proj.meridians_add'] = True
-    default['proj.meridians_vals'] = 'auto'
-    default['proj.meridians']     = {'labels':[0,0,0,1],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
+param['proj.parallels_add'] = True
+param['proj.parallels_vals'] = 'auto'
+param['proj.parallels']     = {'labels':[1,0,0,0],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
 
-    default['proj.parallels_add'] = True
-    default['proj.parallels_vals'] = 'auto'
-    default['proj.parallels']     = {'labels':[1,0,0,0],'color': '#4d4d4d', 'dashes': (1, 4), 'linewidth': 0.5, 'zorder':999}
+param['proj.rivers_add'] = False
+param['proj.rivers']     = {'color': 'blue', 'linewidth': 0.5, 'zorder':999}
 
-    default['proj.rivers_add'] = False
-    default['proj.rivers']     = {'color': 'blue', 'linewidth': 0.5, 'zorder':999}
+param['proj.states_add'] = False
+param['proj.states']     = {'color': 'green', 'linewidth': 0.5, 'zorder':999}
 
-    default['proj.states_add'] = False
-    default['proj.states']     = {'color': 'green', 'linewidth': 0.5, 'zorder':999}
+# about scalar field:
+param['field.plot']  = 'pcolormesh'
+param['field.clim']  = False
+param['field.cvals'] = False
+param['field.cmap']  = False
+param['field.extend']  = None
+param['field.linewidths']  = None
 
-    # about scalar field:
-    default['field.plot']  = 'pcolormesh'
-    default['field.clim']  = False
-    default['field.cvals'] = False
-    default['field.cmap']  = False
-#    default['field.linecolors']  = None
-    default['field.extend']  = None
-    default['field.linewidths']  = None
+# about vector field:
+param['vfield.options']={'units':'x','scale':None}
+param['vfield.key_options']={'coordinates':'figure'}
+param['vfield.key_XYU']=0.05,0.05,'auto'
+param['vfield.key_label']='auto'
+param['vfield.dij0']  = 0,0
+param['vfield.dij']  = 5,5
+param['vfield.C']  = None
 
-    # about vector field:
-    default['vfield.options']={'units':'x','scale':None}
-    default['vfield.key_options']={'coordinates':'figure'}
-    default['vfield.key_XYU']=0.05,0.05,'auto'
-    default['vfield.key_label']='auto'
-    default['vfield.dij0']  = 0,0
-    default['vfield.dij']  = 5,5
-    default['vfield.C']  = None
-
-    # about 1d plots:
-    default['d1_fill.options']  = {'lw':1,'facecolor':'#cccccc','edgecolor':'none'}
-    default['d1_line.options']  = {'lw':1}
-    default['d1.plot']  = 'plot'
-    default['d1.y0']    = 'min'
-
-    param=default
-    del(default)
+# about 1d plots:
+param['d1_fill.options']  = {'lw':1,'facecolor':'#cccccc','edgecolor':'none'}
+param['d1_line.options']  = {'lw':1}
+param['d1.plot']  = 'plot'
+param['d1.y0']    = 'min'
 
 
 class visCfg:
 
   def __init__(self):
-    self.config=param.copy()
+    #self.config=param.copy()
+    # this is a shallow copy! It is fine for param with integers and
+    # string, but not ok for a param with a dict! We need a deepcopy:
+    import copy
+    self.config=copy.deepcopy(param)
 
   def get_param(self,name0,name1=False):
     keys=self.config.keys()
@@ -173,8 +171,6 @@ class Vis(visCfg):
 
 
   def init_figure(self,**kargs):
-    print('======= init fig ')
-    print(kargs)
     fig=kargs.get('fig',None) # use existing fig; create a new one if True
     ax=kargs.get('ax',None) # use existing axes
     cbax=kargs.get('cbax',None) # use existing axes for colorbar
@@ -234,8 +230,9 @@ class Vis(visCfg):
     self.ax=parent.ax
     self.init_handles()
     if hasattr(parent,'map'):
-       self.map=parent.map
-       self.map_info_copy(parent)
+#       self.map=parent.map
+#       self.map_info_copy(parent)
+       self.copy_projection(parent)
 
   def clear_figure(self):
     self.fig.clf()
@@ -256,11 +253,42 @@ class Vis(visCfg):
     return res
 
 
-  def map_info_copy(self,prevObj):
-    for k in ['axes.axis','proj.name','proj.resolution']:
+#  def map_info_copy(self,prevObj):
+#    for k in ['axes.axis','proj.name','proj.resolution','proj.options']:
+#      self.config[k]=prevObj.config[k]
+#
+#    #self.map_info_current=self.map_info_get()
+#    self.map_info_current=prevObj.map_info_get()
+
+
+  def copy_projection(self,prevObj):
+    self.map=prevObj.map
+    for k in ['axes.axis','proj.name','proj.resolution','proj.options']:
       self.config[k]=prevObj.config[k]
 
-    self.map_info_current=self.map_info_get()
+    self.map_info_current=prevObj.map_info_get()
+
+
+  def set_projection(self,opts):
+    '''initiates the projection using basemap options provided as dict'''
+    if not opts: return
+
+    self.config['proj.options']={}
+    for name in opts:
+      val=opts[name]
+      if name=='projection': self.config['proj.name']=val
+      elif name=='resolution': self.config['proj.resolution']=val
+      else: self.config['proj.options'][name]=val
+
+    self.init_projection()
+
+
+  def rm_projection(self):
+    self.config['proj.name']='auto'
+    self.config['proj.resolution']='auto'
+    self.config['proj.options']={}
+    self.config['axes.axis']=False
+    self.map=False
 
 
   def init_projection(self,**kargs):
@@ -301,12 +329,12 @@ class Vis(visCfg):
        else: resolution='h'
        self.config['proj.resolution']=resolution
 
-   
-    # proj options: 
+    # proj options:
     opts=self.config['proj.options']
+
     if self.config['proj.name'] in ('spstere','npstere'):
       opts['lon_0'] = opts.get('lon_0',0)
-      if self.config['proj.name']=='spstere': 
+      if self.config['proj.name']=='spstere':
         opts['boundinglat'] = opts.get('boundinglat',ylim[1])
       else:
         opts['boundinglat'] = opts.get('boundinglat',ylim[0])
@@ -315,7 +343,13 @@ class Vis(visCfg):
       opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
       opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
       opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
-      
+
+    elif self.config['proj.name'] in ('merc','tmerc','cyl'):
+      opts['urcrnrlon']=opts.get('urcrnrlon',xlim[1])
+      opts['urcrnrlat']=opts.get('urcrnrlat',ylim[1])
+      opts['llcrnrlon']=opts.get('llcrnrlon',xlim[0])
+      opts['llcrnrlat']=opts.get('llcrnrlat',ylim[0])
+
     else:
       opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
       opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
@@ -332,24 +366,35 @@ class Vis(visCfg):
     else:
       if debug_lev==2: print(' -> creating proj')
 
-      if self.config['proj.name'] in ('spstere','npstere'):
-        m = Basemap(projection=self.config['proj.name'],
-                  resolution=self.config['proj.resolution'],
-#                  lon_0=lon_0,boundinglat=blat)
-                  **opts)
-      elif self.config['proj.name'] == 'stere':
-        m = Basemap(projection=self.config['proj.name'],
-                  resolution=self.config['proj.resolution'],
-                  urcrnrlon=xlim[1], urcrnrlat=ylim[1],
-                  llcrnrlon=xlim[0], llcrnrlat=ylim[0],
-                  **opts)
-      else:
-        m = Basemap(projection=self.config['proj.name'], lat_ts=0.0,
-                  resolution=self.config['proj.resolution'],
-                  urcrnrlon=xlim[1], urcrnrlat=ylim[1],
-                  llcrnrlon=xlim[0], llcrnrlat=ylim[0],
-                  **opts)
-#                  lon_0=lon_0,lat_0=lat_0)
+##      print(opts)
+##      print(self.config['proj.name'])
+      m=Basemap(projection=self.config['proj.name'],
+                resolution=self.config['proj.resolution'],
+                **opts)
+
+##      try:
+##        m=Basemap(projection=self.config['proj.name'],
+##                  resolution=self.config['proj.resolution'],
+##                  **self.config['proj.options'])
+##      except:
+##
+##        if self.config['proj.name'] in ('spstere','npstere'):
+##          m = Basemap(projection=self.config['proj.name'],
+##                    resolution=self.config['proj.resolution'],
+##                    #lon_0=lon_0,boundinglat=blat)
+##                    **opts)
+##        elif self.config['proj.name'] == 'stere':
+##          m = Basemap(projection=self.config['proj.name'],
+##                    resolution=self.config['proj.resolution'],
+##                    urcrnrlon=xlim[1], urcrnrlat=ylim[1],
+##                    llcrnrlon=xlim[0], llcrnrlat=ylim[0],
+##                    **opts)
+##        else:
+##          m = Basemap(projection=self.config['proj.name'], lat_ts=0.0,
+##                    resolution=self.config['proj.resolution'],
+##                    urcrnrlon=xlim[1], urcrnrlat=ylim[1],
+##                    llcrnrlon=xlim[0], llcrnrlat=ylim[0],
+##                    **opts)
 
       cch.store(cacheLab,m,'localfile')
 
@@ -481,9 +526,11 @@ class Vis(visCfg):
       args['extend']=self.config['field.extend']
 
     args['zorder']=self.config['plot.zorder']
-    plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
-    args['label']=plabel
-    print('FIELD zorder=',args['zorder'])
+
+    # about label: not supported by contour and contourf
+    if self.config['field.plot'] in ('pcolor','pcolormesh'):
+      plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
+      args['label']=plabel
 
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
       self.handles['mappable']+=[meth(x,y,v,**args)]
@@ -556,8 +603,7 @@ class Vis(visCfg):
       w,h=self.config['colorbar.ax_position'][2:]
       if w>h: opts['orientation']='horizontal'
       else: opts['orientation']='vertical'
-##      print w,h, opts['orientation'], self.config['colorbar.ax_position']
-##      print '----'*10
+
       try:
         self.cb=pl.colorbar(self.handles['mappable'][-1],cax=self.cbax,**opts)
         if  self.cbbg: self.cbbg.set(visible=True)
@@ -575,39 +621,35 @@ class Vis(visCfg):
 
     plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
 
-    if 1:
-      plt=self.config['d1.plot']
+#    if 1:
+    plt=self.config['d1.plot']
 
-      if  plt=='fill':
-        args=self.config['d1_fill.options']
-        args['label']=plabel
-        args['zorder']=self.config['plot.zorder']
-        x,y=self._convCoord(x,y)
-        print('FILL zorder=',args['zorder'])
-        self.handles['d1']+=[self.ax.fill(x,y,**args)]
+    if  plt=='fill':
+      args=self.config['d1_fill.options']
+      args['label']=plabel
+      args['zorder']=self.config['plot.zorder']
+      x,y=self._convCoord(x,y)
+      self.handles['d1']+=[self.ax.fill(x,y,**args)]
 
-      elif  plt=='fill_between':
-        args=self.config['d1_fill.options']
-        args['label']=plabel
-        args['zorder']=self.config['plot.zorder']
+    elif  plt=='fill_between':
+      args=self.config['d1_fill.options']
+      args['label']=plabel
+      args['zorder']=self.config['plot.zorder']
 
-        y0=self.config['d1.y0']
-        if y0=='min': Y0=self.ax.get_ylim()[0]
-        elif y0=='max': Y0=self.ax.get_ylim()[1]
-        else: Y0=y0
+      y0=self.config['d1.y0']
+      if y0=='min': Y0=self.ax.get_ylim()[0]
+      elif y0=='max': Y0=self.ax.get_ylim()[1]
+      else: Y0=y0
 
-        x,y=self._convCoord(x,y) # should also convert y0 !! how!? no need for now...
-        self.handles['d1']+=[self.ax.fill_between(x,y,Y0,**args)]
+      x,y=self._convCoord(x,y) # should also convert y0 !! how!? no need for now...
+      self.handles['d1']+=[self.ax.fill_between(x,y,Y0,**args)]
 
-      elif plt=='plot':
-        args=self.config['d1_line.options']
-        args['label']=plabel
-        args['zorder']=self.config['plot.zorder']
-        x,y=self._convCoord(x,y)
-        self.handles['d1']+=[self.ax.plot(x,y,**args)]
-
-
-   # TODO: deal with x as datetimes... choose best xticks
+    elif plt=='plot':
+      args=self.config['d1_line.options']
+      args['label']=plabel
+      args['zorder']=self.config['plot.zorder']
+      x,y=self._convCoord(x,y)
+      self.handles['d1']+=[self.ax.plot(x,y,**args)]
 
   def draw_label(self,labType,labStr):
     if not labStr: return
@@ -662,12 +704,18 @@ class Data(Vis):
     print(' == msg == %s'%msg)
 
   def plot(self,coords='auto',proj='auto',labels=True,extras=True,isExtra=0,**kargs):
-    print('== plotting ... '+self.label+' zorder= %.2f'%self.config['plot.zorder'])
     ax=kargs.pop('ax',None)
     cbax=kargs.pop('cbax',None)
 
-    if ax: self.ax=ax
-    if cbax: self.cbax=cbax
+    if ax:
+      self.ax=ax
+      axp=ax.get_position()
+      self.config['axes.position']=axp.x0,axp.y0,axp.width,axp.height
+
+    if cbax:
+      self.cbax=cbax
+      axp=cbax.get_position()
+      self.config['colorbar.ax_position']=axp.x0,axp.y0,axp.width,axp.height
 
     parent=kargs.pop('inherit',0)
     if parent:
@@ -731,7 +779,6 @@ class Data(Vis):
       isFig=True
       isAxFig=True
 
-###    print hasattr(self,'fig'), isFig
     if hasattr(self,'fig') and isFig:
       if isExtra: pass
       else:
@@ -747,12 +794,13 @@ class Data(Vis):
         self.init_figure()
 
     if proj and not isExtra:
-      if not hasattr(self,'map') or self.map_info_get()!=self.map_info_current:
+      if not hasattr(self,'map') or not self.map or self.map_info_get()!=self.map_info_current:
         # make a new projection:
-        if not self.config['axes.axis'] and not x is None: self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
+        if not self.config['axes.axis'] and not x is None:
+          self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
+
         if debug_lev==2: print(' -> new projection needed')
         self.init_projection(debug_level=debug_lev)
-###        useProj=1
 
     # set labels:
     xlab=ylab=vlab=''
@@ -771,17 +819,19 @@ class Data(Vis):
     else: vlab = '%s (%s)'%(self.info['v']['name'],vunits)
 
 
-    # vifield, 1d or 2d
+    # vfield, 1d or 2d
     if np.iscomplexobj(self.v):
       if debug_lev==2: print(' -> will draw vfield')
       self.draw_vector_field(x,y,np.real(self.v),np.imag(self.v))
 
-    # sclar:
+    # scalar:
     else:
       if ndim==2:
         if debug_lev==2: print(' -> will draw 2d')
         self.draw_scalar_field(x,y,self.v)
-        if not isExtra: self.draw_colorbar()
+        if not isExtra:
+          if debug_lev==2: print(' -> will draw colorbar')
+          self.draw_colorbar()
 
       elif ndim==1:
         if debug_lev==2: print(' -> will draw 1d')
@@ -792,7 +842,11 @@ class Data(Vis):
       if ndim==2:
         tit=vlab
         if not self.t is None:
-          if isinstance(self.t,datetime.datetime):
+          #if isinstance(self.t,datetime.datetime):
+          # now netcdftime.num2date returns array or netcdftime.datetime
+          # obkjects instead of datetime.datetime
+          import netcdftime
+          if isinstance(self.t,datetime.datetime) or isinstance(self.t,netcdftime.datetime):
             tit+=' $\\bullet$ %s'%self.t.strftime('%Y-%m-%d %H:%M')
           else:
             tit+=' $\\bullet$ %s to %s'%(self.t[0,0].strftime('%Y-%m-%d %H:%M'),self.t[0,-1].strftime('%Y-%m-%d %H:%M'))

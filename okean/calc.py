@@ -1,7 +1,5 @@
 import numpy as np
 
-
-
 def isarray(v,nomask=False):
   'True for numpy arrays or numpy masked arrays (if nomask is False)'
   if nomask: return isinstance(v,np.ndarray)
@@ -46,8 +44,13 @@ def inpolygon(x,y,xp,yp):
   try:
     if x.ndim>1:
       shape=x.shape
-      x=x.flat
-      y=y.flat
+      # if masked will generate a MaskedIterator... not ok as we want a flatiter
+      # so:
+      if np.ma.isMA(x): x=x.data.flat
+      else: x=x.flat
+
+      if np.ma.isMA(y): y=y.data.flat
+      else: y=y.flat
   except: pass
 
   if _use_mpl==1:
@@ -390,7 +393,8 @@ def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
   Based on delaunay triangulation provided by matplotlib.
   '''
 
-  if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
+  #if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
+  if np.ma.is_masked(v): mask=v.mask
   else: return v
 
   sh=v.shape
@@ -460,7 +464,10 @@ def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
     u=u[:-4]
 
   u.shape=sh
-  if not inplace: return u
+
+  if not inplace:
+    if not np.ma.is_masked(u): u=u.data
+    return u
 
 
 def cyclic_index(time,t,cycle):
@@ -851,6 +858,25 @@ def ij_limits(x,y,xlim,ylim,margin=0):
     xp=np.array([xlim[0],xlim[1],xlim[1],xlim[0]])
     yp=np.array([ylim[0],ylim[0],ylim[1],ylim[1]])
 
+    dxp=xp.max()-xp.min()
+    dyp=yp.max()-yp.min()
+
+    if dxp==0 or dyp==0: # vertical or horizontal line
+      dx0=np.diff(np.abs(x)).max()
+      dx1=np.diff(np.abs(x).T).max()
+      dy0=np.diff(np.abs(y)).max()
+      dy1=np.diff(np.abs(y).T).max()
+      dxy=np.max([dx0,dx1,dy0,dy1])
+
+      if dxp==0:
+        xp[:2]=xp[0]-dxy
+        xp[-2:]=xp[-1]+dxy
+
+      if dyp==0:
+        yp[:2]=yp[0]-dxy
+        yp[-2:]=yp[-1]+dxy
+
+
     inp=inpolygon(x,y,xp,yp)
     try:    j,i=np.where(inp)
     except: j,i=np.ma.where(inp)
@@ -931,7 +957,7 @@ def bilin(x,y,v,xi,yi,**kargs):
       or with triangulation)
   '''
 
-  from alg import bilin as alg_bilin
+  from .alg import bilin as alg_bilin
   if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
   else: mask=np.zeros_like(v,'bool')
   vi,maski=alg_bilin(x,y,v,xi,yi,mask)
@@ -943,7 +969,7 @@ def bilin_coefs(x,y,xi,yi,mask=False):
   Returns coefs to be used as bilin_fast(v,coefs,...).
   Use Bilin instead.
   '''
-  from alg import bilin_coefs as alg_bc
+  from .alg import bilin_coefs as alg_bc
   if mask is False: mask=np.zeros_like(x,'bool')
   coefs,inds=alg_bc(x,y,xi,yi,mask)
   return xi,yi,coefs,inds
@@ -957,7 +983,7 @@ def  bilin_fast(v,coefs,**kargs):
   Use Bilin instead.
   '''
 
-  from alg import bilin_fast as alg_bf
+  from .alg import bilin_fast as alg_bf
   xi,yi,inds,coefs=coefs
   vi,maski=alg_bf(v,coefs,inds)
   return _bilin_aux(xi,yi,vi,maski,**kargs)
@@ -970,7 +996,7 @@ def easy_extrap(x,y,v,inplace=False):
   Use only when mask_extrap is too slow or extrapolation is not ok.
   '''
 
-  from alg import extrap2 as alg_extrap2
+  from .alg import extrap2 as alg_extrap2
   if np.ma.isMA(v) and v.size!=v.count():
     directions=[1,1,1,1] # use all (E-W,W-E,N-S,S-N)
     if inplace: v[:]=alg_extrap2(x,y,v,v.mask,dir=directions)

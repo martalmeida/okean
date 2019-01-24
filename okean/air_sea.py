@@ -29,7 +29,7 @@ def qsat(Ta,Pa=as_consts['P_default']):
   latent heat flux compared to the calculation with version 1.0.
 
 
-  mma CESAM, 3-11-2008, from matlab air-sea tollbox at sea-mat
+  from matlab air-sea tollbox at sea-mat
   '''
 
   # original code
@@ -38,8 +38,7 @@ def qsat(Ta,Pa=as_consts['P_default']):
 
   # as in Fortran code v2.5b for COARE
   ew = 6.1121*(1.0007+3.46e-6*Pa)*np.exp((17.502*Ta)/(240.97+Ta)) # in mb
-  q  = 0.62197*(ew/(Pa-0.378*ew))                              # mb -> kg/kg
-
+  q  = 0.62197*(ew/(Pa-0.378*ew))                                 # mb -> kg/kg
   return q
 
 
@@ -346,4 +345,39 @@ def nlw(cloud,Tsea,Tair,Rh):
   cff1 = TairK**4
 
   return -emmiss*StefBo*(cff1*(0.39-0.05*np.sqrt(vap))*(1.0-0.6823*cloud**2)+cff2*4.0*(TseaK-TairK))
+
+
+def pvap(T):
+  '''Saturation vapor pressure
+  Using Augustt-Roche-Magnus (or Magnus-Tetens or Magnus) equation
+    T in Celsius
+    output in Pa
+
+  Reference:
+    Alduchov, O.A. and R.E. Eskridge, 1996.
+    Improved Magnus Form Approximation of Saturation Vapor Pressure.
+    J. Appl. Meteor., 35, 601–609
+    https://doi.org/10.1175/1520-0450(1996)035<0601:IMFAOS>2.0.CO;2~
+
+  Formulation:
+    100*6.1094*np.exp(17.625*T/(T+243.04))
+
+  Other formulations (see Table of reference), ex: Tetens (1930):
+    s=100*6.11* 10**(7.5*T/(237.3+T))
+
+  '''
+  return 1000*0.61094*np.exp(17.625*T/(T+243.04))
+
+
+def relative_humidity(T,Td):
+  '''
+  Relative humidity [0..1] from air temperature and dew point temperature
+  T, Td: air and dew point temperature (C)
+
+       saturation vapor pressure at Td (actual vapor pressure)
+  RH = -------------------------------
+       saturation vapor pressure at T
+
+  '''
+  return pvap(Td)/pvap(T)
 

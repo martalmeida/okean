@@ -374,3 +374,7 @@ def isstr(s):
   Same as isinstance(s,basestring) in python 2x
   '''
   return isinstance(s,(''.__class__,u''.__class__))
+  #or
+  #try: basestring
+  #except NameError: basestring=str
+  #return isinstance(s,basestring)

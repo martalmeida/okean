@@ -1,8 +1,14 @@
 import numpy as np
 from okean.roms import roms_tools as rt
 
-def speed(u,v): return np.sqrt(u**2+v**2)
-def ke(u,v): return 0.5*(u**2+v**2)
+def speed(*uv):
+ if len(uv)==1: return np.abs(uv[0]) # assume it is imaginary
+ elif len(uv)==2: return np.sqrt(uv[0]**2+uv[1]**2)
+
+def ke(*uv):
+ if len(uv)==1: return 0.5*(uv[0].real**2+uv[0].imag**2) # assume it is imaginary
+ elif len(uv)==2: return 0.5*(uv[0]**2+uv[1]**2)
+
 
 def okubo(u,v,pm,pn):
   '''

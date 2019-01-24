@@ -1,10 +1,11 @@
 from os.path import isfile
 import numpy as np
 import datetime
+from collections import OrderedDict
 
-from okean import calc, cookbook as cb, netcdf
+from okean import calc, cookbook as cb, netcdf, dateu
 from okean.roms import roms_tools as rt, roms
-import gennc
+from . import gennc
 
 class DataAccess:
   # dims:
@@ -25,6 +26,12 @@ class DataAccess:
   v_name    = 'v'
   ssh_name  = 'ssh'
 
+  # surface variables:
+  ss_temp_name = ''
+  ss_salt_name = ''
+  ss_u_name    = ''
+  ss_v_name    = ''
+
   # time:
   time_name  = 'time'
 
@@ -32,6 +39,7 @@ class DataAccess:
     for k in kargs.keys():
       if not hasattr(self,k): print('new key %s' % k )
       setattr(self,k,kargs[k])
+
 
 def load_data(f,quiet=0,**kargs):
   '''
@@ -46,8 +54,8 @@ def load_data(f,quiet=0,**kargs):
   If f is a opendap address, it must contain also all these variables
   or the ones defined in the input karg settings (DataAccess object)
 
-  To deal with the case of variables in different files/opendap addresses,
-  f can also be a dictionary with keys the variables and values the files
+  To deal with variables in different files/opendap addresses, f can
+  also be a dictionary with keys the variables and values the files
   or opendap addresses. In this case, the keys must be:
     - temp
     - salt
@@ -69,14 +77,10 @@ def load_data(f,quiet=0,**kargs):
     t_units, units of variable time, by default the att  units is used
   '''
 
-  sett=DataAccess()
-  inds={}
-  extra=[]
-  t_units=[]
-  if 'settings' in kargs.keys(): sett    = kargs['settings']
-  if 'inds'     in kargs.keys(): inds    = kargs['inds']
-  if 'extra'    in kargs.keys(): extra   = kargs['extra']
-  if 't_units'  in kargs.keys(): t_units = kargs['t_units']
+  sett    = kargs.get('settings',DataAccess())
+  inds    = kargs.get('inds',{})
+  extra   = kargs.get('extra',[])
+  t_units = kargs.get('t_units',[])
 
   res={}
   msg=''
@@ -90,9 +94,9 @@ def load_data(f,quiet=0,**kargs):
   if not isinstance(f,dict):
     f={'temp':f,'salt':f,'u':f,'v':f,'ssh':f,'misc':f}
 
-  if not f.has_key('xy'):   f['xy']   = f['misc']
-  if not f.has_key('z'):    f['z']    = f['misc']
-  if not f.has_key('time'): f['time'] = f['misc']
+  if 'xy'   not in f: f['xy']   = f['misc']
+  if 'z'    not in f: f['z']    = f['misc']
+  if 'time' not in f: f['time'] = f['misc']
 
   filesUsed=[]
   ncUsed=[]
@@ -170,14 +174,13 @@ def load_data(f,quiet=0,**kargs):
 
   res['NX']=dimsXy[sett.xdim]
   res['NY']=dimsXy[sett.ydim]
-  ###if sett.z_name:
   if sett.zdim:
     res['NZ']=dimsZ[sett.zdim]
   else:
     res['NZ']=1
 
   # about horizontal inds:
-  if inds.has_key(sett.xdim) and len(inds[sett.xdim])==2 and not isinstance(inds[sett.xdim],basestring):
+  if sett.xdim in inds and len(inds[sett.xdim])==2 and not isinstance(inds[sett.xdim],basestring):
     if not quiet: print('  calc horizontal inds...')
     xlim=inds[sett.xdim]
     ylim=inds[sett.ydim]
@@ -193,30 +196,7 @@ def load_data(f,quiet=0,**kargs):
     inds[sett.ydim]='%d:%d' % (j0,j1)
 
 
-  if not quiet: print('  loading lon, lat, depth...')
-  res['lon']  = netcdf.use(ncXy,sett.x_name,**inds)
-  if np.any(res['lon']>360): res['lon']=np.mod(res['lon'],360.)
-  res['lat']  = netcdf.use(ncXy,sett.y_name,**inds)
-  if sett.z_name:
-    res['depth'] = -netcdf.use(ncZ,sett.z_name,**inds)
-  else: res['depth']=False
-
-  if res['lon'].size!=res['lat'].size:
-    res['lon'],res['lat']=np.meshgrid(res['lon'],res['lat'])
-    # needed for griddata, later
-
-  # update nx,ny:
-  if inds.has_key(sett.xdim):
-    res['NY'],res['NX']=res['lon'].shape
-
-  # extra misc vars:
-  if len(extra):
-    for outKey,fileVar in extra:
-      if not quiet: print('  loading extra misc... %s %s' % (outKey,fileVar))
-      res[outKey]=netcdf.use(ncMisc,fileVar,**inds)
-
-
-  # time:
+  # about time dim:
   # file may have one or several times. If several, time dim must be given
   # with kargs inds!
   # but file may also have no time dim or time name !
@@ -228,8 +208,8 @@ def load_data(f,quiet=0,**kargs):
     else:
       times=netcdf.nctime(ncTime,sett.time_name)
 
-    if inds.has_key(sett.tdim):
-      try: tind=dts.parse_date(inds[sett.tdim])
+    if sett.tdim in inds:
+      try: tind=dateu.parse_date(inds[sett.tdim])
       except: tind=inds[sett.tdim] # is an integer, for instance
 
       if isinstance(tind,datetime.datetime):
@@ -257,7 +237,7 @@ def load_data(f,quiet=0,**kargs):
       date=times[0]
       if not quiet: print('    date= %s' % date.isoformat(' '))
     else: # must provide tind as input!!
-      Msg='several dates in file... provice tind!'
+      Msg='several dates in file... provide tind!'
       msg+='\n'+Msg
       return res,msg+' ERROR'
 
@@ -265,6 +245,39 @@ def load_data(f,quiet=0,**kargs):
   else:
     if not quiet: print('    warning: not using time !!')
     res['date']=0
+
+
+  # load lon,lat, depth:
+  if not quiet: print('  loading lon, lat, depth...')
+  res['lon']  = netcdf.use(ncXy,sett.x_name,**inds)
+  if np.any(res['lon']>360): res['lon']=np.mod(res['lon'],360.)
+  res['lat']  = netcdf.use(ncXy,sett.y_name,**inds)
+  if sett.z_name:
+    res['depth'] = -netcdf.use(ncZ,sett.z_name,**inds)
+  else: res['depth']=False
+
+  if res['lon'].size!=res['lat'].size:
+    res['lon'],res['lat']=np.meshgrid(res['lon'],res['lat'])
+    # needed for griddata, later
+
+  # update nx,ny:
+  if sett.xdim in inds:
+    res['NY'],res['NX']=res['lon'].shape
+
+  # load surface variables as extra (from misc file) for now.
+  # (this should be basically never used!)
+  if sett.ss_temp_name: extra+=[['ss_temp',sett.ss_temp_name]]
+  if sett.ss_salt_name: extra+=[['ss_salt',sett.ss_salt_name]]
+  if sett.ss_u_name:    extra+=[['ss_u',   sett.ss_u_name]]
+  if sett.ss_v_name:    extra+=[['ss_v',   sett.ss_v_name]]
+
+  # extra misc vars:
+  if len(extra):
+    for outKey,fileVar in extra:
+      if not quiet: print('  loading extra misc... %s %s' % (outKey,fileVar))
+      res[outKey]=netcdf.use(ncMisc,fileVar,**inds)
+
+
 
   empty3d=np.zeros([res['NZ'],res['NY'],res['NX']])
   empty2d=np.zeros([res['NY'],res['NX']])
@@ -335,9 +348,12 @@ def avg_dates(Date,data,data1):
 
   res=data.copy()
   res['date']=Date
-  for i in ('temp','salt','u','v','zeta','ubar','vbar'):
-    print('    avg %s' % i)
-    res[i] = (data[i]*b +data1[i]*a)/(a+b)
+  for i in ('temp','salt','u','v','zeta','ubar','vbar','ss_temp','ss_salt','ss_u','ss_v'):
+    if i in data:
+      print('    avg %s' % i)
+      res[i] = (data[i]*b +data1[i]*a)/(a+b)
+    else:
+      print('    not found for avg: %s' % i)
 
   return res
 
@@ -479,18 +495,21 @@ def data2roms(data,grd,sparams,**kargs):
              returned and can be used for next data2roms call with
              this same karg
   quiet : output messages flag (false by default)
-  proj : projection - False, name or basemap proj - lcc by default
+  proj : projection - False, *auto* (use default grid projection) or basemap proj
          if False, horizontal interpolations will use lonxlat instead of distances
   interp_opts: options for griddata
   rep_surf: repeat surface level (new upper level)
+            - If surface variables are present rep_surf must be True
+              and for each variable (ex temp) will be used the surface
+              variable (if present, ex ss_temp) instead of the upper layer.
   '''
 
   ij          = kargs.get('ij','j')
   ij_ind      = kargs.get('ij_ind',False)
   horizAux    = kargs.get('horizAux',False)
   quiet       = kargs.get('quiet',False)
-  proj        = kargs.get('proj','lcc') # lonxlat to distance before
-                                        # horizontal interpolation
+  proj        = kargs.get('proj','auto') # lonxlat to distance before
+                                         # horizontal interpolation
   interp_opts = kargs.get('interp_opts',{})
   rep_surf    = kargs.get('rep_surf',True) # create a surface upper level
                                            # before interpolation
@@ -501,17 +520,12 @@ def data2roms(data,grd,sparams,**kargs):
   xu,yu,hu,mu=g.vars('u')
   xv,yv,hv,mv=g.vars('v')
   ny,nx=hr.shape
+  ny0,nx0=hr.shape
   nz=sparams[3]
 
+  if proj=='auto': proj=g.get_projection()
   if proj:
     print('projecting coordinates...')
-    if isinstance(proj,basestring):
-       lonc=(xr.max()+xr.min())/2.
-       latc=(yr.max()+yr.min())/2.
-       from mpl_toolkits.basemap import Basemap
-       proj=Basemap(projection=proj,width=1,height=1,resolution=None,
-                    lon_0=lonc,lat_0=latc, lat_1=latc)
-
     xr,yr=proj(xr,yr)
     xu,yu=proj(xu,yu)
     xv,yv=proj(xv,yv)
@@ -520,12 +534,14 @@ def data2roms(data,grd,sparams,**kargs):
     distance=lambda x,y: np.append(0.,np.sqrt(np.diff(x)**2+np.diff(y)**2).cumsum())
   else:
     dlon,dlat=data['lon'],data['lat']
+    Rdz=1.
     distance=calc.distance
 
   # needed for s_levels and for rep_surf!
   sshr=calc.griddata(dlon,dlat,data['ssh'],xr,yr,extrap=True,**interp_opts)
 
   # repeat surface:
+  any_ssvar=False
   if rep_surf:
     # copy data cos dont want to change the original dataset:
     import copy
@@ -538,14 +554,24 @@ def data2roms(data,grd,sparams,**kargs):
         if np.ma.isMA(data[vname]): vstack=np.ma.vstack
         else: vstack=np.vstack
 
+      ss_vname='ss_'+vname
+      if ss_vname in data and not quiet:
+        any_ssvar=True
+        print('- using surface variable %s'%ss_vname)
+
       if data['depth'][0]>data['depth'][1]: # surf at ind 0
-        data[vname]=vstack((data[vname][0][np.newaxis],data[vname]))
+        if ss_vname in data: data[vname]=vstack((data[ss_vname][np.newaxis],data[vname]))
+        else:                data[vname]=vstack((data[vname][0][np.newaxis],data[vname]))
         if vname=='depth': data[vname][0]=sshr.max()
+        surf_ind=0
       else:
-        data[vname]=vstack((data[vname],data[vname][-1][np.newaxis]))
+        if ss_vname in data: data[vname]=vstack((data[vname],data[ss_vname][np.newaxis]))
+        else:                data[vname]=vstack((data[vname],data[vname][-1][np.newaxis]))
         if vname=='depth': data[vname][-1]=sshr.max()
+        surf_ind=-1
 
     data['NZ']=data['NZ']+1
+
 
   NX=data['NX']
   NY=data['NY']
@@ -585,8 +611,7 @@ def data2roms(data,grd,sparams,**kargs):
 
     # rotate U,V:
     if not quiet: print('rotating U,V to grid angle')
-    angle=g.use('angle')  # rad
-    U,V=calc.rot2d(U,V,angle)
+    U,V=calc.rot2d(U,V,g.angle) # g.angle in rad
     U=rt.rho2uvp3d(U,'u')
     V=rt.rho2uvp3d(V,'v')
 
@@ -627,9 +652,20 @@ def data2roms(data,grd,sparams,**kargs):
   jslice=lambda x,ind: x[:,ind,:]
   islice=lambda x,ind: x[:,:,ind]
 
-  ZZr = np.tile(data['depth'],(nx,ny,1)).T
-  ZZu = np.tile(data['depth'],(nxu,ny,1)).T
-  ZZv = np.tile(data['depth'],(nx,nyv,1)).T
+  if any_ssvar:
+    ZZr = np.tile(data['depth'],(nx0,ny0,1)).T
+    ZZu = np.tile(data['depth'],(nx0-1,ny0,1)).T
+    ZZv = np.tile(data['depth'],(nx0,ny0-1,1)).T
+    # replace 1st level by sea surface height!
+    # instead of sshr.max(). This is at least slightly more correct,
+    # and should be no problem for variables without surface counterpart.
+    ZZr[surf_ind]=sshr
+    ZZu[surf_ind]=(sshr[:,1:]+sshr[:,:-1])/2.
+    ZZv[surf_ind]=(sshr[1:]+sshr[:-1])/2.
+  else:
+    ZZr = np.tile(data['depth'],(nx,ny,1)).T
+    ZZu = np.tile(data['depth'],(nxu,ny,1)).T
+    ZZv = np.tile(data['depth'],(nx,nyv,1)).T
 
   if not useInd is False: #>------------------------------------------
     if   ij=='j':
@@ -642,6 +678,8 @@ def data2roms(data,grd,sparams,**kargs):
       hr  =hr[:,ij_ind]
 
     Zr,Zu,Zv,TEMP,SALT,U,V=[slice(k,ij_ind) for k in [Zr,Zu,Zv,TEMP,SALT,U,V]]
+    if any_ssvar:
+      ZZr,ZZu,ZZv=[slice(k,ij_ind) for k in [ZZr,ZZu,ZZv]]
   # -----------------------------------------------------------------<
 
   if useInd: # then store distances for a possible bry file
@@ -653,7 +691,7 @@ def data2roms(data,grd,sparams,**kargs):
   if not quiet: print('vertical interpolation:')
   if ij=='j':
     for j in range(ny):
-      if not quiet and (ny<10 or (ny>=10 and j%10==0)): print('  j=%3d of %3d' % (j,ny))
+      if not quiet and (ny<20 or (ny>=20 and j%20==0)): print('  j=%3d of %3d' % (j,ny))
       ind=ij_ind[j]
       dr=np.tile(distance(xr[ind,:],yr[ind,:]),(nz,1))
       du=np.tile(distance(xu[ind,:],yu[ind,:]),(nz,1))
@@ -671,17 +709,18 @@ def data2roms(data,grd,sparams,**kargs):
         import pylab as pl
         pl.figure(1)
         pl.clf()
-        pl.pcolormesh(Dr,ZZr[:,j,:],SALT[:,j,:])
+        pl.pcolormesh(Dr,ZZr[:,j,:],TEMP[:,j,:])
         pl.colorbar()
         clim=pl.gci().get_clim()
-      
+
         pl.figure(2)
         pl.clf()
-        pl.pcolormesh(dr,Zr[:,j,:],Salt[:,j,:])
+        pl.pcolormesh(dr,Zr[:,j,:],Temp[:,j,:])
         pl.clim(clim)
         pl.colorbar()
-        raw_input()
-      
+        try: raw_input()
+        except: input() # python 3
+
       Uvel[:,j,:]   = calc.griddata(Rdz*Du,ZZu[:,j,:],U[:,j,:],   Rdz*du,Zu[:,j,:],extrap=True,**interp_opts)
       if j<Vvel.shape[1]:
         dv=np.tile(distance(xv[ind,:],yv[ind,:]),(nz,1))
@@ -698,7 +737,7 @@ def data2roms(data,grd,sparams,**kargs):
 
   elif ij=='i':
     for i in range(nx):
-      if not quiet and (nx<10 or (nx>=10 and i%10==0)): print('  i=%3d of %3d' % (i,nx))
+      if not quiet and (nx<20 or (nx>=20 and i%20==0)): print('  i=%3d of %3d' % (i,nx))
       ind=ij_ind[i]
       dr=np.tile(distance(xr[:,ind],yr[:,ind]),(nz,1))
       dv=np.tile(distance(xv[:,ind],yv[:,ind]),(nz,1))
@@ -744,7 +783,8 @@ def data2roms(data,grd,sparams,**kargs):
   # -----------------------------------------------------------------<
 
 
-  Vars=cb.odict()
+  #Vars=cb.odict()
+  Vars=OrderedDict()
   Vars['temp'] = Temp
   Vars['salt'] = Salt
   Vars['u']    = Uvel

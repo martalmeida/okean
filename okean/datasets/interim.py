@@ -143,19 +143,6 @@ def fill_tend(v,fill='prev'):
   vv[:-1,...]=v
   return vv
 
-def relative_humidity(T,Td):
-  '''
-  Relative humidity from air temperature and dew point temperature,
-  T, Td, air and dew point temperature (C)
-
-  http://www.hpc.ncep.noaa.gov/html/dewrh.shtml
-  '''
-  a_c=T
-  b_c=Td
-  c=6.11* 10**(7.5*a_c/(237.7+a_c))  # saturation vapor pressure
-  d=6.11* 10**(7.5*b_c/(237.7+b_c))  # actual vapor pressure
-  return d/c                         # relative humidity [0..1]
-
 
 def interim_file_data(files,quiet=False):
   '''
@@ -288,7 +275,7 @@ def interim_file_data(files,quiet=False):
   if not quiet: print('      fill_tend... (T dew)')
   Td=fill_tend(Td)
   T=tair
-  rhum=relative_humidity(T,Td)
+  rhum=air_sea.relative_humidity(T,Td)
   ##  rhum=((112-0.1*T+Td)/(112+0.9*T))**8
   rhum[rhum>1]=1
   out['rhum']=Data(x,y,rhum,'0--1')

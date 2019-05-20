@@ -849,7 +849,9 @@ class Data(Vis):
           if isinstance(self.t,datetime.datetime) or isinstance(self.t,netcdftime.datetime):
             tit+=' $\\bullet$ %s'%self.t.strftime('%Y-%m-%d %H:%M')
           else:
-            tit+=' $\\bullet$ %s to %s'%(self.t[0,0].strftime('%Y-%m-%d %H:%M'),self.t[0,-1].strftime('%Y-%m-%d %H:%M'))
+            try:
+              tit+=' $\\bullet$ %s to %s'%(self.t[0,0].strftime('%Y-%m-%d %H:%M'),self.t[0,-1].strftime('%Y-%m-%d %H:%M'))
+            except: tit+=' *Unknown date*'
 
         if not self.info['v']['slice'] in (None,'Unk'):
           tit+=' $\\bullet$ %s'%self.info['v']['slice']

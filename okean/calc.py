@@ -275,8 +275,7 @@ def griddata(x,y,v,xi,yi,**kargs):
       yb=var_border(y)
 
       # get target points outside:
-      cond=~inpolygon(xi.flat,yi.flat,xb,yb)
-      cond.shape=xi.shape
+      cond=~inpolygon(xi,yi,xb,yb)
       maskCond=maskCond | cond
 
   return np.ma.masked_where(maskCond,res)

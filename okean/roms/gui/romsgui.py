@@ -2360,7 +2360,10 @@ class rgui:
 
       self.datav=datav
       self.data=data
-      self.canvas.show()
+      try:
+        self.canvas.show()
+      except:
+        self.canvas.draw()
 
 
     # activate tools like zoom, slices, etc:

@@ -273,7 +273,10 @@ class Grid(Common):
       try:
         sph=''.join(sph).strip()
       except TypeError:
-        sph=b''.join(sph).strip().decode() # bytes type needed for python3
+        if sph.shape==(): # size is 1 though !
+          sph=sph[()].decode()
+        else:
+          sph=b''.join(sph).strip().decode() # bytes type needed for python3
 
       if len(sph): sph=sph[0]
     except: pass
@@ -1555,6 +1558,7 @@ class MHis():
         #  o[i].extra[-1].config['d1.plot']='plot'
     elif slc=='uv': # for uv, better to mask arrows inside child domains
       if not hasattr(self.grid,'ingrd'): self.grid._set_ingrid('p')
+      from functools import reduce
       for c,i in enumerate(o):
         if not i.v is None:
           if len(self.grid[c].ingrd_p):

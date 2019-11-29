@@ -44,8 +44,7 @@ class plfilt(object):
         if t is None:
             return uf
         else:
-            tf_map = {'valid' : t[self.Nt-1:-self.Nt+1], 'same' : t}
-            
+            tf = {'valid' : t[self.Nt-1:-self.Nt+1], 'same' : t}
             return uf, tf[mode]
 
 
@@ -88,10 +87,10 @@ def pl33(u,dt=1,t=None, extend_mode = 'same'):
         Filtered signal.
     tf : numpy.ndarray
         Time stamps cut to the same length as the signal.
-    """"
+    """
     
     a=plfilt(dt)
-    return a(u,t)
+    return a(u,t, extend_mode)
 
 #if __name__ == '__main__':
 #    u = np.zeros((1000,),'d')

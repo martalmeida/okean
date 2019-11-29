@@ -44,14 +44,54 @@ class plfilt(object):
         if t is None:
             return uf
         else:
-            tf = t[self.Nt-1:-self.Nt+1]
-            return uf, tf
+            tf_map = {'valid' : t[self.Nt-1:-self.Nt+1], 'same' : t}
+            
+            return uf, tf[mode]
 
 
 
-def pl33(u,dt=1,t=None):
-  a=plfilt(dt)
-  return a(u,t)
+def pl33(u,dt=1,t=None, extend_mode = 'same'):
+    """Applies a tide-killer type convolution filter. 
+    
+    The pl33 filter is described on p. 21, Rosenfeld (1983), WHOI
+    Technical Report 85-35. Filter half amplitude period = 33 h., half
+    power period = 38 h.
+    
+     Parameters
+    ----------
+    u : (M,) array_like
+        Time series signal to filter.
+    dt : float (optional)
+        Sampling rate in multiples of the unit used in `t`. Default
+        is 1. This usually is represented in multiples of hrs. If the
+        series is sampled every hour and is set to 1 h, the filter will apply
+        a 33 h half amplitude period (`T`). `dt` can be set different from the
+        actual sampling rate to change the cutoff period, e.g. if sampling
+        rate is equal to 1h and dt is set to 0.5, `T` will be equal to 66 h.
+    t : (M,) array_like (optional)
+        Time stamp series with the same length of `u`.
+    extend_mode : {`valid`, `same`}, (optional)
+        Keyword for the type of padding made by the convolution function.
+        For a window W = 1/dt*33, N = M-2*W.
+        `same`:
+            Mode `same` returns output of length max(M, N). Boundary effects
+            are still visible.
+        `valid`:
+            Mode `valid` returns output of length max(M, N) - min(M, N) + 1.
+            The convolution product is only given for points where the signals
+            overlap completely. Values outside the signal boundary have no
+            effect.
+
+    Returns
+    -------
+    uf : numpy.ndarray
+        Filtered signal.
+    tf : numpy.ndarray
+        Time stamps cut to the same length as the signal.
+    """"
+    
+    a=plfilt(dt)
+    return a(u,t)
 
 #if __name__ == '__main__':
 #    u = np.zeros((1000,),'d')

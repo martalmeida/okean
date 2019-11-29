@@ -5,6 +5,7 @@ apply pl33 33 hour filter to timeseries.
 '''
 
 import numpy as np
+from scipy.signal import detrend as dtrend
 
 class plfilt(object):
     """docstring for plfilt"""
@@ -39,8 +40,14 @@ class plfilt(object):
         self.pl33 = np.interp(self.filter_time, self._dt, self._pl33)
         self.pl33 /= self.pl33.sum()
     
-    def __call__(self, u, t=None, mode='valid'):
-        uf = np.convolve(u, self.pl33, mode=mode)
+    def __call__(self, u, t=None, mode='valid', detrend = False):
+        if detrend:
+            u_dt = dtrend(u, type = 'linear')
+            du = u - u_dt
+            u = u_dt
+        else:
+            du = 0
+        uf = np.convolve(u, self.pl33, mode=mode)+du
         if t is None:
             return uf
         else:
@@ -49,7 +56,7 @@ class plfilt(object):
 
 
 
-def pl33(u,dt=1,t=None, extend_mode = 'same'):
+def pl33(u,dt=1,t=None, extend_mode = 'same', detrend = False):
     """Applies a tide-killer type convolution filter. 
     
     The pl33 filter is described on p. 21, Rosenfeld (1983), WHOI
@@ -80,6 +87,8 @@ def pl33(u,dt=1,t=None, extend_mode = 'same'):
             The convolution product is only given for points where the signals
             overlap completely. Values outside the signal boundary have no
             effect.
+    detrend : bool
+        Apply linear detrend prior to applying convolution.
 
     Returns
     -------
@@ -90,7 +99,7 @@ def pl33(u,dt=1,t=None, extend_mode = 'same'):
     """
     
     a=plfilt(dt)
-    return a(u,t, extend_mode)
+    return a(u,t, mode = extend_mode, detrend = detrend)
 
 #if __name__ == '__main__':
 #    u = np.zeros((1000,),'d')

@@ -181,6 +181,31 @@ def load_blkdata_cordex(cordexClim,date0=False,date1=False,quiet=True,grd=False)
   return out
 
 
+def load_blkdata_era5(datapath,date0=False,date1=False,quiet=True):
+  from okean.datasets import era5
+  a=era5.ERA5Data(datapath)
+  data=a.data(date0,date1,quiet)
+
+  out=OrderedDict()
+  time=data['time']
+  for it in range(len(time)):
+    out[time[it]]={}
+    for k in data:
+
+      if k in ('time',): continue
+      elif  k.startswith('INFO'):
+        out[time[it]][k]=data[k]
+      else:
+        out[time[it]][k]=data[k].data[it,...]
+
+        # x and y should be the same, so:
+        if 'x' not in out[time[it]]:
+          out[time[it]]['x']=data[k].x
+          out[time[it]]['y']=data[k].y
+
+  return out
+
+
 def conv_units(data,model,quiet=True):
   '''
   Some bulk variables have different units in ROMS Rutgers and ROMS-AGRIF
@@ -287,10 +312,11 @@ def data2romsblk(data,grd,**kargs):
   # about wind:
   if not quiet: print(' --> rot U,V wind and U,V wind stress')
   out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],g.angle)
-  out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],g.angle)
+  if 'sustr' in out and 'svstr' in out:
+    out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],g.angle)
 
-  out['sustr']=rt.rho2uvp(out['sustr'],'u')
-  out['svstr']=rt.rho2uvp(out['svstr'],'v')
+    out['sustr']=rt.rho2uvp(out['sustr'],'u')
+    out['svstr']=rt.rho2uvp(out['svstr'],'v')
 
   return out
 
@@ -329,7 +355,7 @@ def make_blk_interim(interimpath,grd,bulk,date0=False,date1=False,**kargs):
   else: original=False
 
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create: q.create(model=model,original=original)
 
   for d in data:
     if model=='roms':
@@ -371,7 +397,7 @@ def make_blk_gfs(gfspath,grd,bulk,date0,date1=False,nforec=0,**kargs):
 
   # common to interim----------------------
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create: q.create(model=model,original=original)
 
   for d in data:
     if model=='roms':
@@ -417,7 +443,7 @@ def make_blk_narr(grd,bulk,date0,date1=False,**kargs):
 
   # common to interim----------------------
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create: q.create(model=model,original=original)
 
   for d in data:
     if model=='roms':
@@ -454,7 +480,7 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
   else: original=False
 
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create: q.create(model=model,original=original)
 
   for d in data:
     if model=='roms':
@@ -495,7 +521,7 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
     if 'x_original' in tmp: original=tmp['x_original'].shape
     else: original=False
 
-    q.create(model,original)
+    q.create(model=model,original=original)
 
 
   for d in data:
@@ -551,7 +577,7 @@ def make_blk_cordex(cordexClim,grd,bulk,date0=False,date1=False,**kargs):
   else: original=False
 
   q=gennc.GenBlk(bulk,grd,**kargs)
-  if create: q.create(model,original)
+  if create: q.create(model=model,original=original)
 
   for d in data:
     if model=='roms':
@@ -563,6 +589,49 @@ def make_blk_cordex(cordexClim,grd,bulk,date0=False,date1=False,**kargs):
 
     if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
     q.fill(D,quiet=quiet)
+
+
+def make_blk_era5(datapath,grd,bulk,date0=False,date1=False,**kargs):
+  '''
+  see make_blk_interim
+
+  ps: to not include original data in file, use karg keepor=False
+  '''
+
+  quiet  = kargs.get('quiet',0)
+  create = kargs.get('create',1)
+  model  = kargs.get('model','roms') # or roms-agrif
+  proj   = kargs.get('proj','auto')
+
+  data=load_blkdata_era5(datapath,date0,date1,quiet)
+
+  g=roms.Grid(grd)
+  if proj=='auto': kargs['proj']=g.get_projection()
+
+  # about original data, run data2romsblk once to test for x_original:
+  tmp=data2romsblk(list(data.values())[0],g,**kargs)
+  if 'x_original' in tmp: original=tmp['x_original'].shape
+  else: original=False
+
+  # about wind speed and stress:
+  wspeed='wspd' in list(data.values())[0]
+  wstress='sustr' in list(data.values())[0]
+
+  q=gennc.GenBlk(bulk,grd,**kargs)
+  if create: q.create(model=model,original=original,wspeed=wspeed,wstress=wstress)
+
+  for d in data:
+    if model=='roms':
+       if not quiet: print('  converting units:'),
+       conv_units(data[d],model,quiet)
+
+    D=data2romsblk(data[d],g,**kargs)
+    D['date']=d
+
+    if not quiet: print('  =>filling date=%s' % d.isoformat(' '))
+    q.fill(D,quiet=quiet)
+
+
 
 
 

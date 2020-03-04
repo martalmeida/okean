@@ -269,17 +269,25 @@ class Grid(Common):
     # let's also assume that empty or None sph means True!! (may not be a very smart idea)
     sph=self.spherical
     trueVals=[1,'T','',None]
-    try:
-      try:
-        sph=''.join(sph).strip()
-      except TypeError:
-        if sph.shape==(): # size is 1 though !
-          sph=sph[()].decode()
-        else:
-          sph=b''.join(sph).strip().decode() # bytes type needed for python3
 
-      if len(sph): sph=sph[0]
-    except: pass
+    if sph.shape==(): # another netcdf4 version, another issue!!
+      try:
+        sph=sph[()].decode()
+      except:
+        sph=sph[()]
+    else:
+      try:
+        try:
+          sph=''.join(sph).strip()
+        except TypeError:
+          if sph.shape==(): # size is 1 though !
+            sph=sph[()].decode()
+          else:
+            sph=b''.join(sph).strip().decode() # bytes type needed for python3
+
+        if len(sph): sph=sph[0]
+      except: pass
+
     self.spherical=sph in trueVals
 
   def load_grid(): self.load()
@@ -301,7 +309,7 @@ class Grid(Common):
 
   def border_multi_corner(self):
     mc=self.use('maskc')
-    if np.unique(m).size==1: return self.border() # it is not multi-corner!
+    if np.unique(mc).size==1: return self.border() # it is not multi-corner!
 
     l,n=mc.shape
 
@@ -400,7 +408,8 @@ class Grid(Common):
     if j is False: j=slice(None)
     if i is False: i=slice(None)
 
-    x,y,h,m=[i.data for i in [x,y,h,m] if np.ma.isMA(i)]
+    #x,y,h,m=[i.data for i in [x,y,h,m] if np.ma.isMA(i)]
+    x,y,h,m=[k.data if  np.ma.isMA(k) else k for k in [x,y,h,m]]
 
     return x[j,i],y[j,i],h[j,i],m[j,i]
 

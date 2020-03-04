@@ -256,7 +256,8 @@ def load_data(f,quiet=0,**kargs):
     res['depth'] = -netcdf.use(ncZ,sett.z_name,**inds)
   else: res['depth']=False
 
-  if res['lon'].size!=res['lat'].size:
+  #if res['lon'].size!=res['lat'].size: --> may have same size and be 1d !!
+  if res['lon'].ndim==1:
     res['lon'],res['lat']=np.meshgrid(res['lon'],res['lat'])
     # needed for griddata, later
 

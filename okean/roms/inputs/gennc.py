@@ -133,9 +133,7 @@ class GenIni(GenCommon):
 
     GenCommon.__init__(self,filename,grid,sparams,**kargs)
 
-    date = 0
-    if 'date'   in kargs.keys(): date   = kargs['date']
-    self.date   = date
+    self.date=kargs.get('date',0)
 
     # about time:
     try:
@@ -860,17 +858,26 @@ class GenBlk(GenCommon):
   '''
 
   def __init__(self,filename,grid,**kargs):
-    if not 'type'  in kargs.keys(): kargs['type']  = 'ROMS Bulk forcing file'
-    if not 'title' in kargs.keys(): kargs['title'] = 'ROMS Bulk forcing file'
+    if not 'type'  in kargs: kargs['type']  = 'ROMS Bulk forcing file'
+    if not 'title' in kargs: kargs['title'] = 'ROMS Bulk forcing file'
 
     GenCommon.__init__(self,filename,grid,**kargs)
 
 
-  def create(self,model='roms',original=False):
+  def create(self,**kargs):
     '''
     Creates netcdf bulk forcing file
-    for model 'roms' or 'roms-agrif'
+    kargs:
+      model: 'roms' or 'roms-agrif'
+      wspeed: add wind speed (False)
+      wstress: add wind stress (False)
     '''
+
+    model       = kargs.get('model','roms')
+    original    = kargs.get('original',False)
+    add_wspeed  = kargs.get('wspeed',False)
+    add_wstress = kargs.get('wstress',False)
+
     nc=netcdf.Pync(self.filename,'t',version=self.ncversion)
 
     # Dimensions:
@@ -1026,28 +1033,32 @@ class GenBlk(GenCommon):
       v.add_att('units','cloud fraction')
 
     #  next only required by roms-agrif (wspd,sustr,svstr)
-    v=nc.add_var('wspd',np.dtype('d'),('time','eta_rho', 'xi_rho'))
-    v.add_att('long_name','wind speed 10m')
-    v.add_att('units','metre second-1')
-    v.add_att('time','time')
-
-    v=nc.add_var('sustr',np.dtype('d'),('time','eta_u', 'xi_u'))
-    v.add_att('long_name','surface u-momentum stress')
-    v.add_att('units','Newton metre-2')
-    v.add_att('time','time')
-
-    v=nc.add_var('svstr',np.dtype('d'),('time','eta_v', 'xi_v'))
-    v.add_att('long_name','surface v-momentum stress')
-    v.add_att('units','Newton metre-2')
-    v.add_att('time','time')
-
-    if addOriginal:
-      v=nc.add_var('wspd_original',np.dtype('d'),('time','y_original', 'x_original'))
+    if add_wspeed:
+      v=nc.add_var('wspd',np.dtype('d'),('time','eta_rho', 'xi_rho'))
+      v.add_att('long_name','wind speed 10m')
       v.add_att('units','metre second-1')
-      v=nc.add_var('sustr_original',np.dtype('d'),('time','y_original', 'x_original'))
+      v.add_att('time','time')
+
+      if addOriginal:
+        v=nc.add_var('wspd_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','metre second-1')
+
+    if add_wstress:
+      v=nc.add_var('sustr',np.dtype('d'),('time','eta_u', 'xi_u'))
+      v.add_att('long_name','surface u-momentum stress')
       v.add_att('units','Newton metre-2')
-      v=nc.add_var('svstr_original',np.dtype('d'),('time','y_original', 'x_original'))
+      v.add_att('time','time')
+
+      v=nc.add_var('svstr',np.dtype('d'),('time','eta_v', 'xi_v'))
+      v.add_att('long_name','surface v-momentum stress')
       v.add_att('units','Newton metre-2')
+      v.add_att('time','time')
+
+      if addOriginal:
+        v=nc.add_var('sustr_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','Newton metre-2')
+        v=nc.add_var('svstr_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','Newton metre-2')
 
 
     # Global Attributes:
@@ -1098,6 +1109,10 @@ class GenBlk(GenCommon):
       names='tair','pres','rhum','prate','radlw','radsw','dlwrf','uwnd',\
             'vwnd','wspd','sustr','svstr',\
             'cloud' # not used, but add it anyway
+
+    names=list(names)
+    for name in ('wspd','sustr','svstr'):
+      if not name in nc.varnames: names.remove(name)
 
     for i in names:
       if isinstance(i,basestring): filev,datav=i,i

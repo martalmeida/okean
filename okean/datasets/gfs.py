@@ -64,7 +64,9 @@ class GFSDownload:
     # Ground Heat Flux             GFLUX:s
     # Sensible Heat Net Flux       SHTFL:s
     # Latent Heat Net Flux         LHTFL:s
-    self.egrep='| egrep "(PRATE|ALBDO|RH:2 m|TMP:2 m above|TMP:s|PRES:s|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s )" |'
+#    self.egrep='| egrep "(PRATE|ALBDO|RH:2 m|TMP:2 m above|TMP:s|PRES:s|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s )" |'
+
+    self.egrep='| egrep "(PRATE:surface.*ave|ALBDO|RH:2 m above ground|:TMP:2 m above|:TMP:surface|:PRES:surface|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s)" |'
 
     # get info from tags info file:
     self.get_tags()

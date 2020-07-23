@@ -146,7 +146,7 @@ def use(filename,varname,interface='auto',**kargs):
     elif k.endswith('SEARCH'):
       kk=k[:-len('SEARCH')]
       for dn in nc.vars[varname].dimnames:
-        if dn.find(kk)>=0:
+        if dn.find(kk)==0:
           k=dn
           break
 

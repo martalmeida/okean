@@ -247,6 +247,9 @@ def data2romsblk(data,grd,**kargs):
                                # if margin is 'no calc', no extraction of
                                # a domain portion is done
 
+  check_data=kargs.get('check_data',True) # check min,max values of some variables
+  model  = kargs.get('model','roms') # check_data depends on model
+
   # about projection:
   # - if auto will use grid default projection
   # - if False, no projection is used
@@ -317,6 +320,33 @@ def data2romsblk(data,grd,**kargs):
 
     out['sustr']=rt.rho2uvp(out['sustr'],'u')
     out['svstr']=rt.rho2uvp(out['svstr'],'v')
+
+  if check_data:
+    # check humidity:
+    vmax=100
+    if model=='roms': vmax=100
+    else: vmax=1 # agrif
+    out['rhum'][out['rhum']<0]=0
+    out['rhum'][out['rhum']>vmax]=vmax
+
+    # check rain:
+    out['prate'][out['prate']<0]=0
+
+    # check lwrad_down:
+    # check if is positive in roms:
+    if model=='roms':
+      if np.any(out['dlwrf']<0):
+       print(' --> Warning: negative LWdown found (model %s)!'%model)
+    else:
+      if np.any(out['dlwrf']>0):
+       print(' --> Warning: positive LWdown found (model %s)!'%model)
+
+    # check swrad:
+    out['radsw'][out['radsw']<0]=0
+
+    # check clouds:
+    out['cloud'][out['cloud']<0]=0
+    out['cloud'][out['cloud']>1]=1
 
   return out
 

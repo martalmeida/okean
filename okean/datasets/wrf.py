@@ -84,10 +84,10 @@ def parse_time(t):
   nt=t.shape[0]
   tout=np.zeros(nt,datetime.datetime)
 
-  if t.dim==2: # 'y','y','y','y','-','... ect
+  if t.ndim==2: # 'y','y','y','y','-','... ect
     for i in range(nt):
-       tmp=''.join(t[i])
-       tout[i]=parser.parse(tmp.replace('_',' '))
+       tmp=b''.join(t[i])
+       tout[i]=parser.parse(tmp.replace(b'_',b' '))
   else: # yyyymmdd.xx
     for i in range(nt):
       L=t[i]

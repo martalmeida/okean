@@ -377,6 +377,10 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
     if not tri:
       tri=mtri.Triangulation(x[~mask],y[~mask])
 
+      # remove very small triangles:
+      area=np.abs(np.asarray([poly_area(tri.x[i],tri.y[i]) for i in tri.triangles]))
+      tri.set_mask(area<area.mean()/1e10)
+
     if tri_type=='cubic':
       u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)
     elif tri_type=='linear':

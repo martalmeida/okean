@@ -9,7 +9,8 @@ contains general modeling tools. Specific tools are also included for ROMS.
 
 __authors__ = 'Martinho Marta-Almeida <m.martalmeida@gmail.com> \
 <Couto de Esteves, 3740-037, Portugal>',
-__version__='2020-07-23 16:43:09.650688'
+__version__='2020.11'
+__versionfull__='2020-10-09 09:33:04.058215'
 
 
 def doc(tag=None):
@@ -44,6 +45,7 @@ def doc(tag=None):
       print(':: no local doc files found')
       print(':: folder %s'%pdoc)
       print(':: visit %s'%urldoc)
+      print(':: visit https://martalmeida.github.io/notebooks/')
     else:
       print(':: available local doc files:')
       print(':: folder %s'%pdoc)

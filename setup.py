@@ -8,20 +8,24 @@ Requires:
 """
 
 classifiers = """\
-Development Status :: alpha
+Development Status :: 3 - Alpha
 Environment :: Console
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-License :: European Union Public Licence - EUPL v.1.1
+License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)
 Operating System :: OS Independent
 Programming Language :: Python
 Topic :: Scientific/Engineering
 Topic :: Software Development :: Libraries :: Python Modules
 """
 
-from numpy.distutils.core import Extension
-from numpy.distutils.command.install import install
-
+if 1:
+  from numpy.distutils.core import Extension
+  from numpy.distutils.command.install import install
+  from numpy.distutils.core import setup
+else:
+  from setuptools import setup, Extension
+  from setuptools.command.install import install
 
 class my_install(install):
     def run(self):
@@ -30,13 +34,14 @@ class my_install(install):
         # post installation:
 
 
-        # link pppack
-        import os
-        from distutils.sysconfig import get_python_lib
-        p=get_python_lib(plat_specific=1) # installation folder
-        src=os.path.join(p,'okean','roms','rtools.so')
-        dest=os.path.join(p,'okean','pppack.so')
-#        os.symlink(src,dest)
+        if 0:
+          # link pppack
+          import os
+          from distutils.sysconfig import get_python_lib
+          p=get_python_lib(plat_specific=1) # installation folder
+          src=os.path.join(p,'okean','roms','rtools.so')
+          dest=os.path.join(p,'okean','pppack.so')
+          #os.symlink(src,dest)
 
         print('''
         enjoy okean
@@ -86,7 +91,6 @@ def get_version():
   
 
 if __name__ == '__main__':
-    from numpy.distutils.core import setup
 
     setup(name = "okean",
           version = get_version(),
@@ -115,9 +119,9 @@ if __name__ == '__main__':
                          ('okean/misc', ['okean/misc/hull_code.tar.gz']),
                          ('okean/data/ncview_cmaps/', ncview_cm),
                          ('okean/documentation/',okean_doc),
-                         ('',['okean_documentation.ipynb']),
-                         ('',['EUPL v.1.1 - licencia.pdf'])],
-          classifiers = filter(None, classifiers.split("\n")),
+#                         ('',['okean_documentation.ipynb']),
+                         ('',['EUPL v1_2 PT.txt'])],
+          classifiers = list(filter(None, classifiers.split("\n"))),
           scripts=['okean/bin/rgui','okean/bin/show_nctime','okean/bin/show','okean/bin/qstate',
                    'okean/bin/romsview','okean/bin/disp'],
           cmdclass={'install': my_install},

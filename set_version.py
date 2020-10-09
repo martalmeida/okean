@@ -9,11 +9,13 @@ if 0:
 else: # just use current date
   f='okean/__init__.py'
   import datetime
-  s="__version__='%s'\n"% datetime.datetime.today().isoformat(' ')
+  date=datetime.datetime.now()
+  s0="__version__='%s'\n"% date.strftime('%Y.%m')
+  s1="__versionfull__='%s'\n"% date.isoformat(' ')
 
   lines=open(f).readlines()
   for i,l in enumerate(lines):
-    if l.strip().startswith('__version__='):
-      lines[i]=s
+    if   l.strip().startswith('__version__='): lines[i]=s0
+    elif l.strip().startswith('__versionfull__='): lines[i]=s1
 
   open(f,'w').writelines(lines)

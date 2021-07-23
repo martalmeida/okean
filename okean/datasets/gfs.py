@@ -433,7 +433,9 @@ def get_date(fname):
   or
   etc/gfs_20110101_18_06.grib2
   '''
-  if isinstance(fname,basestring):
+  #if isinstance(fname,basestring):
+  from okean.cookbook import isstr
+  if isstr(fname):
     # expected date to be in filename or in path of file
     # expected hour_start and hour sim to be in filename!
     # hour_start must have 2 digist and hour_sim musta have at least 2 digits!
@@ -733,7 +735,8 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
     if not quiet: print('       LW up not found: using sst')
     if isPygrib:
       #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-      x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+      #x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+      x,y,sst=gribu.getvar(fname,'t',tags='surface',lons=xlim,lats=ylim) # K
     else:
       x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
 
@@ -771,7 +774,15 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   # Cloud cover [0--100 --> 0--1]:
   if not quiet: print(' --> Cloud cover')
-  x,y,clouds  = gribu.getvar(fname,'tcc',tags='atmosphere:level 0',lons=xlim,lats=ylim)
+  #x,y,clouds  = gribu.getvar(fname,'tcc',tags='atmosphere:level 0',lons=xlim,lats=ylim)
+  # new from mar-2021:
+  tags=['atmosphere:level 0','instant'] # new instantaneous clouds
+  if len(gribu.findvar(fname,'tcc',*tags)):
+    x,y,clouds  = gribu.getvar(fname,'tcc',tags=tags)
+  else:
+    tags=['atmosphere:level 0','avg'] # old avg clouds
+    x,y,clouds  = gribu.getvar(fname,'tcc',tags=tags)
+
   if clouds is False:
     if not quiet: print('CALC clouds from LW,TAIR,TSEA and RH')
     # first get sst (maybe already done to calc lw_up)
@@ -780,7 +791,8 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
       if not quiet: print('  get TSEA')
       if isPygrib:
         #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-        x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+        #x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+        x,y,sst=gribu.getvar(fname,'t',tags='surface',lons=xlim,lats=ylim) # K
       else:
         x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
 

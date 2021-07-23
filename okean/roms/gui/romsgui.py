@@ -16,8 +16,15 @@ from matplotlib.figure import Figure
 import numpy as np
 import os
 import pylab
-from mpl_toolkits.basemap import Basemap
-from mpl_toolkits. basemap import cm as basemap_cm
+
+try:
+  import cartopy
+  useCartopy=True
+except: useCartopy=False
+
+try:
+  from mpl_toolkits.basemap import cm as basemap_cm
+except: basemap_cm=False
 
 from collections import OrderedDict
 from . import gui_tools
@@ -140,9 +147,10 @@ def get_colormaps():
   for k in sorted(pl_tools.cm.cmap_d.keys()):
     res['usersdef']+=['_'+k]
 
-  bcm=basemap_cm._cmapnames
-  bcm.sort()
-  res['basemap']=bcm
+  if basemap_cm:
+    bcm=basemap_cm._cmapnames
+    bcm.sort()
+    res['basemap']=bcm
 
   for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
     res['ncview']+=[' '+k]
@@ -1566,15 +1574,25 @@ class rgui:
 
 
 
-  def clear_fig(self):
+  def clear_fig(self,proj=False):
     if 0: # slower
       self.figure.clf()
       t0=pytime.time()
       self.axes = self.figure.add_axes((.12,.15,.8,.78))
       self.cbar=self.figure.add_axes((.1,.06,.8,.03))
     else:
-      if hasattr(self,'axes'): self.axes.clear()
-      else: self.axes = self.figure.add_axes((.1,.19,.85,.75))
+      if hasattr(self,'axes'):
+        if useCartopy:
+          self.axes.remove()
+          self.axes = self.figure.add_axes((.1,.19,.85,.75),projection=proj)
+        else:
+          self.axes.clear()
+      else:
+        if useCartopy:
+          self.axes = self.figure.add_axes((.1,.19,.85,.75),projection=proj)
+        else:
+          self.axes = self.figure.add_axes((.1,.19,.85,.75))
+
       if hasattr(self,'cbar'): self.cbar.clear()
       else: self.cbar=self.figure.add_axes((.1,.1,.85,.03))
 
@@ -2111,7 +2129,7 @@ class rgui:
 #      cbar=None
      pass
     else:
-      self.clear_fig()
+      self.clear_fig(proj=data[0].map)
       ax=self.axes
       cbar=self.cbar
       cbarOrientation='horizontal'

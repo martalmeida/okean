@@ -10,6 +10,9 @@ from functools import reduce
 from .nc.pync4 import Pync
 from . import calc
 from .cookbook import isstr
+# netcdftime no longer needed. Using cftime (installed with netCDF4) instead:
+from cftime import date2num, num2date as num2date_
+
 lck=False
 
 def ncopen(filename,perm='r',interface='auto',**kargs):
@@ -80,7 +83,16 @@ def varnames(fname,interface='auto'):
   return res
 
 
-def num2date(tnum,tunits,calendar='standard'):
+def num2date(tnum,tunits,calendar='standard',only_use_cftime_datetimes=False):
+  # keep python datetimes for compatibility with matplotlib, for now.
+  # if cftime datetimes are really needed with matplotlib, they can be used
+  # with nc-time-axis: https://github.com/SciTools/nc-time-axis
+
+  return num2date_(tnum,tunits,calendar,
+                   only_use_cftime_datetimes=only_use_cftime_datetimes)
+
+
+def num2date_old(tnum,tunits,calendar='standard'):
   from netcdftime import utime
 
   #return utime(tunits,calendar).num2date(tnum)
@@ -88,19 +100,18 @@ def num2date(tnum,tunits,calendar='standard'):
   # for some reason, removing mask or dividing by 1 solves the problem!!!
   return utime(tunits,calendar).num2date(tnum/1)
 
-def date2num(tdate,tunits,calendar='standard'):
+def date2num_old(tdate,tunits,calendar='standard'):
   from netcdftime import utime
   return utime(tunits,calendar).date2num(tdate)
 
-
-def nctime(filename,varname,interface='auto',**kargs):
+def nctime_old(filename,varname,interface='auto',**kargs):
   time=use(filename,varname,interface=interface,**kargs)
   if time is None: return
   units=vatt(filename,varname,'units')
   try: cal=vatt(filename,varname,'calendar')
   except: cal='standard'
 
-  # for ROMS output files the calender attribute must be fixed!
+  # for ROMS output files the calendar attribute must be fixed!
   if cal=='gregorian_proleptic': cal='proleptic_gregorian'
 
   # dates like 2004-01-01T00:00:00Z are not supported by old varsions
@@ -109,6 +120,19 @@ def nctime(filename,varname,interface='auto',**kargs):
 
   units=units.replace('T',' ').replace('Z',' ')
   units=' '.join(units.split())
+
+  return num2date(time,units,cal)
+
+
+def nctime(filename,varname,**kargs):
+  time=use(filename,varname,**kargs)
+  if time is None: return
+  units=vatt(filename,varname,'units')
+  try: cal=vatt(filename,varname,'calendar')
+  except: cal='standard'
+
+  # older  ROMS output files the calendar attribute must be fixed!
+  if cal=='gregorian_proleptic': cal='proleptic_gregorian'
 
   return num2date(time,units,cal)
 

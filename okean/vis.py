@@ -4,8 +4,13 @@ import pylab as pl
 import numpy as np
 from configparser import ConfigParser
 from collections import OrderedDict
-from mpl_toolkits.basemap import Basemap
 from . import dateu as dts, ticks, cache, calc, cookbook as cb
+try:
+  import cartopy.crs as ccrs
+  useCartopy=True
+except:
+  from mpl_toolkits.basemap import Basemap
+  useCartopy=False
 
 
 param={}
@@ -206,7 +211,11 @@ class Vis(visCfg):
     # main ax:
     if ax: self.ax=ax
     else:
-      self.ax=self.fig.add_axes(self.config['axes.position'])
+      if useCartopy and hasattr(self,'map'):
+        self.ax=self.fig.add_axes(self.config['axes.position'],
+                projection=self.map)
+      else:
+        self.ax=self.fig.add_axes(self.config['axes.position'])
 
     # colorbar bg:
     if  self.config['colorbar.bg_position']:
@@ -269,9 +278,12 @@ class Vis(visCfg):
     self.map_info_current=prevObj.map_info_get()
 
 
-  def set_projection(self,opts):
+  def set_projection(self,opts,**kargs):
     '''initiates the projection using basemap options provided as dict'''
     if not opts: return
+
+    for k in kargs:
+      if k=='extent': self.config['axes.axis']=kargs['extent']
 
     self.config['proj.options']={}
     for name in opts:
@@ -332,69 +344,68 @@ class Vis(visCfg):
     # proj options:
     opts=self.config['proj.options']
 
-    if self.config['proj.name'] in ('spstere','npstere'):
-      opts['lon_0'] = opts.get('lon_0',0)
-      if self.config['proj.name']=='spstere':
-        opts['boundinglat'] = opts.get('boundinglat',ylim[1])
-      else:
-        opts['boundinglat'] = opts.get('boundinglat',ylim[0])
-
-    elif self.config['proj.name'] == 'stere':
+    if useCartopy:
       opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
       opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
-      opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
-
-    elif self.config['proj.name'] in ('merc','tmerc','cyl'):
-      opts['urcrnrlon']=opts.get('urcrnrlon',xlim[1])
-      opts['urcrnrlat']=opts.get('urcrnrlat',ylim[1])
-      opts['llcrnrlon']=opts.get('llcrnrlon',xlim[0])
-      opts['llcrnrlat']=opts.get('llcrnrlat',ylim[0])
+      opts['lat_1']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.25)
+      opts['lat_2']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.75)
 
     else:
-      opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
-      opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+      if self.config['proj.name'] in ('spstere','npstere'):
+        opts['lon_0'] = opts.get('lon_0',0)
+        if self.config['proj.name']=='spstere':
+          opts['boundinglat'] = opts.get('boundinglat',ylim[1])
+        else:
+          opts['boundinglat'] = opts.get('boundinglat',ylim[0])
 
+      elif self.config['proj.name'] == 'stere':
+        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+        opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
+
+      elif self.config['proj.name'] in ('merc','tmerc','cyl'):
+        opts['urcrnrlon']=opts.get('urcrnrlon',xlim[1])
+        opts['urcrnrlat']=opts.get('urcrnrlat',ylim[1])
+        opts['llcrnrlon']=opts.get('llcrnrlon',xlim[0])
+        opts['llcrnrlat']=opts.get('llcrnrlat',ylim[0])
+
+      else:
+        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
 
     # load proj from cache or create new:
     self.map_info_current=self.map_info_get()
     cacheLab=str(self.map_info_current)
     cch=cache.Cache()
 
-    if cch.is_stored(cacheLab,'localfile'):
+    if 0 and cch.is_stored(cacheLab,'localfile'):
       if debug_lev==2: print(' -> loading proj from cache')
       m=cch.load(cacheLab,'localfile')
     else:
       if debug_lev==2: print(' -> creating proj')
 
-##      print(opts)
-##      print(self.config['proj.name'])
-      m=Basemap(projection=self.config['proj.name'],
-                resolution=self.config['proj.resolution'],
-                **opts)
+      #print(self.config['proj.name'],opts)
+      if useCartopy:
+        if self.config['proj.name']=='lcc':
 
-##      try:
-##        m=Basemap(projection=self.config['proj.name'],
-##                  resolution=self.config['proj.resolution'],
-##                  **self.config['proj.options'])
-##      except:
-##
-##        if self.config['proj.name'] in ('spstere','npstere'):
-##          m = Basemap(projection=self.config['proj.name'],
-##                    resolution=self.config['proj.resolution'],
-##                    #lon_0=lon_0,boundinglat=blat)
-##                    **opts)
-##        elif self.config['proj.name'] == 'stere':
-##          m = Basemap(projection=self.config['proj.name'],
-##                    resolution=self.config['proj.resolution'],
-##                    urcrnrlon=xlim[1], urcrnrlat=ylim[1],
-##                    llcrnrlon=xlim[0], llcrnrlat=ylim[0],
-##                    **opts)
-##        else:
-##          m = Basemap(projection=self.config['proj.name'], lat_ts=0.0,
-##                    resolution=self.config['proj.resolution'],
-##                    urcrnrlon=xlim[1], urcrnrlat=ylim[1],
-##                    llcrnrlon=xlim[0], llcrnrlat=ylim[0],
-##                    **opts)
+          yc=(ylim[0]+ylim[1])/2
+          if yc>0: cutoff=ylim[0]-1
+          else: cutoff=ylim[1]+1
+
+          m=ccrs.LambertConformal(central_longitude=opts['lon_0'],
+                 central_latitude=opts['lat_0'],
+                 standard_parallels=[opts['lat_1'],opts['lat_2']],
+                 cutoff=cutoff)
+
+        elif self.config['proj.name']=='merc':
+          m=ccrs.Mercator(central_longitude=opts['lon_0'],
+                 latitude_true_scale=opts['lat_0'])
+
+      else:
+        m=Basemap(projection=self.config['proj.name'],
+                  resolution=self.config['proj.resolution'],
+                  **opts)
+
 
       cch.store(cacheLab,m,'localfile')
 
@@ -402,6 +413,50 @@ class Vis(visCfg):
 
 
   def draw_projection(self):
+    if useCartopy: self.draw_projection_cartopy()
+    else: self.draw_projection_basemap()
+
+  def draw_projection_cartopy(self):
+    if not self.map: return
+
+    if self.map_info_get()!=self.map_info_current:
+      self.init_projection()
+
+    self.ax.set_extent(self.config['axes.axis'])
+
+    if self.config['proj.coast_add']:
+      self.ax.coastlines(**self.config['proj.coast'])
+
+    xlim=self.config['axes.axis'][:2]
+    ylim=self.config['axes.axis'][2:]
+
+    if self.config['proj.meridians_add']:
+      if self.config['proj.meridians_vals']=='auto':
+        if self.map_info_current['proj'].endswith('stere'):
+          meridians=range(0,360,45)
+        else:
+          meridians=ticks.loose_label(xlim[0],xlim[1])
+      else: meridians=self.config['proj.meridians_vals']
+    else: meridians=[]
+
+    if self.config['proj.parallels_add']:
+      if self.config['proj.parallels_vals']=='auto':
+        parallels=ticks.loose_label(ylim[0],ylim[1])
+      else: parallels=self.config['proj.parallels_vals']
+    else: parallels=[]
+
+    opts=dict(color=self.config['proj.meridians']['color'],linewidth=self.config['proj.meridians']['linewidth'])
+
+    gl=self.ax.gridlines(draw_labels=1,x_inline=False, y_inline=False,
+       xlocs=meridians,ylocs=parallels,**opts)
+
+    gl.right_labels=False
+    gl.top_labels=False
+    gl.rotate_labels=False
+
+
+
+  def draw_projection_basemap(self):
     #if not self.config['proj.name']:
     #  self.map=False
     #  return
@@ -469,8 +524,11 @@ class Vis(visCfg):
 
   def _convCoord(self,x,y):
     if x.size!=y.size: x,y=np.meshgrid(x,y)
-    if hasattr(self,'map') and self.map: return self.map(x,y)
-    else: return x,y
+
+    if useCartopy: return x,y
+    else:
+      if hasattr(self,'map') and self.map: return self.map(x,y)
+      else: return x,y
 
 
   def draw_scalar_field(self,x,y,v):
@@ -526,6 +584,8 @@ class Vis(visCfg):
       args['extend']=self.config['field.extend']
 
     args['zorder']=self.config['plot.zorder']
+
+    if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
 
     # about label: not supported by contour and contourf
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
@@ -771,6 +831,14 @@ class Data(Vis):
        np.all(x>=-360) and np.all(x<=360) and np.all(y>=-90) and np.all(y<=90): proj=True
     elif proj=='auto': proj=False
 
+    if proj and not isExtra:
+      if not hasattr(self,'map') or not self.map or self.map_info_get()!=self.map_info_current:
+        # make a new projection:
+        if not self.config['axes.axis'] and not x is None:
+          self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
+
+        if debug_lev==2: print(' -> new projection needed')
+        self.init_projection(debug_level=debug_lev)
 
     try:
       isFig=pl.fignum_exists(self.fig.number)
@@ -793,14 +861,6 @@ class Data(Vis):
         if debug_lev==2: print(' -> will create new fig')
         self.init_figure()
 
-    if proj and not isExtra:
-      if not hasattr(self,'map') or not self.map or self.map_info_get()!=self.map_info_current:
-        # make a new projection:
-        if not self.config['axes.axis'] and not x is None:
-          self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
-
-        if debug_lev==2: print(' -> new projection needed')
-        self.init_projection(debug_level=debug_lev)
 
     # set labels:
     xlab=ylab=vlab=''
@@ -842,11 +902,17 @@ class Data(Vis):
       if ndim==2:
         tit=vlab
         if not self.t is None:
-          #if isinstance(self.t,datetime.datetime):
-          # now netcdftime.num2date returns array or netcdftime.datetime
-          # obkjects instead of datetime.datetime
-          import netcdftime
-          if isinstance(self.t,datetime.datetime) or isinstance(self.t,netcdftime.datetime):
+          ##if isinstance(self.t,datetime.datetime):
+          ## now netcdftime.num2date returns array or netcdftime.datetime
+          ## objects instead of datetime.datetime
+          #import netcdftime
+          cond0=isinstance(self.t,datetime.datetime)
+          #cond1=isinstance(self.t,netcdftime.datetime)
+          # using cftime now:
+          import cftime
+          cond1=isinstance(self.t,cftime.datetime)
+
+          if cond0 or cond1:
             tit+=' $\\bullet$ %s'%self.t.strftime('%Y-%m-%d %H:%M')
           else:
             try:

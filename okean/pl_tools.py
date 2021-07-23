@@ -290,6 +290,10 @@ class InteractiveRect:
     self.line=False
     self.lineOpts=lineOpts
 
+    if not 'marker' in lineOpts: self.lineOpts['marker']='s'
+    self.lineOpts['ms']=0
+    self.lineOpts['picker']=True
+
     self.cmd=cmd
     self.axis=axis
 
@@ -513,7 +517,7 @@ class cmap_aux:
 
   def _invert(self,c):
     if isinstance(c,plt.matplotlib.colors.LinearSegmentedColormap):
-      return invert_lsc(c) 
+      return invert_lsc(c)
     elif isinstance(c,plt.matplotlib.colors.ListedColormap):
       return invert_lc(c)
 
@@ -714,7 +718,7 @@ class ucmaps(cmap_aux):
                          (0.3,  0.61,  0.61),
                          (0.9,  0.0,   0.0),
                          (1.0,  0.85,  0.0))}
-      cdict=plt.cm.revcmap(cdict)
+      #cdict=plt.cm.revcmap(cdict)
 
     else:
       i=((28,23,3),(28,28,3),(28,3,23),(28,3,28),
@@ -729,20 +733,26 @@ class ucmaps(cmap_aux):
         'green': _cm.gfunc[g],
         'blue': _cm.gfunc[b]}
 
-    cdict=plt.cm.revcmap(cdict)
+    #cdict=plt.cm.revcmap(cdict)
     return plt.matplotlib.colors.LinearSegmentedColormap('oceano_%02d'%ind,cdict,256)
 
 
 def invert_lsc(C):
   '''Invert linearSegmentedColormap'''
-  r=plt.cm.revcmap(C._segmentdata)
-  return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
+  #r=plt.cm.revcmap(C._segmentdata)
+  #return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
+  C1=C.reversed()
+  C1.name=C.name+'_r'
+  return C1
 
 
 def invert_lc(C):
   '''Invert ListedColormap'''
-  r=np.flipud(C.colors)
-  return plt.matplotlib.colors.ListedColormap(r, name=C.name+'_r', N=C.N)
+  #r=np.flipud(C.colors)
+  #return plt.matplotlib.colors.ListedColormap(r, name=C.name+'_r', N=C.N)
+  C1=C.reversed()
+  C1.name=C.name+'_r'
+  return C1
 
 
 class ncview_cmaps(cmap_aux):
@@ -810,7 +820,9 @@ cm=ucmaps()
 
 # other colormaps,
 # basemap:
-from mpl_toolkits. basemap import cm as cm_basemap
+try:
+  from mpl_toolkits.basemap import cm as cm_basemap
+except:pass
 
 # ncview:
 cm_ncview=ncview_cmaps()

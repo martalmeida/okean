@@ -25,7 +25,15 @@ def depthof(v,z,val):
   except: val=np.ones(v.shape[1:],v.dtype)*val
 
   from . import rtools
-  mask=(~v[0].mask).astype('i')
+
+  # roms-agrif or clm variables may not be masked, so instead of
+  #mask=(~v[0].mask).astype('i')
+  # use:
+  if np.ma.is_masked(v): # isMA make be True and mask not nD array, thus use is_masked.
+    mask=(~v[0].mask).astype('i')
+  else:
+    mask=np.ones(v[0].shape,'i')
+
   zz=rtools.depthof(v,z,mask,val)
   # 999 --> surface higher than val
   # 9999 --> all whater column lower than val

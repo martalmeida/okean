@@ -223,8 +223,8 @@ class Grid(Common):
                width=W,height=H)
 
       elif prj=='merc':
-        dlon_=dlon_/10
-        dlat_=dlat_/10
+        dlon_=dlon/10
+        dlat_=dlat/10
         o=dict(resolution='c',projection=prj,
                llcrnrlon=xlim[0]-dlon_, llcrnrlat=ylim[0]-dlat_,
                urcrnrlon=xlim[1]+dlon_, urcrnrlat=ylim[1]+dlat_,
@@ -232,6 +232,7 @@ class Grid(Common):
                lat_0=0.5*(ylim[0]+ylim[1]))
 
       self.proj_info['basemap_opts']=o
+      self.proj_info['extent']=xlim[0]-dlon/10,xlim[1]+dlon/10, ylim[0]-dlat/10,ylim[1]+dlat/10
 
 
   def get_projection(self,prjtype='nice'):
@@ -529,7 +530,7 @@ class Grid(Common):
     if prjtype=='original' and self.proj_info['basemap_opts0']: d=self.proj_info['basemap_opts0']
     elif prjtype=='nice': d=self.proj_info['basemap_opts']
 
-    a.set_projection(d)
+    a.set_projection(d,extent=self.proj_info['extent'])
 
     return a
 
@@ -645,7 +646,7 @@ class MGrid():
     if prjtype=='original' and self[0].proj_info['basemap_opts0']: d=self[0].proj_info['basemap_opts0']
     elif prjtype=='nice': d=self[0].proj_info['basemap_opts']
 
-    a.set_projection(d)
+    a.set_projection(d,extent=self[0].proj_info['extent'])
 
     return vis.MData([a])
 
@@ -1023,7 +1024,7 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
 
     return out
 
@@ -1098,7 +1099,7 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
 
     return out
 
@@ -1130,7 +1131,8 @@ class His(Common,Derived):
       eta='%d:%d'%(j0,j1)
 
       if data is False: V=self.use(varname,SEARCHtime=time,xi_SEARCH=xi,eta_SEARCH=eta)
-      else: v=data[...,j0:j1,i0:i1]
+      #else: v=data[...,j0:j1,i0:i1]
+      else: V=data[...,j0:j1,i0:i1]
 
       x=x[j0:j1,i0:i1]
       y=y[j0:j1,i0:i1]
@@ -1139,7 +1141,8 @@ class His(Common,Derived):
 
     else:
       if data is False: V=self.use(varname,SEARCHtime=time)
-      else: v=data
+      #else: v=data
+      else: V=data
 
     if V.ndim==3:
       v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
@@ -1336,7 +1339,7 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
 
     return out
 

@@ -56,7 +56,7 @@ class Cache:
 
     elif type=='localfile':
       f=self.local_fname(label)
-      if not os.path.isdir(self.dir): os.makedirs(self.dir)
+      if not os.path.isdir(self.dir): os.makedirs(self.dir,exist_ok=True)
       s=pickle.dump(data,open(f,'wb'))
       self.data[label]=None
       return s    

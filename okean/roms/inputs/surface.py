@@ -256,24 +256,25 @@ def data2romsblk(data,grd,**kargs):
   # - any Basemap projection can be used
   proj=kargs.get('proj','auto')
 
-  # about origina data to keep:
+  # about original data to keep:
   # - if 2, will keep data only inside rt.grid_vicinity rectange
   # - if 1, all original data is kept
   keepOriginal = 2
   for k in kargs:
     if k.lower().startswith('keepor'): keepOriginal=kargs[k]
 
-  if cb.isstr(grd): g=roms.Grid(grd)
-  else: g=grd
+  if not grd is False:
+    if cb.isstr(grd): g=roms.Grid(grd)
+    else: g=grd
 
-  if proj=='auto': proj=g.get_projection()
+    if proj=='auto': proj=g.get_projection()
 
-  if proj:
-    data_x,data_y=proj(data['x'],data['y'])
-    grd_x,grd_y=proj(g.lon,g.lat)
-  else:
-    data_x,data_y=data['x'],data['y']
-    grd_x,grd_y=g.lon,g.lat
+    if proj:
+      data_x,data_y=proj(data['x'],data['y'])
+      grd_x,grd_y=proj(g.lon,g.lat)
+    else:
+      data_x,data_y=data['x'],data['y']
+      grd_x,grd_y=g.lon,g.lat
 
   cond=False
   out={}
@@ -282,44 +283,50 @@ def data2romsblk(data,grd,**kargs):
     if vname.startswith('INFO') or vname in 'xy': continue
     # vnames starting with INFO are an info key, without data
 
-    if not quiet: print('  interp %s' % vname)
+    if not grd is False:
+      if not quiet: print('  interp %s' % vname)
 
-    if cond is False:
-      if Margin=='no calc':
-        cond=np.ones_like(data['x'],'bool')
-        i1,i1=0,0
-        j2,i2=data['x'].shape
-      else:
-        cond,inds=rt.grid_vicinity(grd,data['x'],data['y'],
-                                   margin=Margin,rect=True,retinds=True)
-        i1,i2,j1,j2=inds
+      if cond is False:
+        if Margin=='no calc':
+          cond=np.ones_like(data['x'],'bool')
+          i1,i1=0,0
+          j2,i2=data['x'].shape
+        else:
+          cond,inds=rt.grid_vicinity(grd,data['x'],data['y'],
+                                     margin=Margin,rect=True,retinds=True)
+          i1,i2,j1,j2=inds
 
-    out[vname]=calc.griddata(data_x[cond],data_y[cond],
+      out[vname]=calc.griddata(data_x[cond],data_y[cond],
                            data[vname][cond],grd_x,grd_y,extrap=True)
 
-    if keepOriginal:
-      # keep original data:
-      if keepOriginal==1:
-        out[vname+'_original']=data[vname] # keep all original data
-      elif keepOriginal==2:
-        out[vname+'_original']=data[vname][j1:j2,i1:i2] # keep data only inside vicinity rectangle
-
-      if 'x_original' not in out:
+      if keepOriginal:
+        # keep original data:
         if keepOriginal==1:
-          out['x_original']=data['x']
-          out['y_original']=data['y']
+          out[vname+'_original']=data[vname] # keep all original data
         elif keepOriginal==2:
-          out['x_original']=data['x'][j1:j2,i1:i2]
-          out['y_original']=data['y'][j1:j2,i1:i2]
+          out[vname+'_original']=data[vname][j1:j2,i1:i2] # keep data only inside vicinity rectangle
+
+        if 'x_original' not in out:
+          if keepOriginal==1:
+            out['x_original']=data['x']
+            out['y_original']=data['y']
+          elif keepOriginal==2:
+            out['x_original']=data['x'][j1:j2,i1:i2]
+            out['y_original']=data['y'][j1:j2,i1:i2]
+    else:
+      out[vname]=data[vname]
 
   # about wind:
-  if not quiet: print(' --> rot U,V wind and U,V wind stress')
-  out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],g.angle)
-  if 'sustr' in out and 'svstr' in out:
-    out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],g.angle)
+  if not grd is False:
+    if not quiet: print(' --> rot U,V wind and U,V wind stress')
+    out['uwnd'],out['vwnd']=calc.rot2d(out['uwnd'],out['vwnd'],g.angle)
+    if 'sustr' in out and 'svstr' in out:
+      out['sustr'],out['svstr']=calc.rot2d(out['sustr'],out['svstr'],g.angle)
 
-    out['sustr']=rt.rho2uvp(out['sustr'],'u')
-    out['svstr']=rt.rho2uvp(out['svstr'],'v')
+      out['sustr']=rt.rho2uvp(out['sustr'],'u')
+      out['svstr']=rt.rho2uvp(out['svstr'],'v')
+
+  # note that if grd is False, use sustr and svstr at rho (right?)
 
   if check_data:
     # check humidity:
@@ -375,9 +382,14 @@ def make_blk_interim(interimpath,grd,bulk,date0=False,date1=False,**kargs):
 
   data=load_blkdata_interim(interimpath,date0,date1,quiet,past)
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
 
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
@@ -411,8 +423,14 @@ def make_blk_gfs(gfspath,grd,bulk,date0,date1=False,nforec=0,**kargs):
 
   data,miss=load_blkdata_gfs(gfspath,date0,date1,nforec=nforec,quiet=quiet)
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
@@ -455,8 +473,14 @@ def make_blk_narr(grd,bulk,date0,date1=False,**kargs):
 
   data,miss=load_blkdata_narr(date0,date1,quiet=quiet)
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
@@ -501,8 +525,14 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
 
   data=load_blkdata_cfsr(cfsrpath,date0,date1,quiet) # unique diff from make_blk_interim !!
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
@@ -541,8 +571,14 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
 
   if not len(data): return
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create:
@@ -598,8 +634,14 @@ def make_blk_cordex(cordexClim,grd,bulk,date0=False,date1=False,**kargs):
   data=load_blkdata_cordex(cordexClim,date0,date1,quiet,grd) # unique diff from make_blk_cordex/interim !!
   # grd is provided to extract just a portion of cordex domain, otherwise there is a memory error
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(data[list(data.keys())[0]],g,**kargs)
@@ -635,8 +677,21 @@ def make_blk_era5(datapath,grd,bulk,date0=False,date1=False,**kargs):
 
   data=load_blkdata_era5(datapath,date0,date1,quiet)
 
-  g=roms.Grid(grd)
-  if proj=='auto': kargs['proj']=g.get_projection()
+  if not grd is False:
+    g=roms.Grid(grd)
+    if proj=='auto': kargs['proj']=g.get_projection()
+  else:
+    g=False
+
+    # latitude must be reversed otherwise ROMS hindices subroutine (interpolate.F) will not find Jmin
+    for k in data:
+      if data[k]['y'][0,0]>data[k]['y'][-1,0]:
+        # flip all data:
+        for vname in data[k]: data[k][vname]=data[k][vname][::-1]
+
+    k=list(data.keys())[0]
+    kargs['coords']=data[k]['x'],data[k]['y']
+
 
   # about original data, run data2romsblk once to test for x_original:
   tmp=data2romsblk(list(data.values())[0],g,**kargs)

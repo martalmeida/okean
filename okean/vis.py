@@ -4,13 +4,14 @@ import pylab as pl
 import numpy as np
 from configparser import ConfigParser
 from collections import OrderedDict
-from . import dateu as dts, ticks, cache, calc, cookbook as cb
-try:
-  import cartopy.crs as ccrs
-  useCartopy=True
-except:
-  from mpl_toolkits.basemap import Basemap
-  useCartopy=False
+from . import dateu as dts, ticks, calc, cookbook as cb ##, cache
+#try:
+import cartopy.crs as ccrs
+import cartopy
+#  useCartopy=True
+#except:
+#  from mpl_toolkits.basemap import Basemap
+#  useCartopy=False
 
 
 param={}
@@ -22,7 +23,7 @@ param['figure.figsize']=None#8,6
 param['figure.edgecolor']=None
 param['figure.facecolor']=None
 param['axes.position']=.1,.1,.75,.8
-param['axes.axis']=False # xlim ylim
+####################param['axes.axis']=False # xlim ylim
 param['axes.labels']={'fontsize':10}
 param['colorbar.ax_position']=.875,.1,.03,.8
 param['colorbar.options']={}
@@ -30,15 +31,18 @@ param['colorbar.bg_position']=False #.86,.08,.08,.84
 param['colorbar.bg']={'edgecolor':'none','facecolor':'white','alpha':0.5,'linewidth':0}
 
 # map projection:
-param['proj.name']='auto'
-param['proj.resolution']='auto'
-param['proj.options']={}
+#########param['proj.name']='auto'
+##########param['proj.resolution']='auto'
+param['proj.params']={}
+param['proj.extent']=[]
 
 param['proj.coast_add']=True
-param['proj.coast']={'color': '#999999', 'linewidth': 0.5, 'zorder':999}
+##param['proj.coast']={'color': '#999999', 'linewidth': 0.5, 'zorder':999}
+param['proj.coast']={'edgecolor': '#999999', 'lw': 0.5}######33, 'zorder':999}
 
 param['proj.continents_add'] = True
-param['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
+##param['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
+param['proj.continents']     = {'facecolor': '#f2f2f2','edgecolor':'none'}
 
 param['proj.oceans_add'] = False
 param['proj.oceans'] = {'color': 'aqua', 'zorder':999}
@@ -211,7 +215,8 @@ class Vis(visCfg):
     # main ax:
     if ax: self.ax=ax
     else:
-      if useCartopy and hasattr(self,'map'):
+##      if useCartopy and hasattr(self,'map'):
+      if hasattr(self,'map'):
         self.ax=self.fig.add_axes(self.config['axes.position'],
                 projection=self.map)
       else:
@@ -241,7 +246,8 @@ class Vis(visCfg):
     if hasattr(parent,'map'):
 #       self.map=parent.map
 #       self.map_info_copy(parent)
-       self.copy_projection(parent)
+##       self.copy_projection(parent)
+      self.map=parent.map
 
   def clear_figure(self):
     self.fig.clf()
@@ -256,10 +262,10 @@ class Vis(visCfg):
     try: self.cbbg.cla()
     except: pass
 
-  def map_info_get(self):
-    res=dict(limits=self.config['axes.axis'],proj=self.config['proj.name'],res=self.config['proj.resolution'])
-    res.update(self.config['proj.options'])
-    return res
+##  def map_info_get(self):
+##    res=dict(limits=self.config['axes.axis'],proj=self.config['proj.name'],res=self.config['proj.resolution'])
+##    res.update(self.config['proj.options'])
+##    return res
 
 
 #  def map_info_copy(self,prevObj):
@@ -270,169 +276,209 @@ class Vis(visCfg):
 #    self.map_info_current=prevObj.map_info_get()
 
 
-  def copy_projection(self,prevObj):
-    self.map=prevObj.map
-    for k in ['axes.axis','proj.name','proj.resolution','proj.options']:
-      self.config[k]=prevObj.config[k]
+#  def copy_projection(self,prevObj):
+#    self.map=prevObj.map
+#    for k in ['axes.axis','proj.name','proj.resolution','proj.options']:
+#      self.config[k]=prevObj.config[k]
+#
+#    self.map_info_current=prevObj.map_info_get()
 
-    self.map_info_current=prevObj.map_info_get()
 
-
-  def set_projection(self,opts,**kargs):
-    '''initiates the projection using basemap options provided as dict'''
-    if not opts: return
+###  def set_projection(self,opts,**kargs):
+  def set_projection(self,p,**kargs):
+    '''initiates the cartopy projection'''
+#    if not opts: return
 
     for k in kargs:
-      if k=='extent': self.config['axes.axis']=kargs['extent']
+      #if k=='extent': self.config['axes.axis']=kargs['extent']
+      if k=='extent': self.config['proj.extent']=kargs['extent']
 
-    self.config['proj.options']={}
-    for name in opts:
-      val=opts[name]
-      if name=='projection': self.config['proj.name']=val
-      elif name=='resolution': self.config['proj.resolution']=val
-      else: self.config['proj.options'][name]=val
+    self.config['proj.params']=p.proj4_params
+    self.map=p
 
-    self.init_projection()
+#    self.config['proj.options']={}
+#    for name in opts:
+#      val=opts[name]
+#      if name=='projection': self.config['proj.name']=val
+#      elif name=='resolution': self.config['proj.resolution']=val
+#      else: self.config['proj.options'][name]=val
+#
+#    self.init_projection()
 
 
   def rm_projection(self):
-    self.config['proj.name']='auto'
-    self.config['proj.resolution']='auto'
-    self.config['proj.options']={}
-    self.config['axes.axis']=False
+#    self.config['proj.name']='auto'
+#    self.config['proj.resolution']='auto'
+#    self.config['proj.options']={}
+#    self.config['axes.axis']=False
+    self.config['proj.params']={}
+    self.config['proj.extent']=False
     self.map=False
 
 
-  def init_projection(self,**kargs):
-    debug_lev=kargs.get('debug_level',0)
+  def init_projection(self,**ckargs):
+    xlim,ylim=self.config['proj.extent'][:2],self.config['axes.axis'][2:]
+    opts=self.config['proj.params']
 
-    # proj xy limits:
-    if not self.config['axes.axis']:
-      xlim=-100,20
-      ylim=-30,60
-      self.config['axes.axis']=xlim+ylim
-    else: xlim,ylim=self.config['axes.axis'][:2],self.config['axes.axis'][2:]
+    if opts['proj']=='lcc':
+      yc=(ylim[0]+ylim[1])/2
+      if yc>0: cutoff=ylim[0]-1
+      else: cutoff=ylim[1]+1
 
-    # proj name:
-    if self.config['proj.name']=='auto':
-       cond0=ylim[1]>80
-       cond1=ylim[0]<-80
-       lonrange=xlim[1]-xlim[0]
-       latrange=ylim[1]-ylim[0]
+      cutoff=ckargs.pop('cutoff',cutoff)
+      p=ccrs.LambertConformal(central_longitude=opts['lon_0'],
+                              central_latitude=opts['lat_0'],
+                              secant_latitudes=(opts['lat_1'],opts['lat_2']),
+                              cutoff=cutoff,**ckargs)
+    elif opts['proj']=='merc':
+      p=ccrs.Mercator(central_longitude=opts['lon_0'],
+                      latitude_true_scale=opts['lat_ts'],**ckargs)
+    elif opts['proj']=='tmerc':
+      p=ccrs.TransverseMercator(central_longitude=opts['lon_0'],
+                                  central_latitude=opts['lat_0'],**ckargs)
+    else: return 'not implemented yet'
 
-       name='cyl'
-       #if cond0 and cond1: name='cyl'
-       if lonrange<90 and (cond0 and not cond1 or (cond1 and not cond0)): name='lcc'
-       elif not cond0 and not cond1: name='merc'
-       elif lonrange>330 and ylim[1]<-30: name='spstere'
-       elif lonrange>330 and ylim[0]>30: name='npstere'
-       self.config['proj.name']=name
-
-
-    # proj resolution:
-    if self.config['proj.resolution']=='auto':
-       lonrange=xlim[1]-xlim[0]
-       latrange=ylim[1]-ylim[0]
-       Amax=360*180.
-       A=lonrange*latrange
-       if A/Amax>0.5: resolution='c'
-       elif A/Amax>0.1: resolution='l'
-       elif A/Amax>0.0001: resolution='i'
-       else: resolution='h'
-       self.config['proj.resolution']=resolution
-
-    # proj options:
-    opts=self.config['proj.options']
-
-    if useCartopy:
-      opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
-      opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
-      opts['lat_1']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.25)
-      opts['lat_2']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.75)
-
-    else:
-      if self.config['proj.name'] in ('spstere','npstere'):
-        opts['lon_0'] = opts.get('lon_0',0)
-        if self.config['proj.name']=='spstere':
-          opts['boundinglat'] = opts.get('boundinglat',ylim[1])
-        else:
-          opts['boundinglat'] = opts.get('boundinglat',ylim[0])
-
-      elif self.config['proj.name'] == 'stere':
-        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
-        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
-        opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
-
-      elif self.config['proj.name'] in ('merc','tmerc','cyl'):
-        opts['urcrnrlon']=opts.get('urcrnrlon',xlim[1])
-        opts['urcrnrlat']=opts.get('urcrnrlat',ylim[1])
-        opts['llcrnrlon']=opts.get('llcrnrlon',xlim[0])
-        opts['llcrnrlat']=opts.get('llcrnrlat',ylim[0])
-
-      else:
-        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
-        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
-
-    # load proj from cache or create new:
-    self.map_info_current=self.map_info_get()
-    cacheLab=str(self.map_info_current)
-    cch=cache.Cache()
-
-    if 0 and cch.is_stored(cacheLab,'localfile'):
-      if debug_lev==2: print(' -> loading proj from cache')
-      m=cch.load(cacheLab,'localfile')
-    else:
-      if debug_lev==2: print(' -> creating proj')
-
-      #print(self.config['proj.name'],opts)
-      if useCartopy:
-        if self.config['proj.name']=='lcc':
-
-          yc=(ylim[0]+ylim[1])/2
-          if yc>0: cutoff=ylim[0]-1
-          else: cutoff=ylim[1]+1
-
-          m=ccrs.LambertConformal(central_longitude=opts['lon_0'],
-                 central_latitude=opts['lat_0'],
-                 standard_parallels=[opts['lat_1'],opts['lat_2']],
-                 cutoff=cutoff)
-
-        elif self.config['proj.name']=='merc':
-          m=ccrs.Mercator(central_longitude=opts['lon_0'],
-                 latitude_true_scale=opts['lat_0'])
-
-      else:
-        m=Basemap(projection=self.config['proj.name'],
-                  resolution=self.config['proj.resolution'],
-                  **opts)
+    self.map=p
 
 
-      cch.store(cacheLab,m,'localfile')
+#  def init_projection_OLD(self,**kargs):
+#    debug_lev=kargs.get('debug_level',0)
+#
+#    # proj xy limits:
+#    if not self.config['axes.axis']:
+#      xlim=-100,20
+#      ylim=-30,60
+#      self.config['axes.axis']=xlim+ylim
+#    else: xlim,ylim=self.config['axes.axis'][:2],self.config['axes.axis'][2:]
+#
+#    # proj name:
+#    if self.config['proj.name']=='auto':
+#       cond0=ylim[1]>80
+#       cond1=ylim[0]<-80
+#       lonrange=xlim[1]-xlim[0]
+#       latrange=ylim[1]-ylim[0]
+#
+#       name='cyl'
+#       #if cond0 and cond1: name='cyl'
+#       if lonrange<90 and (cond0 and not cond1 or (cond1 and not cond0)): name='lcc'
+#       elif not cond0 and not cond1: name='merc'
+#       elif lonrange>330 and ylim[1]<-30: name='spstere'
+#       elif lonrange>330 and ylim[0]>30: name='npstere'
+#       self.config['proj.name']=name
+#
+#
+#    # proj resolution:
+#    if self.config['proj.resolution']=='auto':
+#       lonrange=xlim[1]-xlim[0]
+#       latrange=ylim[1]-ylim[0]
+#       Amax=360*180.
+#       A=lonrange*latrange
+#       if A/Amax>0.5: resolution='c'
+#       elif A/Amax>0.1: resolution='l'
+#       elif A/Amax>0.0001: resolution='i'
+#       else: resolution='h'
+#       self.config['proj.resolution']=resolution
+#
+#    # proj options:
+#    opts=self.config['proj.options']
+#
+#    if useCartopy:
+#      opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+#      opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+#      opts['lat_1']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.25)
+#      opts['lat_2']=opts.get('lat_1',ylim[0]+(ylim[1]-ylim[0])*.75)
+#
+#    else:
+#      if self.config['proj.name'] in ('spstere','npstere'):
+#        opts['lon_0'] = opts.get('lon_0',0)
+#        if self.config['proj.name']=='spstere':
+#          opts['boundinglat'] = opts.get('boundinglat',ylim[1])
+#        else:
+#          opts['boundinglat'] = opts.get('boundinglat',ylim[0])
+#
+#      elif self.config['proj.name'] == 'stere':
+#        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+#        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+#        opts['lat_ts']=opts.get('lat_ts',0.5*(ylim[0]+ylim[1]))
+#
+#      elif self.config['proj.name'] in ('merc','tmerc','cyl'):
+#        opts['urcrnrlon']=opts.get('urcrnrlon',xlim[1])
+#        opts['urcrnrlat']=opts.get('urcrnrlat',ylim[1])
+#        opts['llcrnrlon']=opts.get('llcrnrlon',xlim[0])
+#        opts['llcrnrlat']=opts.get('llcrnrlat',ylim[0])
+#
+#      else:
+#        opts['lon_0']=opts.get('lon_0',0.5*(xlim[0]+xlim[1]))
+#        opts['lat_0']=opts.get('lat_0',0.5*(ylim[0]+ylim[1]))
+#
+#    # load proj from cache or create new:
+#    self.map_info_current=self.map_info_get()
+#    cacheLab=str(self.map_info_current)
+#    cch=cache.Cache()
+#
+#    if 0 and cch.is_stored(cacheLab,'localfile'):
+#      if debug_lev==2: print(' -> loading proj from cache')
+#      m=cch.load(cacheLab,'localfile')
+#    else:
+#      if debug_lev==2: print(' -> creating proj')
+#
+#      #print(self.config['proj.name'],opts)
+#      if useCartopy:
+#        if self.config['proj.name']=='lcc':
+#
+#          yc=(ylim[0]+ylim[1])/2
+#          if yc>0: cutoff=ylim[0]-1
+#          else: cutoff=ylim[1]+1
+#
+#          m=ccrs.LambertConformal(central_longitude=opts['lon_0'],
+#                 central_latitude=opts['lat_0'],
+#                 standard_parallels=[opts['lat_1'],opts['lat_2']],
+#                 cutoff=cutoff)
+#
+#        elif self.config['proj.name']=='merc':
+#          m=ccrs.Mercator(central_longitude=opts['lon_0'],
+#                 latitude_true_scale=opts['lat_0'])
+#
+#      else:
+#        m=Basemap(projection=self.config['proj.name'],
+#                  resolution=self.config['proj.resolution'],
+#                  **opts)
+#
+#
+#      cch.store(cacheLab,m,'localfile')
+#
+#    self.map=m
 
-    self.map=m
 
-
+##  def draw_projection(self):
+##    if useCartopy: self.draw_projection_cartopy()
+##    else: self.draw_projection_basemap()
+##
+##  def draw_projection_cartopy(self):
   def draw_projection(self):
-    if useCartopy: self.draw_projection_cartopy()
-    else: self.draw_projection_basemap()
-
-  def draw_projection_cartopy(self):
     if not self.map: return
 
-    if self.map_info_get()!=self.map_info_current:
-      self.init_projection()
+#    if self.map_info_get()!=self.map_info_current:
+#      self.init_projection()
 
-    self.ax.set_extent(self.config['axes.axis'])
+#    self.ax.set_extent(self.config['axes.axis'])
+    self.ax.set_extent(self.config['proj.extent'])
 
     if self.config['proj.coast_add']:
       self.ax.coastlines(**self.config['proj.coast'])
 
-    xlim=self.config['axes.axis'][:2]
-    ylim=self.config['axes.axis'][2:]
+    if self.config['proj.continents_add']:
+      self.ax.add_feature(cartopy.feature.LAND,**self.config['proj.continents'])
+
+
+
+    xlim=self.config['proj.extent'][:2]
+    ylim=self.config['proj.extent'][2:]
 
     if self.config['proj.meridians_add']:
       if self.config['proj.meridians_vals']=='auto':
-        if self.map_info_current['proj'].endswith('stere'):
+###########        if self.map_info_current['proj'].endswith('stere'):
+        if self.config['proj.params']['proj'].endswith('stere'):
           meridians=range(0,360,45)
         else:
           meridians=ticks.loose_label(xlim[0],xlim[1])
@@ -456,79 +502,81 @@ class Vis(visCfg):
 
 
 
-  def draw_projection_basemap(self):
-    #if not self.config['proj.name']:
-    #  self.map=False
-    #  return
-    if not self.map: return
-
-    if self.map_info_get()!=self.map_info_current:
-      self.init_projection()
-
-    # there is a bug in set_axes_limits, called at the end of drawcoastlines,
-    # fillcontinents, etc, here:
-    #     first draw boundary, no fill
-    #     limb1 = self.drawmapboundary(fill_color='none')
-    # argument ax is missing! So, boundary will go the the latest axes, which can be self.cbax!!
-    # my current version is 1.0.7
-    # To avoid it:
-    try:
-      pl.sca(self.ax) # does not work inside tk gui with Figure
-    except: pass
-
-    # better do this before draw anything else, otherwise the drawmapboundary will be
-    # called many times (by set_axes_limits, depending on the projection used)
-    if self.config['proj.oceans_add']:
-      self.map.drawmapboundary(ax=self.ax,**self.config['proj.oceans'])
-
-    if self.config['proj.coast_add']:
-      self.map.drawcoastlines(ax=self.ax,**self.config['proj.coast'])
-
-
-    if self.config['proj.continents_add']:
-      try: # may fail for high zooms
-        self.map.fillcontinents(ax=self.ax,**self.config['proj.continents'])
-      except: pass
-
-
-    if self.config['proj.countries_add']:
-      self.map.drawcountries(ax=self.ax,**self.config['proj.countries'])
-
-    if self.config['proj.states_add']:
-      self.map.drawstates(ax=self.ax,**self.config['proj.states'])
-
-    if self.config['proj.rivers_add']:
-      self.map.drawrivers(ax=self.ax,**self.config['proj.rivers'])
-
-    if self.config['proj.meridians_add']:
-      if self.config['proj.meridians_vals']=='auto':
-        if self.map_info_current['proj'].endswith('stere'):
-          meridians=range(0,360,45)
-        else:
-          xlim=self.map.llcrnrlon,self.map.urcrnrlon
-          xlim=self.map.lonmin,self.map.lonmax
-          meridians=ticks.loose_label(xlim[0],xlim[1])
-      else: meridians=self.config['proj.meridians_vals']
-      self.map.drawmeridians(meridians,ax=self.ax,**self.config['proj.meridians'])
-
-    if self.config['proj.parallels_add']:
-      if self.config['proj.parallels_vals']=='auto':
-        ylim=self.map.llcrnrlat,self.map.urcrnrlat
-        ylim=self.map.latmin,self.map.latmax
-        parallels=ticks.loose_label(ylim[0],ylim[1])
-      else: parallels=self.config['proj.parallels_vals']
-      self.map.drawparallels(parallels,ax=self.ax,**self.config['proj.parallels'])
-
-    for k in self.ax.spines:
-      self.ax.spines[k].set_zorder(999.5)
+#  def draw_projection_basemap(self):
+#    #if not self.config['proj.name']:
+#    #  self.map=False
+#    #  return
+#    if not self.map: return
+#
+#    if self.map_info_get()!=self.map_info_current:
+#      self.init_projection()
+#
+#    # there is a bug in set_axes_limits, called at the end of drawcoastlines,
+#    # fillcontinents, etc, here:
+#    #     first draw boundary, no fill
+#    #     limb1 = self.drawmapboundary(fill_color='none')
+#    # argument ax is missing! So, boundary will go the the latest axes, which can be self.cbax!!
+#    # my current version is 1.0.7
+#    # To avoid it:
+#    try:
+#      pl.sca(self.ax) # does not work inside tk gui with Figure
+#    except: pass
+#
+#    # better do this before draw anything else, otherwise the drawmapboundary will be
+#    # called many times (by set_axes_limits, depending on the projection used)
+#    if self.config['proj.oceans_add']:
+#      self.map.drawmapboundary(ax=self.ax,**self.config['proj.oceans'])
+#
+#    if self.config['proj.coast_add']:
+#      self.map.drawcoastlines(ax=self.ax,**self.config['proj.coast'])
+#
+#
+#    if self.config['proj.continents_add']:
+#      try: # may fail for high zooms
+#        self.map.fillcontinents(ax=self.ax,**self.config['proj.continents'])
+#      except: pass
+#
+#
+#    if self.config['proj.countries_add']:
+#      self.map.drawcountries(ax=self.ax,**self.config['proj.countries'])
+#
+#    if self.config['proj.states_add']:
+#      self.map.drawstates(ax=self.ax,**self.config['proj.states'])
+#
+#    if self.config['proj.rivers_add']:
+#      self.map.drawrivers(ax=self.ax,**self.config['proj.rivers'])
+#
+#    if self.config['proj.meridians_add']:
+#      if self.config['proj.meridians_vals']=='auto':
+#        if self.map_info_current['proj'].endswith('stere'):
+#          meridians=range(0,360,45)
+#        else:
+#          xlim=self.map.llcrnrlon,self.map.urcrnrlon
+#          xlim=self.map.lonmin,self.map.lonmax
+#          meridians=ticks.loose_label(xlim[0],xlim[1])
+#      else: meridians=self.config['proj.meridians_vals']
+#      self.map.drawmeridians(meridians,ax=self.ax,**self.config['proj.meridians'])
+#
+#    if self.config['proj.parallels_add']:
+#      if self.config['proj.parallels_vals']=='auto':
+#        ylim=self.map.llcrnrlat,self.map.urcrnrlat
+#        ylim=self.map.latmin,self.map.latmax
+#        parallels=ticks.loose_label(ylim[0],ylim[1])
+#      else: parallels=self.config['proj.parallels_vals']
+#      self.map.drawparallels(parallels,ax=self.ax,**self.config['proj.parallels'])
+#
+#    for k in self.ax.spines:
+#      self.ax.spines[k].set_zorder(999.5)
 
   def _convCoord(self,x,y):
-    if x.size!=y.size: x,y=np.meshgrid(x,y)
+    return x,y
 
-    if useCartopy: return x,y
-    else:
-      if hasattr(self,'map') and self.map: return self.map(x,y)
-      else: return x,y
+##    if x.size!=y.size: x,y=np.meshgrid(x,y)
+##
+##    if useCartopy: return x,y
+##    else:
+##      if hasattr(self,'map') and self.map: return self.map(x,y)
+##      else: return x,y
 
 
   def draw_scalar_field(self,x,y,v):
@@ -585,7 +633,8 @@ class Vis(visCfg):
 
     args['zorder']=self.config['plot.zorder']
 
-    if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
+    ##if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
+    if hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
 
     # about label: not supported by contour and contourf
     if self.config['field.plot'] in ('pcolor','pcolormesh'):
@@ -681,11 +730,13 @@ class Vis(visCfg):
 
     plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
 
-#    if 1:
     plt=self.config['d1.plot']
+
 
     if  plt=='fill':
       args=self.config['d1_fill.options']
+      ###if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
+      if hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
       args['label']=plabel
       args['zorder']=self.config['plot.zorder']
       x,y=self._convCoord(x,y)
@@ -693,6 +744,8 @@ class Vis(visCfg):
 
     elif  plt=='fill_between':
       args=self.config['d1_fill.options']
+      ###if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
+      if hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
       args['label']=plabel
       args['zorder']=self.config['plot.zorder']
 
@@ -706,6 +759,8 @@ class Vis(visCfg):
 
     elif plt=='plot':
       args=self.config['d1_line.options']
+      ###if useCartopy and hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
+      if hasattr(self,'map'): args['transform']=ccrs.PlateCarree()
       args['label']=plabel
       args['zorder']=self.config['plot.zorder']
       x,y=self._convCoord(x,y)
@@ -832,13 +887,15 @@ class Data(Vis):
     elif proj=='auto': proj=False
 
     if proj and not isExtra:
-      if not hasattr(self,'map') or not self.map or self.map_info_get()!=self.map_info_current:
+      if not hasattr(self,'map'):########## or not self.map or self.map_info_get()!=self.map_info_current:
         # make a new projection:
-        if not self.config['axes.axis'] and not x is None:
-          self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
+        ###if not self.config['axes.axis'] and not x is None:
+        if not self.config['proj.extent'] and not x is None:
+          #self.config['axes.axis']=x.min(),x.max(),y.min(),y.max()
+          self.config['proj.extent']=x.min(),x.max(),y.min(),y.max()
 
         if debug_lev==2: print(' -> new projection needed')
-        self.init_projection(debug_level=debug_lev)
+        self.init_projection()##############################debug_level=debug_lev)
 
     try:
       isFig=pl.fignum_exists(self.fig.number)

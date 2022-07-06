@@ -86,7 +86,7 @@ def accum2avg(v,nforec):
   DT_FOREC=24/(N_DAILY_SIMS*N_FOREC_STEPS)
 
   # accum to avg (intermediate times):
-  v.shape=v.shape[0]/N_FOREC_STEPS,N_FOREC_STEPS,v.shape[1],v.shape[-1]
+  v.shape=v.shape[0]//N_FOREC_STEPS,N_FOREC_STEPS,v.shape[1],v.shape[-1]
   v[:,1:,...]=(v[:,1:,...]-v[:,:-1,...])/(3600*DT_FOREC)
   v[:,0,...]=v[:,0,...]/(3600*DT_FOREC)
 
@@ -233,8 +233,8 @@ def interim_file_data(files,quiet=False):
   out['time']=time
 
   # calc number of forecast steps stored,nforec (used by accum2avg)
-  if [fTime[i].hour for i in range(8)]==range(3,22,3)+[0]: nforec=4
-  elif [fTime[i].hour for i in range(4)]==range(6,19,6)+[0]: nforec=2
+  if [fTime[i].hour for i in range(8)]==list(range(3,22,3))+[0]: nforec=4
+  elif [fTime[i].hour for i in range(4)]==list(range(6,19,6))+[0]: nforec=2
   else:
     if not quiet: print('INTERIM WRONG TIME: cannot n forec steps')
     return

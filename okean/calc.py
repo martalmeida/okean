@@ -525,6 +525,14 @@ def cyclic_index(time,t,cycle):
 
   return Ind,d
 
+def lat_radius(lat):
+  '''earth radius at lat'''
+  lat=lat*np.pi/180
+  r1=6378137
+  r2=6356752.3
+
+  r=(((r1**2*np.cos(lat))**2+(r2**2*np.sin(lat))**2)/((r1*np.cos(lat))**2+(r2*np.sin(lat))**2))**.5
+  return r
 
 def distance(lon,lat):
   '''
@@ -818,7 +826,7 @@ def mcross_points(xm,ym,xl,yl,addl=False,plt=False):
   return xx,yy
 
 
-def ij_limits(x,y,xlim,ylim,margin=0):
+def ij_limits_OLD_REMOVE(x,y,xlim,ylim,margin=0):
   '''
   ij limits of xy so that xlim and ylim box is inside xy[ij]
   Returns i0,i1,j0,j1, so for 1D x[i0:i1], y[j0:j1], and for 2D
@@ -895,6 +903,79 @@ def ij_limits(x,y,xlim,ylim,margin=0):
   j2=min(L-1,j2+margin)
 
   return i1,i2+1,j1,j2+1
+
+
+def ij_limits(x,y,xlim,ylim,margin=1,check=0):
+
+  if x.ndim==1:
+    L=y.size
+    M=x.size
+    i1,=np.where(x<xlim[0])
+    if len(i1): i1=i1[-1]
+    else: i1=0
+
+    i2,=np.where(x>xlim[1])
+    if len(i2): i2=i2[0]
+    else: i2=M
+
+    j1,=np.where(y<ylim[0])
+    if len(j1): j1=j1[-1]
+    else: j1=0
+
+    j2,=np.where(y>ylim[1])
+    if len(j2): j2=j2[0]
+    else: j2=L
+
+    I0,I1,J0,J1=i1,i2,j1,j2
+    J0=J0-margin
+    J1=J1+1+margin
+    I0=I0-margin
+    I1=I1+1+margin
+  else:
+    # lower left and upper right:
+    d=((x-xlim[0])**2+(y-ylim[0])**2)**.5
+    j0,i0=np.where(d==d.min())
+    j0,i0=j0[0],i0[0]
+
+    d=((x-xlim[1])**2+(y-ylim[1])**2)**.5
+    j1,i1=np.where(d==d.min())
+    j1,i1=j1[0],i1[0]
+
+    # upper left and lower right:
+    d=((x-xlim[0])**2+(y-ylim[1])**2)**.5
+    j2,i2=np.where(d==d.min())
+    j2,i2=j2[0],i2[0]
+
+    d=((x-xlim[1])**2+(y-ylim[0])**2)**.5
+    j3,i3=np.where(d==d.min())
+    j3,i3=j3[0],i3[0]
+
+    add=1 # to ensure all xlim,ylim points are inside region
+    J0=min(j0,j1,j2,j3)-add-margin
+    J1=max(j0,j1,j2,j3)+1+add+margin
+    I0=min(i0,i1,i1,i2)-add-margin
+    I1=max(i0,i1,i1,i2)+1+add+margin
+
+    L,M=x.shape
+
+  J0=max(0,J0)
+  I0=max(0,I0)
+  J1=min(L,J1)
+  I1=min(M,I1)
+
+  if check:
+    import pylab as pl
+    pl.plot(xlim,ylim,'r')
+    if x.ndim==1:
+      [pl.plot([i,i],[y.min(),y.max()],'k') for i in x[I0:I1]]
+      [pl.plot([x.min(),x.max()],[i,i],'k') for i in y[J0:J1]]
+
+    else:
+      pl.plot(x[j0,i0],y[j0,i0],'g*')
+      pl.plot(x[j1,i1],y[j1,i1],'g*')
+      pl.plot(x[J0:J1,I0:I1],y[J0:J1,I0:I1],'k+')
+
+  return I0,I1,J0,J1
 
 
 def angle_point_line(x,y,xp,yp,n=1):

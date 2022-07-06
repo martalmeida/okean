@@ -2897,6 +2897,7 @@ class rgui:
       self.select_var(var)
 
     q=self.__get_romsobj(var)
+    q=q[0] # consider only 1st domain , if more than one used !!
     itime = self.__get_itime()
 
     if type in ('profile','time_series'):

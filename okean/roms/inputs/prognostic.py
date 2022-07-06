@@ -180,7 +180,7 @@ def load_data(f,quiet=0,**kargs):
     res['NZ']=1
 
   # about horizontal inds:
-  if sett.xdim in inds and len(inds[sett.xdim])==2 and not isinstance(inds[sett.xdim],basestring):
+  if sett.xdim in inds and len(inds[sett.xdim])==2 and not cb.isstr(inds[sett.xdim]):
     if not quiet: print('  calc horizontal inds...')
     xlim=inds[sett.xdim]
     ylim=inds[sett.ydim]

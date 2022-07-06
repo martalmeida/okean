@@ -234,11 +234,24 @@ def era5_file_data(files,quiet=False):
   if x.ndim==1 and y.ndim==1:
     x,y=np.meshgrid(x,y)
 
+  # about ERA5T (near real time):
+  # used between the ERA5 3 months delay and 5 days before present day
+  # tes the inclusion of near real time data:
+  v=netcdf.use(varfile('t2m'),'t2m')
+  incNrt=v.ndim==4
+  if incNrt:
+    i_nrt=np.where(np.diff(v.data[:,0,0,0])==0)[0][0]
+    v=v[:i_nrt,0],v[i_nrt:,1]
+
   # tair [K-->C]
   if not quiet: print(' --> T air')
   vname='t2m'
   f=varfile(vname)
   tair=netcdf.use(f,vname)-273.15
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    tair=np.vstack((tair[:i_nrt,0],tair[i_nrt:,1]))
+
   if dateEnd:
     if not quiet: print('      fill_tend...')
     tair=fill_tend(tair)
@@ -251,6 +264,10 @@ def era5_file_data(files,quiet=False):
   vname='d2m'
   f=varfile(vname)
   Td=netcdf.use(f,vname)-273.15
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    Td=np.vstack((Td[:i_nrt,0],Td[i_nrt:,1]))
+
   if dateEnd:
     if not quiet: print('      fill_tend... (T dew)')
     Td=fill_tend(Td)
@@ -266,6 +283,10 @@ def era5_file_data(files,quiet=False):
   vname='sp'
   f=varfile(vname)
   pres=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    pres=np.vstack((pres[:i_nrt,0],pres[i_nrt:,1]))
+
   if dateEnd:
     if not quiet: print('      fill_tend...')
     pres=fill_tend(pres)
@@ -295,6 +316,10 @@ def era5_file_data(files,quiet=False):
   vname='mtpr'
   f=varfile(vname)
   prate=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    prate=np.vstack((prate[:i_nrt,0],prate[i_nrt:,1]))
+
   if not quiet: print('      avg_fix_time - DTstep=1h - DT=%.2f h'%DT)
   prate=avg_fix_time(prate,DT)
   if dateEnd:
@@ -330,6 +355,10 @@ def era5_file_data(files,quiet=False):
   vname='msnswrf'
   f=varfile(vname)
   sw_net=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    sw_net=np.vstack((sw_net[:i_nrt,0],sw_net[i_nrt:,1]))
+
   if not quiet: print('      avg_fix_time - DTstep=1h - DT=%.2f h'%DT)
   sw_net=avg_fix_time(sw_net,DT)
   if dateEnd:
@@ -346,6 +375,10 @@ def era5_file_data(files,quiet=False):
   lw_net=netcdf.use(f,vname)*-1 # positive upward (*-1)
   # here vars have roms-agrif signs --> radlw is positive upward!
   # conversion to ROMS is done in surface.py
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    lw_net=np.vstack((lw_net[:i_nrt,0],lw_net[i_nrt:,1]))
+
   if not quiet: print('      avg_fix_time - DTstep=1h - DT=%.2f h'%DT)
   lw_net=avg_fix_time(lw_net,DT)
   if dateEnd:
@@ -360,6 +393,10 @@ def era5_file_data(files,quiet=False):
   vname='msdwlwrf'
   f=varfile(vname)
   lw_down=netcdf.use(f,vname)*-1 # positive upward (*-1)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    lw_down=np.vstack((lw_down[:i_nrt,0],lw_down[i_nrt:,1]))
+
   if not quiet: print('      avg_fix_time - DTstep=1h - DT=%.2f h'%DT)
   lw_down=avg_fix_time(lw_down,DT)
   if dateEnd:
@@ -374,9 +411,17 @@ def era5_file_data(files,quiet=False):
   vname='u10'
   f=varfile(vname)
   uwnd=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    uwnd=np.vstack((uwnd[:i_nrt,0],uwnd[i_nrt:,1]))
+
   vname='v10'
   f=varfile(vname)
   vwnd=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    vwnd=np.vstack((vwnd[:i_nrt,0],vwnd[i_nrt:,1]))
+
   if dateEnd:
     if not quiet: print('      fill_tend...')
     uwnd=fill_tend(uwnd)
@@ -399,6 +444,9 @@ def era5_file_data(files,quiet=False):
   vname='tcc'
   f=varfile(vname)
   clouds=netcdf.use(f,vname)
+  if incNrt:
+    if not quiet: print('     - dealing with NRT data')
+    clouds=np.vstack((clouds[:i_nrt,0],clouds[i_nrt:,1]))
   if dateEnd:
     if not quiet: print('      fill_tend...')
     clouds=fill_tend(clouds)

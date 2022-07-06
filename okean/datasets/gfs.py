@@ -691,7 +691,9 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   # P rate [kg m-2 s-1 -> cm/d]
   if not quiet: print(' --> P rate')
-  x,y,prate=gribu.getvar(fname,'prate',tags='avg',lons=xlim,lats=ylim)
+  if gribu.findvar(fname,'prate','avg'):
+    x,y,prate=gribu.getvar(fname,'prate',tags='avg',lons=xlim,lats=ylim)
+  else: x,y,prate=gribu.getvar(fname,'prate',tags='instant',lons=xlim,lats=ylim)
   # Conversion kg m^-2 s^-1  to cm/day
   prate=prate*86400*100/1000.
   prate=np.where(abs(prate)<1.e-4,0,prate)

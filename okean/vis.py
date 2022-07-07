@@ -42,7 +42,7 @@ param['proj.coast']={'edgecolor': '#999999', 'lw': 0.5}######33, 'zorder':999}
 
 param['proj.continents_add'] = True
 ##param['proj.continents']     = {'color': '#f2f2f2', 'zorder':999}
-param['proj.continents']     = {'facecolor': '#f2f2f2','edgecolor':'none'}
+param['proj.continents']     = {'facecolor': '#f2f2f2','edgecolor':'none', 'zorder':999}
 
 param['proj.oceans_add'] = False
 param['proj.oceans'] = {'color': 'aqua', 'zorder':999}
@@ -605,6 +605,10 @@ class Vis(visCfg):
         args['cmap']=cmap
 
     x,y=self._convCoord(x,y)
+
+    # forget about pcolor:
+    if self.config['field.plot'].startswith('pcolor'): self.config['field.plot']='pcolormesh'
+
     meth=eval('self.ax.'+self.config['field.plot'])
 
 #    if self.config['field.clim']:
@@ -667,9 +671,8 @@ class Vis(visCfg):
 
 
     # rotate u,v to projection angle:
-    if hasattr(self,'map'):# and self.map:
-###      print u.shape,v.shape,x.shape,y.shape
-      u,v=self.map.rotate_vector(u,v,x,y)
+##    if hasattr(self,'map'):# and self.map:
+###      u,v=self.map.rotate_vector(u,v,x,y) --> no need with cartopy !!
 
     x,y=self._convCoord(x,y)
 
@@ -691,6 +694,9 @@ class Vis(visCfg):
 
     plabel=self.config['plot.label'] if self.config['plot.label'] else self.label
     kargs={}
+
+    if hasattr(self,'map'): kargs['transform']=ccrs.PlateCarree()
+
     kargs['label']=plabel
     kargs['zorder']=self.config['plot.zorder']
     kargs.update(self.config['vfield.options'])
@@ -990,7 +996,6 @@ class Data(Vis):
           if not vlab=='Unk': self.draw_label('title',vlab)
         else:
           if not ylab=='Unk': self.draw_label('ylabel',ylab)
-
 
     if proj and not isExtra:
       if debug_lev==2: print(' -> will draw projection', self.info['v'])

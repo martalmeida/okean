@@ -1376,7 +1376,10 @@ class rgui:
       self.widgets['lat1'].insert(0,y1)
       self.widgets['lat2'].insert(0,y2)
 
+    print('NEW LIMS:',x1,x2,y1,y2)
+    print('WILL SHOW AFTER NEW LIMS!!')
     if show: self.show()
+    print('-- SHOW DONE AFTER NEW LIMS!!')
 
   def __get_grid_lims(self):
     lonlim1=float(self.widgets['lon1'].get())
@@ -1710,6 +1713,9 @@ class rgui:
     # scale:
     svec=self.widgets['svec']
     s=float(svec.get())
+
+    # for cartopy !?
+    s=s*1e5
 
     return d,s
 
@@ -2294,6 +2300,7 @@ class rgui:
       o.config['field.linewidths']=.5
 
     # proj:
+    '''
     if data[0].config['proj.name']=='auto':
       data[0].config['proj.name']=self.options['projection'].get()
     else:
@@ -2316,6 +2323,19 @@ class rgui:
     popt=data[0].config['proj.options']
     for n,v in [('width',W),('height',H),('lon_0',lon_0),('lat_0',lat_0),('lat_1',lat_1),('lat_2',lat_2)]:
       if n in popt: popt[n]=v
+    '''
+#    grid=self.files['Grid'][0]
+#    print('PROJJJJJJJJJJJJJJJJJJ')
+#    p=grid.get_projection(cartopy=1)
+#    p=data[0].map
+#    print('PROJJJJJJJJJJJJJJJJJJ DONE')
+#
+    lonlims,latlims=self.__get_grid_lims()
+#    data[0].config['axes.axis']=lonlims+latlims
+#
+    #data[0].set_projection(p,extent=grid.proj_info['extent'])
+#    data[0].set_projection(p,extent=lonlims+latlims)#grid.proj_info['extent'])
+    data[0].config['proj.extent']=lonlims+latlims
     #--------------------
 
     resolution=self.options['coastline_res'].get()[0]
@@ -2339,9 +2359,13 @@ class rgui:
       data.plot()
       data[0].fig.show()
     else:
+      print('WILL DO VIS PLOT:')
       data.plot(ax=self.axes,cbax=self.cbar)
-#      self.canvas.show()
-      self.canvas.draw()
+      print('DONE VIS PLOT:')
+      #self.canvas.show()
+      #print('will canvas draw')
+      #self.canvas.draw()
+      #print('done canvas draw')
 
     self.map=data[0].map
 
@@ -2383,7 +2407,6 @@ class rgui:
       except:
         self.canvas.draw()
 
-
     # activate tools like zoom, slices, etc:
     if   self.active_tool == 'zoom':        self.interactive_zoom(chstate=False)
     elif self.active_tool == 'vslice':      self.interactive_vslice(chstate=False)
@@ -2397,6 +2420,9 @@ class rgui:
 
     self.sync_save()
 
+    print('--> canvas draw')
+    self.canvas.draw()
+    print('--> canvas draw done')
     return
 
 #      qv=ax.quiver(xm,ym,u,v,units='x',scale=scale)
@@ -2780,15 +2806,21 @@ class rgui:
       self.__set_cursor('tcross')
 
       lopts=dict(zorder=1e4)
-      self.zoom=pl_tools.InteractiveRect(ax=self.axes,axis=(self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax),
-                                             cmd=self.__zoom,**lopts)
+##      self.zoom=pl_tools.InteractiveRect(ax=self.axes,axis=(self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax),
+##                                             cmd=self.__zoom,**lopts)
+      self.zoom=pl_tools.InteractiveRect(ax=self.axes,cmd=self.__zoom,**lopts)
 
       self.active_tool='zoom'
 
   def __zoom(self):
-    ob=self.zoom # PUT THIS IN CACHE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    x,y=self.map(ob.x,ob.y,inverse=1)
+    ob=self.zoom
+
+
+###    x,y=self.map(ob.x,ob.y,inverse=1)
+##    tr=self.map.transform_points(cartopy.crs.PlateCarree(),ob.x,ob.y)
+    tr=cartopy.crs.PlateCarree().transform_points(self.map,ob.x,ob.y)
+    x=tr[:,0]
+    y=tr[:,1]
 
     x0,x1=np.min(x),np.max(x)
     y0,y1=np.min(y),np.max(y)

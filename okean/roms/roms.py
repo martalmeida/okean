@@ -1153,7 +1153,7 @@ class His(Common,Derived):
 ###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
     x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     zeta=self.use('zeta',SEARCHtime=time)
-    zeta=rt.rho2uvp(zeta,varname)
+    zeta=rt.rho2uvp(zeta,self.vloc(varname)[0])
 
     out.v=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_mask,spline)
 

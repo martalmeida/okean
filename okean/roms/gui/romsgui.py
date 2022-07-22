@@ -1340,6 +1340,10 @@ class rgui:
       grd=self.files['Grid'][0]
       lonlims=grd.lon.min(),grd.lon.max()
       latlims=grd.lat.min(),grd.lat.max()
+      dx=lonlims[1]-lonlims[0]
+      dy=latlims[1]-latlims[0]
+      lonlims=lonlims[0]-dx/10,lonlims[1]+dx/10
+      latlims=latlims[0]-dy/10,latlims[1]+dy/10
     else:
       lonlims=lims[:2]
       latlims=lims[2:]
@@ -1392,7 +1396,7 @@ class rgui:
     lonlims,latlims=self.__get_grid_lims()
     return ticks.loose_label(lonlims[0],lonlims[1]),ticks.loose_label(latlims[0],latlims[1])
 
-  def select_file(self,f=False,show=True):
+  def select_file(self,f=False,show=True,multiple=True):
     def finfo(f):
      atts=netcdf.fatt(f)
      if 'title' in atts.keys(): s=netcdf.fatt(f,'title')
@@ -1414,7 +1418,6 @@ class rgui:
       try: atype=netcdf.fatt(f,'title').split()[0].lower() # agrif child grids
       except: atype='grid'
 
-    print(atype)
     if atype.find('grid')>=0 or atype.find('grd')>=0:
       self.files['grid']=f
       self.files['grid_finfo']=finfo(f)
@@ -1434,7 +1437,12 @@ class rgui:
     elif atype.find('history')>=0 or atype.find('initial')>=0 or\
          atype.find('average')>=0 or atype.find('restart')>=0 or\
          atype.find('climatology')>=0:
-      self.files['his']=f
+
+      if not multiple:
+        self.files['his']=[f] # do not look for other files, like nesting ones inside roms.MHis
+      else:
+        self.files['his']=f # will load all files like <name>*.<ext>
+
       self.files['his_finfo']=finfo(f)
 
       if 'grd_file' in netcdf.fatt(f) and os.path.isfile(netcdf.fatt(f,'grd_file')):
@@ -1541,8 +1549,8 @@ class rgui:
     self.swapp['ftitle']={}
     for v in vars:
       f=self.variables[v]
+      if isinstance(f,list): f=f[0]
       if not f in self.swapp['ftitle']:
-        print(f,v)
         try:
           ftitle=netcdf.fatt(f,'title')
         except: ftitle='NO TITLE'
@@ -1740,6 +1748,7 @@ class rgui:
     #f=self.files['his']
 
     info=self.swapp['vinfo'][varname]
+    if isinstance(f,list): f=f[0]
     ftitle=self.swapp['ftitle'][f]
 
 #    info=netcdf.vatt(f,varname)
@@ -2998,10 +3007,11 @@ class rgui:
         print('cannot file vslice obj')
         return
 
-      # covert to lon lat... after zoom the values change!
-      try:
-        ob.lon,ob.lat=self.map(ob.x,ob.y,inverse=1)
-      except:
+      if self.map:
+        tr=cartopy.crs.PlateCarree().transform_points(self.map,ob.x,ob.y)
+        ob.lon=tr[:,0]
+        ob.lat=tr[:,1]
+      else:
         ob.lon,ob.lat=ob.x,ob.y
 
       # store previous slice:
@@ -3036,6 +3046,7 @@ class rgui:
       self.select_var(var)
 
     q=self.__get_romsobj(var)
+    q=q[0]
     itime = self.__get_itime()
 
     # number of points to use:
@@ -3070,18 +3081,14 @@ class rgui:
 
 
     # slicell:
-    try:
-      self.map.xmin
-      #d,z,v=q.slicell(var,X,Y,itime,dist=True)
+    if self.map:
       data=q.slicell(var,X,Y,itime,dist=True)
       d,z,v=data.d,data.z,data.v
-    except:
-      #x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+    else:
       data=q.slicell(var,X,Y,itime,dist=False)
       x,y,z,v=data.x,data.y,data.z,data.v
       x=x[0,...]
       y=y[0,...]
-      #print x.shape, y.shape
       x=np.hstack((0,np.diff(x))).cumsum()
       y=np.hstack((0,np.diff(y))).cumsum()
       d=np.sqrt(x**2+y**2)

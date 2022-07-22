@@ -493,7 +493,7 @@ class Vis(visCfg):
 
     opts=dict(color=self.config['proj.meridians']['color'],linewidth=self.config['proj.meridians']['linewidth'])
 
-    gl=self.ax.gridlines(draw_labels=1,x_inline=False, y_inline=False,
+    gl=self.ax.gridlines(draw_labels=True,x_inline=False, y_inline=False,
        xlocs=meridians,ylocs=parallels,**opts)
 
     gl.right_labels=False

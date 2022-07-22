@@ -5,6 +5,12 @@
 import matplotlib
 matplotlib.use('tkagg')
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('filename', help='file to load',nargs='*')
+parser.add_argument('--nest', help='load other files of the type <name>*.<ext>',action='store_true') # store_true means default is false!
+parser.add_argument('--debug', help='show debug messages', action='store_true')
+args = vars(parser.parse_args())
 
 from okean.roms.gui import romsgui
 import sys
@@ -12,12 +18,9 @@ import sys
 class NullStream:
   def write(self, text): pass
 
+if not args['debug']: sys.stdout = NullStream()
+r=romsgui.rgui()
+for f in args['filename']:
+  r.select_file(f,multiple=args['nest'])
 
-if __name__=='__main__':
-  sys.stdout = NullStream()
-  r=romsgui.rgui()
-  for i in sys.argv[1:]:
-    r.select_file(i)
-
-
-  r.root.mainloop()
+r.root.mainloop()

@@ -315,6 +315,9 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
   mpl_tri=kargs.get('mpl_tri',True)
   tri_type=kargs.get('tri_type','cubic') # cubic or linear
   tri_kind=kargs.get('tri_kind','geom') # min_E or geom (for type cubic only)
+  min_area=kargs.get('min_area','auto1') # right value of first bin if only 1st and
+                                         # last bins have values; otherwise
+                                         # area.mean()/1e10 (auto2)
 
 
   # warning, if x.shape=n,1  x[~mask] will also have 2 dims!! Thus better just use ravel...
@@ -379,7 +382,17 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
 
       # remove very small triangles:
       area=np.abs(np.asarray([poly_area(tri.x[i],tri.y[i]) for i in tri.triangles]))
-      tri.set_mask(area<area.mean()/1e10)
+
+      if min_area=='auto1':
+        # check if all zeros except 1st al last:
+        hist_y,hist_x=np.histogram(area)
+        if np.all(hist_y[1:-1]==0): min_area=hist_x[1]
+        else: min_area='auto2'
+
+      if min_area=='auto2':
+        tri.set_mask(area<area.mean()/1e10)
+      else:
+        tri.set_mask(area<min_area)
 
     if tri_type=='cubic':
       u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)

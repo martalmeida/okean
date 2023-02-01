@@ -150,9 +150,10 @@ def use(filename,varname,interface='auto',**kargs):
   if not shape:
     try: return v[:][0] # may be needed for dtype='|S1'
     except: return v[:]
-  else:
-    size=reduce(lambda i,j: i*j,shape)
-    if size==0: return
+  # next code would return empty arrays as None !!!
+  #else:
+  #  size=reduce(lambda i,j: i*j,shape)
+  #  if size==0: return
 
 
   d=v.dims

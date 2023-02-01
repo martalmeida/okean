@@ -221,13 +221,13 @@ class Grid(Common):
       elif prj=='tmerc':
         pnew=dict(proj=prj,lon_0=lon_c,lat_0=lat_c)
 
-    self.proj_info['proj_dict_nice']=pnew
+      self.proj_info['proj_dict_nice']=pnew
 
-    # 3) keep data extent, with some margin (needed for plots)
-    marginX=dlon/10
-    marginY=dlat/10
-    self.proj_info['extent']=xlim[0]-marginX,xlim[1]+marginX, ylim[0]-marginY,ylim[1]+marginY
-    self.proj_info['extent_no_margin']=xlim[0],xlim[1],ylim[0],ylim[1]
+      # 3) keep data extent, with some margin (needed for plots)
+      marginX=dlon/10
+      marginY=dlat/10
+      self.proj_info['extent']=xlim[0]-marginX,xlim[1]+marginX, ylim[0]-marginY,ylim[1]+marginY
+      self.proj_info['extent_no_margin']=xlim[0],xlim[1],ylim[0],ylim[1]
 
 
   def get_projection(self,prjtype='nice',cartopy=False,**ckargs):
@@ -258,7 +258,10 @@ class Grid(Common):
         cutoff=ckargs.pop('cutoff',cutoff)
         p=ccrs.LambertConformal(central_longitude=opts['lon_0'],
                                 central_latitude=opts['lat_0'],
-                                secant_latitudes=(opts['lat_1'],opts['lat_2']),
+                                #secant_latitudes=(opts['lat_1'],opts['lat_2']),
+                                # secant latitudes deprecated, use standard paralels
+                                # (https://scitools.org.uk/cartopy/docs/v0.17/crs/projections.html)
+                                standard_parallels=(opts['lat_1'],opts['lat_2']),
                                 cutoff=cutoff,**ckargs)
       elif opts['proj']=='merc':
         p=ccrs.Mercator(central_longitude=opts['lon_0'],
@@ -372,23 +375,29 @@ class Grid(Common):
     sph=self.spherical
     trueVals=[1,'T','',None]
 
-    if sph.shape==(): # another netcdf4 version, another issue!!
-      try:
-        sph=sph[()].decode()
-      except:
-        sph=sph[()]
+    # check if numeric:
+    if np.issubdtype(sph.dtype,np.number):
+      #if sph.size: sph=sph[0] # may have size and no shape !
+      if np.sum(sph.shape): sph=sph[0]
     else:
-      try:
-        try:
-          sph=''.join(sph).strip()
-        except TypeError:
-          if sph.shape==(): # size is 1 though !
-            sph=sph[()].decode()
-          else:
-            sph=b''.join(sph).strip().decode() # bytes type needed for python3
 
-        if len(sph): sph=sph[0]
-      except: pass
+      if sph.shape==(): # another netcdf4 version, another issue!!
+        try:
+          sph=sph[()].decode()
+        except:
+          sph=sph[()]
+      else:
+        try:
+          try:
+            sph=''.join(sph).strip()
+          except TypeError:
+            if sph.shape==(): # size is 1 though !
+              sph=sph[()].decode()
+            else:
+              sph=b''.join(sph).strip().decode() # bytes type needed for python3
+
+          if len(sph): sph=sph[0]
+        except: pass
 
     self.spherical=sph in trueVals
 

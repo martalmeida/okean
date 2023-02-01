@@ -9,8 +9,8 @@ contains general modeling tools. Specific tools are also included for ROMS.
 
 __authors__ = 'Martinho Marta-Almeida <m.martalmeida@gmail.com> \
 <Couto de Esteves, 3740-037, Portugal>',
-__version__='2022.07'
-__versionfull__='2022-07-22 11:10:15.511877'
+__version__='2023.01'
+__versionfull__='2023-01-26 16:38:03.047654'
 
 
 def doc(tag=None):

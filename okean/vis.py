@@ -317,7 +317,8 @@ class Vis(visCfg):
 
 
   def init_projection(self,**ckargs):
-    xlim,ylim=self.config['proj.extent'][:2],self.config['axes.axis'][2:]
+    #xlim,ylim=self.config['proj.extent'][:2],self.config['axes.axis'][2:]
+    xlim,ylim=self.config['proj.extent'][:2],self.config['proj.extent'][2:]
     opts=self.config['proj.params']
 
     if opts['proj']=='lcc':

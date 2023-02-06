@@ -353,14 +353,15 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
   else:
     import  matplotlib.tri as mtri
     if extrap:
-
-        # add corners:
-        if 0:
-          dx=(xi.max()-xi.min())/(1.*xi.size)
-          dy=(yi.max()-yi.min())/(1.*yi.size)
-        else: # higher distance from domain:
-          dx=(xi.max()-xi.min())
-          dy=(yi.max()-yi.min())
+      # check if new points are needed in order to ensure extrap,
+      # ie, check if xi,yi are not inside x,y convex hull:
+      from shapely.geometry import MultiPoint
+      chull=MultiPoint(np.vstack((x,y)).T).convex_hull
+      points=MultiPoint(np.vstack((xi.ravel(),yi.ravel())).T)
+      if not chull.contains(points):
+        # add 4 corners to x,y:
+        dx=xi.max()-xi.min()
+        dy=yi.max()-yi.min()
 
         xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
         yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
@@ -384,9 +385,12 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
       area=np.abs(np.asarray([poly_area(tri.x[i],tri.y[i]) for i in tri.triangles]))
 
       if min_area=='auto1':
-        # check if all zeros except 1st al last:
+        # check if all zeros except 1st and last, but 1st bin must
+        # be smaller than last as it should contain outliers. A couple
+        # of large triangles may appear in concave shapes and in such case
+        # there are no outiers
         hist_y,hist_x=np.histogram(area)
-        if np.all(hist_y[1:-1]==0): min_area=hist_x[1]
+        if np.all(hist_y[1:-1]==0) and hist_y[-1]>hist_y[0]: min_area=hist_x[1]
         else: min_area='auto2'
 
       if min_area=='auto2':

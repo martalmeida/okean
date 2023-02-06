@@ -970,8 +970,8 @@ def ij_limits(x,y,xlim,ylim,margin=1,check=0):
     add=1 # to ensure all xlim,ylim points are inside region
     J0=min(j0,j1,j2,j3)-add-margin
     J1=max(j0,j1,j2,j3)+1+add+margin
-    I0=min(i0,i1,i1,i2)-add-margin
-    I1=max(i0,i1,i1,i2)+1+add+margin
+    I0=min(i0,i1,i2,i3)-add-margin
+    I1=max(i0,i1,i2,i3)+1+add+margin
 
     L,M=x.shape
 

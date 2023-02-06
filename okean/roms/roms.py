@@ -1245,8 +1245,8 @@ class His(Common,Derived):
     x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     if True: # extrat only portion of data needed:
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
-      xi='%d:%d'%(i0,i1)
-      eta='%d:%d'%(j0,j1)
+      xi=slice(i0,i1)
+      eta=slice(j0,j1)
 
       if data is False: V=self.use(varname,SEARCHtime=time,xi_SEARCH=xi,eta_SEARCH=eta)
       #else: v=data[...,j0:j1,i0:i1]

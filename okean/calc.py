@@ -352,33 +352,35 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
 
   else:
     import  matplotlib.tri as mtri
-    if extrap:
-      # check if new points are needed in order to ensure extrap,
-      # ie, check if xi,yi are not inside x,y convex hull:
-      from shapely.geometry import MultiPoint
-      chull=MultiPoint(np.vstack((x,y)).T).convex_hull
-      points=MultiPoint(np.vstack((xi.ravel(),yi.ravel())).T)
-      if not chull.contains(points):
-        # add 4 corners to x,y:
-        dx=xi.max()-xi.min()
-        dy=yi.max()-yi.min()
-
-        xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
-        yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
-        vv=np.zeros(4,v.dtype)
-        mv=np.zeros(4,'bool')
-
-        for i in range(4):
-          d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
-          j=np.where(d==d.min())[0][0]
-          vv[i]=v[~mask][j]
-
-        x=np.ma.hstack((x,xv))
-        y=np.ma.hstack((y,yv))
-        v=np.ma.hstack((v,vv))
-        mask=np.hstack((mask,mv))
-
     if not tri:
+      if extrap:
+        # check if new points are needed in order to ensure extrap,
+        # ie, check if xi,yi are not inside x,y convex hull:
+        from shapely.geometry import MultiPoint
+        chull=MultiPoint(np.vstack((x[~mask],y[~mask])).T).convex_hull
+        # chull coords are given by xc,yc=chull.exterior.coords.xy
+        points=MultiPoint(np.vstack((xi.ravel(),yi.ravel())).T)
+        if not chull.contains(points):
+          # add 4 corners to x,y:
+          dx=xi.max()-xi.min()
+          dy=yi.max()-yi.min()
+
+          xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
+          yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
+          vv=np.zeros(4,v.dtype)
+          mv=np.zeros(4,'bool')
+
+          for i in range(4):
+            d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
+            j=np.where(d==d.min())[0][0]
+            vv[i]=v[~mask][j]
+
+          x=np.ma.hstack((x,xv))
+          y=np.ma.hstack((y,yv))
+          v=np.ma.hstack((v,vv))
+          mask=np.hstack((mask,mv))
+
+
       tri=mtri.Triangulation(x[~mask],y[~mask])
 
       # remove very small triangles:
@@ -388,7 +390,7 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
         # check if all zeros except 1st and last, but 1st bin must
         # be smaller than last as it should contain outliers. A couple
         # of large triangles may appear in concave shapes and in such case
-        # there are no outiers
+        # there are no outliers
         hist_y,hist_x=np.histogram(area)
         if np.all(hist_y[1:-1]==0) and hist_y[-1]>hist_y[0]: min_area=hist_x[1]
         else: min_area='auto2'
@@ -398,13 +400,18 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
       else:
         tri.set_mask(area<min_area)
 
+    else: # tri is provided as input arg
+      tri,v,mask=tri
+
     if tri_type=='cubic':
       u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)
     elif tri_type=='linear':
       u = mtri.LinearTriInterpolator(tri, v[~mask])(xi,yi)
 
 
-  return u, tri
+  return u, (tri,v,mask) # new v and mask may be needed if extrap;
+                         # returning v and mask will avoid recalculate
+                         # convex hull and add new data corners
 
 
 def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):

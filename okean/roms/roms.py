@@ -807,14 +807,17 @@ class His(Common,Derived):
 
 
   def path_s_levels(self,time,x,y,rw='r',**kargs):
-    inds=kargs.get('inds',None)
+    inds=kargs.get('inds','find')
 
     xr,yr,h,m=self.grid.vars()
     zeta=self.use('zeta',SEARCHtime=time)
 
-    if inds:
-      i0,i1=inds['xi']
-      j0,j1=inds['eta']
+    if not inds is False:
+      if inds=='find':
+        i0,i1,j0,j1=calc.ij_limits(xr, yr, (x.min(),x.max()),(y.min(),y.max()), margin=1)
+      else: # inds is a dict
+        i0,i1=inds['xi']
+        j0,j1=inds['eta']
 
       xr=xr[j0:j1,i0:i1]
       yr=yr[j0:j1,i0:i1]

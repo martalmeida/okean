@@ -3097,11 +3097,13 @@ class rgui:
     pylab.ioff()
     f=pylab.figure()
     if v.ndim==2:
-      pylab.pcolor(d/1000.,z,v)
+      #pylab.pcolor(d/1000.,z,v)
+      pylab.pcolormesh(d,z,v)
       pylab.colorbar()
       pylab.ylabel('Depth [m]')
     elif v.ndim==1:
-      pylab.plot(np.squeeze(d)/1000.,np.squeeze(v))
+      #pylab.plot(np.squeeze(d)/1000.,np.squeeze(v))
+      pylab.plot(np.squeeze(d),np.squeeze(v))
 
     pylab.xlabel('Position along the section [km]')
 

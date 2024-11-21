@@ -516,6 +516,37 @@ def _griddata(x,y,v,xi,yi,**kargs):
       # a possible way how to do it may be:
       # https://stackoverflow.com/questions/71402899/filter-simplices-out-of-scipy-spatial-delaunay
 
+      '''
+      # teste----------------
+      def good_triangles(tri,points,amin):
+        edge_lengths = np.zeros(tri.vertices.shape)
+        areas = np.zeros(tri.vertices.shape[0])
+        seen = {}
+        # loop over triangles
+        for i, vertex in enumerate(tri.vertices):
+          #a=poly_area(points[vertex,0],points[vertex,1])
+          # faster:
+
+          #a=(1/2)|x1(y2 − y3) + x2(y3 − y1) + x3(y1 − y2)|
+          a=(points[vertex,0][0]*(points[vertex,1][1]-points[vertex,1][2])+
+             points[vertex,0][1]*(points[vertex,1][2]-points[vertex,1][0])+
+             points[vertex,0][2]*(points[vertex,1][0]-points[vertex,1][1]))/2
+
+          if a<0: a=-a
+          areas[i]=a
+
+        return areas>amin
+
+
+      amin=1e-9
+      good=good_triangles(tri,points,amin)
+#      subset_tri.nsimplex = large_triangle_ids.size
+#      subset_tri.simplices = tri.simplices[large_triangles]
+#      subset_tri.neighbors = tri.neighbors[large_triangles]
+
+      # teste----------------
+      '''
+
     import scipy.interpolate
     if tri_type=='cubic':
       u=scipy.interpolate.CloughTocher2DInterpolator(tri,v[~mask])(xi.ravel(),yi.ravel())

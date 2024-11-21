@@ -155,10 +155,13 @@ def get_colormaps():
   for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
     res['ncview']+=[' '+k]
 
-  try:names=pylab.cm._cmapnames
-  except AttributeError:
-    try: names=pylab.cm.cmapnames
-    except AttributeError: names=pylab.cm.cmap_d.keys()
+  try:
+    names=pylab.cm._colormaps()
+  except:
+    try:names=pylab.cm._cmapnames
+    except AttributeError:
+      try: names=pylab.cm.cmapnames
+      except AttributeError: names=pylab.cm.cmap_d.keys()
 
   for n in names:
     for k in colorbrewer.keys():

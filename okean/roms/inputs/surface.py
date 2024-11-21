@@ -531,6 +531,12 @@ def make_blk_cfsr(cfsrpath,grd,bulk,date0=False,date1=False,**kargs):
   else:
     g=False
 
+    # latitude must be reversed otherwise ROMS hindices subroutine (interpolate.F) will not find Jmin
+    for k in data:
+      if data[k]['y'][0,0]>data[k]['y'][-1,0]:
+        # flip all data:
+        for vname in data[k]: data[k][vname]=data[k][vname][::-1]
+
     k=list(data.keys())[0]
     kargs['coords']=data[k]['x'],data[k]['y']
 

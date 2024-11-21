@@ -298,6 +298,9 @@ def era5_file_data(files,quiet=False):
     '''Fix data to right time in avg rate fields (ie, prev half hour to now)
        See:
        https://confluence.ecmwf.int/display/CKB/ERA5+data+documentation#ERA5datadocumentation-Meanratesandaccumulations
+
+       # used for mean rates:
+       https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=overview
     '''
     DTstep=1
     a=DTstep/2.

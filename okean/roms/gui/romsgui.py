@@ -16,8 +16,15 @@ from matplotlib.figure import Figure
 import numpy as np
 import os
 import pylab
-from mpl_toolkits.basemap import Basemap
-from mpl_toolkits. basemap import cm as basemap_cm
+
+try:
+  import cartopy
+  useCartopy=True
+except: useCartopy=False
+
+try:
+  from mpl_toolkits.basemap import cm as basemap_cm
+except: basemap_cm=False
 
 from collections import OrderedDict
 from . import gui_tools
@@ -140,17 +147,21 @@ def get_colormaps():
   for k in sorted(pl_tools.cm.cmap_d.keys()):
     res['usersdef']+=['_'+k]
 
-  bcm=basemap_cm._cmapnames
-  bcm.sort()
-  res['basemap']=bcm
+  if basemap_cm:
+    bcm=basemap_cm._cmapnames
+    bcm.sort()
+    res['basemap']=bcm
 
   for k in sorted(pl_tools.cm_ncview.cmap_d.keys()):
     res['ncview']+=[' '+k]
 
-  try:names=pylab.cm._cmapnames
-  except AttributeError:
-    try: names=pylab.cm.cmapnames
-    except AttributeError: names=pylab.cm.cmap_d.keys()
+  try:
+    names=pylab.cm._colormaps()
+  except:
+    try:names=pylab.cm._cmapnames
+    except AttributeError:
+      try: names=pylab.cm.cmapnames
+      except AttributeError: names=pylab.cm.cmap_d.keys()
 
   for n in names:
     for k in colorbrewer.keys():
@@ -1332,6 +1343,10 @@ class rgui:
       grd=self.files['Grid'][0]
       lonlims=grd.lon.min(),grd.lon.max()
       latlims=grd.lat.min(),grd.lat.max()
+      dx=lonlims[1]-lonlims[0]
+      dy=latlims[1]-latlims[0]
+      lonlims=lonlims[0]-dx/10,lonlims[1]+dx/10
+      latlims=latlims[0]-dy/10,latlims[1]+dy/10
     else:
       lonlims=lims[:2]
       latlims=lims[2:]
@@ -1368,7 +1383,10 @@ class rgui:
       self.widgets['lat1'].insert(0,y1)
       self.widgets['lat2'].insert(0,y2)
 
+    print('NEW LIMS:',x1,x2,y1,y2)
+    print('WILL SHOW AFTER NEW LIMS!!')
     if show: self.show()
+    print('-- SHOW DONE AFTER NEW LIMS!!')
 
   def __get_grid_lims(self):
     lonlim1=float(self.widgets['lon1'].get())
@@ -1381,7 +1399,7 @@ class rgui:
     lonlims,latlims=self.__get_grid_lims()
     return ticks.loose_label(lonlims[0],lonlims[1]),ticks.loose_label(latlims[0],latlims[1])
 
-  def select_file(self,f=False,show=True):
+  def select_file(self,f=False,show=True,multiple=True):
     def finfo(f):
      atts=netcdf.fatt(f)
      if 'title' in atts.keys(): s=netcdf.fatt(f,'title')
@@ -1403,7 +1421,6 @@ class rgui:
       try: atype=netcdf.fatt(f,'title').split()[0].lower() # agrif child grids
       except: atype='grid'
 
-    print(atype)
     if atype.find('grid')>=0 or atype.find('grd')>=0:
       self.files['grid']=f
       self.files['grid_finfo']=finfo(f)
@@ -1423,7 +1440,12 @@ class rgui:
     elif atype.find('history')>=0 or atype.find('initial')>=0 or\
          atype.find('average')>=0 or atype.find('restart')>=0 or\
          atype.find('climatology')>=0:
-      self.files['his']=f
+
+      if not multiple:
+        self.files['his']=[f] # do not look for other files, like nesting ones inside roms.MHis
+      else:
+        self.files['his']=f # will load all files like <name>*.<ext>
+
       self.files['his_finfo']=finfo(f)
 
       if 'grd_file' in netcdf.fatt(f) and os.path.isfile(netcdf.fatt(f,'grd_file')):
@@ -1530,8 +1552,8 @@ class rgui:
     self.swapp['ftitle']={}
     for v in vars:
       f=self.variables[v]
+      if isinstance(f,list): f=f[0]
       if not f in self.swapp['ftitle']:
-        print(f,v)
         try:
           ftitle=netcdf.fatt(f,'title')
         except: ftitle='NO TITLE'
@@ -1566,15 +1588,25 @@ class rgui:
 
 
 
-  def clear_fig(self):
+  def clear_fig(self,proj=False):
     if 0: # slower
       self.figure.clf()
       t0=pytime.time()
       self.axes = self.figure.add_axes((.12,.15,.8,.78))
       self.cbar=self.figure.add_axes((.1,.06,.8,.03))
     else:
-      if hasattr(self,'axes'): self.axes.clear()
-      else: self.axes = self.figure.add_axes((.1,.19,.85,.75))
+      if hasattr(self,'axes'):
+        if useCartopy:
+          self.axes.remove()
+          self.axes = self.figure.add_axes((.1,.19,.85,.75),projection=proj)
+        else:
+          self.axes.clear()
+      else:
+        if useCartopy:
+          self.axes = self.figure.add_axes((.1,.19,.85,.75),projection=proj)
+        else:
+          self.axes = self.figure.add_axes((.1,.19,.85,.75))
+
       if hasattr(self,'cbar'): self.cbar.clear()
       else: self.cbar=self.figure.add_axes((.1,.1,.85,.03))
 
@@ -1693,6 +1725,9 @@ class rgui:
     svec=self.widgets['svec']
     s=float(svec.get())
 
+    # for cartopy !?
+    s=s*1e5
+
     return d,s
 
   def select_var(self,varname):
@@ -1716,6 +1751,7 @@ class rgui:
     #f=self.files['his']
 
     info=self.swapp['vinfo'][varname]
+    if isinstance(f,list): f=f[0]
     ftitle=self.swapp['ftitle'][f]
 
 #    info=netcdf.vatt(f,varname)
@@ -2111,7 +2147,7 @@ class rgui:
 #      cbar=None
      pass
     else:
-      self.clear_fig()
+      self.clear_fig(proj=data[0].map)
       ax=self.axes
       cbar=self.cbar
       cbarOrientation='horizontal'
@@ -2276,6 +2312,7 @@ class rgui:
       o.config['field.linewidths']=.5
 
     # proj:
+    '''
     if data[0].config['proj.name']=='auto':
       data[0].config['proj.name']=self.options['projection'].get()
     else:
@@ -2298,6 +2335,19 @@ class rgui:
     popt=data[0].config['proj.options']
     for n,v in [('width',W),('height',H),('lon_0',lon_0),('lat_0',lat_0),('lat_1',lat_1),('lat_2',lat_2)]:
       if n in popt: popt[n]=v
+    '''
+#    grid=self.files['Grid'][0]
+#    print('PROJJJJJJJJJJJJJJJJJJ')
+#    p=grid.get_projection(cartopy=1)
+#    p=data[0].map
+#    print('PROJJJJJJJJJJJJJJJJJJ DONE')
+#
+    lonlims,latlims=self.__get_grid_lims()
+#    data[0].config['axes.axis']=lonlims+latlims
+#
+    #data[0].set_projection(p,extent=grid.proj_info['extent'])
+#    data[0].set_projection(p,extent=lonlims+latlims)#grid.proj_info['extent'])
+    data[0].config['proj.extent']=lonlims+latlims
     #--------------------
 
     resolution=self.options['coastline_res'].get()[0]
@@ -2321,9 +2371,13 @@ class rgui:
       data.plot()
       data[0].fig.show()
     else:
+      print('WILL DO VIS PLOT:')
       data.plot(ax=self.axes,cbax=self.cbar)
-#      self.canvas.show()
-      self.canvas.draw()
+      print('DONE VIS PLOT:')
+      #self.canvas.show()
+      #print('will canvas draw')
+      #self.canvas.draw()
+      #print('done canvas draw')
 
     self.map=data[0].map
 
@@ -2365,7 +2419,6 @@ class rgui:
       except:
         self.canvas.draw()
 
-
     # activate tools like zoom, slices, etc:
     if   self.active_tool == 'zoom':        self.interactive_zoom(chstate=False)
     elif self.active_tool == 'vslice':      self.interactive_vslice(chstate=False)
@@ -2379,6 +2432,9 @@ class rgui:
 
     self.sync_save()
 
+    print('--> canvas draw')
+    self.canvas.draw()
+    print('--> canvas draw done')
     return
 
 #      qv=ax.quiver(xm,ym,u,v,units='x',scale=scale)
@@ -2762,15 +2818,21 @@ class rgui:
       self.__set_cursor('tcross')
 
       lopts=dict(zorder=1e4)
-      self.zoom=pl_tools.InteractiveRect(ax=self.axes,axis=(self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax),
-                                             cmd=self.__zoom,**lopts)
+##      self.zoom=pl_tools.InteractiveRect(ax=self.axes,axis=(self.map.xmin, self.map.xmax, self.map.ymin, self.map.ymax),
+##                                             cmd=self.__zoom,**lopts)
+      self.zoom=pl_tools.InteractiveRect(ax=self.axes,cmd=self.__zoom,**lopts)
 
       self.active_tool='zoom'
 
   def __zoom(self):
-    ob=self.zoom # PUT THIS IN CACHE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    x,y=self.map(ob.x,ob.y,inverse=1)
+    ob=self.zoom
+
+
+###    x,y=self.map(ob.x,ob.y,inverse=1)
+##    tr=self.map.transform_points(cartopy.crs.PlateCarree(),ob.x,ob.y)
+    tr=cartopy.crs.PlateCarree().transform_points(self.map,ob.x,ob.y)
+    x=tr[:,0]
+    y=tr[:,1]
 
     x0,x1=np.min(x),np.max(x)
     y0,y1=np.min(y),np.max(y)
@@ -2879,6 +2941,7 @@ class rgui:
       self.select_var(var)
 
     q=self.__get_romsobj(var)
+    q=q[0] # consider only 1st domain , if more than one used !!
     itime = self.__get_itime()
 
     if type in ('profile','time_series'):
@@ -2947,10 +3010,11 @@ class rgui:
         print('cannot file vslice obj')
         return
 
-      # covert to lon lat... after zoom the values change!
-      try:
-        ob.lon,ob.lat=self.map(ob.x,ob.y,inverse=1)
-      except:
+      if self.map:
+        tr=cartopy.crs.PlateCarree().transform_points(self.map,ob.x,ob.y)
+        ob.lon=tr[:,0]
+        ob.lat=tr[:,1]
+      else:
         ob.lon,ob.lat=ob.x,ob.y
 
       # store previous slice:
@@ -2985,6 +3049,7 @@ class rgui:
       self.select_var(var)
 
     q=self.__get_romsobj(var)
+    q=q[0]
     itime = self.__get_itime()
 
     # number of points to use:
@@ -3019,18 +3084,14 @@ class rgui:
 
 
     # slicell:
-    try:
-      self.map.xmin
-      #d,z,v=q.slicell(var,X,Y,itime,dist=True)
+    if self.map:
       data=q.slicell(var,X,Y,itime,dist=True)
       d,z,v=data.d,data.z,data.v
-    except:
-      #x,y,z,v=q.slicell(var,X,Y,itime,dist=False)
+    else:
       data=q.slicell(var,X,Y,itime,dist=False)
       x,y,z,v=data.x,data.y,data.z,data.v
       x=x[0,...]
       y=y[0,...]
-      #print x.shape, y.shape
       x=np.hstack((0,np.diff(x))).cumsum()
       y=np.hstack((0,np.diff(y))).cumsum()
       d=np.sqrt(x**2+y**2)
@@ -3039,11 +3100,13 @@ class rgui:
     pylab.ioff()
     f=pylab.figure()
     if v.ndim==2:
-      pylab.pcolor(d/1000.,z,v)
+      #pylab.pcolor(d/1000.,z,v)
+      pylab.pcolormesh(d,z,v)
       pylab.colorbar()
       pylab.ylabel('Depth [m]')
     elif v.ndim==1:
-      pylab.plot(np.squeeze(d)/1000.,np.squeeze(v))
+      #pylab.plot(np.squeeze(d)/1000.,np.squeeze(v))
+      pylab.plot(np.squeeze(d),np.squeeze(v))
 
     pylab.xlabel('Position along the section [km]')
 

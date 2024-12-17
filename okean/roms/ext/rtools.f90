@@ -1,6 +1,6 @@
-c f2py -c rtools.f -m rtools --fcompiler=gnu95
-c f2py -c rtools.f -m rtools --f90flags==-32
-c f2py -c rtools.f -m rtools --fcompiler=pg
+! f2py -c rtools.f -m rtools --fcompiler=gnu95
+! f2py -c rtools.f -m rtools --f90flags==-32
+! f2py -c rtools.f -m rtools --fcompiler=pg
 
 
       function interp_spl(z,v,lev,N)
@@ -27,24 +27,24 @@ c f2py -c rtools.f -m rtools --fcompiler=pg
       end
 
 
-      subroutine roms_slicez(s,v,h,zeta,tts,ttb,hc,Nr,
-     & Vtransform,Vstretching,lev,SN,SPL,
-     & N,Ny,Nx)
+      subroutine roms_slicez(s,v,h,zeta,tts,ttb,hc,Nr, &
+      Vtransform,Vstretching,lev,SN,SPL, &
+      N,Ny,Nx)
 
       integer :: N,Ny,Nx,j,i,Nr, Vtransform,Vstretching
-      real ( kind=8 ) :: z_w(0:Nr,Ny,Nx),h(Ny,Nx),zeta(Ny,Nx),
-     &     z_r(Nr,Ny,Nx),hc,tts,ttb, v(N,Ny,Nx), s(Ny,Nx),
-     &     lev(Ny,Nx), interp_lin,interp_spl
+      real ( kind=8 ) :: z_w(0:Nr,Ny,Nx),h(Ny,Nx),zeta(Ny,Nx), &
+          z_r(Nr,Ny,Nx),hc,tts,ttb, v(N,Ny,Nx), s(Ny,Nx), &
+          lev(Ny,Nx), interp_lin,interp_spl
       logical :: SN  ! masked near surface
       logical :: SPL ! use spline instead of linear interpolation
 
-Cf2py intent(out) s
+!f2py intent(out) s
 !Cf2py integer optional, intent(in) :: n=shape(v,0)
 !Cf2py integer optional, intent(in) :: m=shape(v,1)
 !Cf2py integer optional, intent(in) :: l=shape(v,2)
 
-      call s_levels(h,zeta,tts,ttb,hc,Nr,Ny,Nx,z_r,z_w,
-     & Vtransform,Vstretching)
+      call s_levels(h,zeta,tts,ttb,hc,Nr,Ny,Nx,z_r,z_w, &
+      Vtransform,Vstretching)
 
       if (N.eq.Nr) then
 
@@ -103,24 +103,24 @@ Cf2py intent(out) s
       end
 
 
-      subroutine scoord(theta_s,theta_b,N,sc_r,Cs_r,sc_w,Cs_w,
-     & Vstretching)
+      subroutine scoord(theta_s,theta_b,N,sc_r,Cs_r,sc_w,Cs_w, &
+      Vstretching)
       implicit none
       integer :: N,k,Vstretching
-c      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
-c      not a good idea ... check:
-c      https://sysbio.ioc.ee/projects/f2py2e/FAQ.html#q-what-if-fortran-90-code-uses-type-spec-kind-kind
-c      thus:
+!      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+!      not a good idea ... check:
+!      https://sysbio.ioc.ee/projects/f2py2e/FAQ.html#q-what-if-fortran-90-code-uses-type-spec-kind-kind
+!      thus:
       integer, parameter :: r8 = 8
-      real (kind=r8) :: theta_s,theta_b,sc_r(N),Cs_r(N),sc_w(0:N),
-     & Cs_w(0:N)
+      real (kind=r8) :: theta_s,theta_b,sc_r(N),Cs_r(N),sc_w(0:N), &
+      Cs_w(0:N)
       real (kind=r8) :: cff1,cff2,ds,sc__w,sc__r
       real (kind=r8) :: Aweight,Bweight,Csur,Cbot,Cweight
 
-Cf2py intent(out) sc_r
-Cf2py intent(out) Cs_r
-Cf2py intent(out) sc_w
-Cf2py intent(out) Cs_w
+!f2py intent(out) sc_r
+!f2py intent(out) Cs_r
+!f2py intent(out) sc_w
+!f2py intent(out) Cs_w
 
 !     -----------------------------------------------------------------------
 !     Original vertical strectching function, Song and Haidvogel (1994).
@@ -137,13 +137,13 @@ Cf2py intent(out) Cs_w
           sc_w(k)=ds*REAL(k-N,r8)
           sc_r(k)=ds*(REAL(k-N,r8)-0.5_r8)
           IF (theta_s.ne.0.0_r8) THEN
-            Cs_w(k)=(1.0_r8-theta_b)*cff1*SINH(theta_s*sc_w(k))+
-     &              theta_b*(cff2*TANH(theta_s*(sc_w(k)+0.5_r8))-
-     &              0.5_r8)
+            Cs_w(k)=(1.0_r8-theta_b)*cff1*SINH(theta_s*sc_w(k))+ &
+                   theta_b*(cff2*TANH(theta_s*(sc_w(k)+0.5_r8))- &
+                   0.5_r8)
 
-            Cs_r(k)=(1.0_r8-theta_b)*cff1*SINH(theta_s*sc_r(k))+
-     &               theta_b*(cff2*TANH(theta_s*(sc_r(k)+0.5_r8))-
-     &               0.5_r8)
+            Cs_r(k)=(1.0_r8-theta_b)*cff1*SINH(theta_s*sc_r(k))+ &
+                    theta_b*(cff2*TANH(theta_s*(sc_r(k)+0.5_r8))- &
+                    0.5_r8)
           ELSE
             Cs_w(k)=sc_w(k)
             Cs_r(k)=sc_r(k)
@@ -165,14 +165,14 @@ Cf2py intent(out) Cs_w
           sc__w=ds*real(k-N,r8)
           sc_w(k)=sc__w
           IF (theta_s.gt.0.0_r8) THEN
-            Csur=(1.0_r8-COSH(theta_s*sc__w))/
-     &           (COSH(theta_s)-1.0_r8)
+            Csur=(1.0_r8-COSH(theta_s*sc__w))/ &
+                (COSH(theta_s)-1.0_r8)
             IF (theta_b.gt.0.0_r8) THEN
-              Cbot=SINH(theta_b*(sc__w+1.0_r8))/
-     &             SINH(theta_b)-1.0_r8
-              Cweight=(sc__w+1.0_r8)**Aweight*
-     &                (1.0_r8+(Aweight/Bweight)*
-     &                        (1.0_r8-(sc__w+1.0_r8)**Bweight))
+              Cbot=SINH(theta_b*(sc__w+1.0_r8))/ &
+                  SINH(theta_b)-1.0_r8
+              Cweight=(sc__w+1.0_r8)**Aweight* &
+                     (1.0_r8+(Aweight/Bweight)* &
+                             (1.0_r8-(sc__w+1.0_r8)**Bweight))
               Cs_w(k)=Cweight*Csur+(1.0_r8-Cweight)*Cbot
             ELSE
               Cs_w(k)=Csur
@@ -188,14 +188,14 @@ Cf2py intent(out) Cs_w
           sc__r=ds*(k-N-0.5_r8)
           sc_r(k)=sc__r
           IF (theta_s.gt.0.0_r8) THEN
-            Csur=(1.0_r8-COSH(theta_s*sc__r))/
-     &           (COSH(theta_s)-1.0_r8)
+            Csur=(1.0_r8-COSH(theta_s*sc__r))/ &
+                (COSH(theta_s)-1.0_r8)
             IF (theta_b.gt.0.0_r8) THEN
-              Cbot=SINH(theta_b*(sc__r+1.0_r8))/
-     &             SINH(theta_b)-1.0_r8
-              Cweight=(sc__r+1.0_r8)**Aweight*
-     &                (1.0_r8+(Aweight/Bweight)*
-     &                        (1.0_r8-(sc__r+1.0_r8)**Bweight))
+              Cbot=SINH(theta_b*(sc__r+1.0_r8))/ &
+                  SINH(theta_b)-1.0_r8
+              Cweight=(sc__r+1.0_r8)**Aweight* &
+                     (1.0_r8+(Aweight/Bweight)* &
+                             (1.0_r8-(sc__r+1.0_r8)**Bweight))
               Cs_r(k)=Cweight*Csur+(1.0_r8-Cweight)*Cbot
             ELSE
               Cs_r(k)=Csur
@@ -225,14 +225,14 @@ Cf2py intent(out) Cs_w
           sc__w=ds*(k-N)
           sc_w(k)=sc__w
           IF (theta_s.gt.0.0_r8) THEN
-            Csur=(1.0_r8-COSH(theta_s*sc__w))/
-     &           (COSH(theta_s)-1.0_r8)
+            Csur=(1.0_r8-COSH(theta_s*sc__w))/ &
+                (COSH(theta_s)-1.0_r8)
           ELSE
             Csur=-sc__w**2
           END IF
           IF (theta_b.gt.0.0_r8) THEN
-            Cbot=(EXP(theta_b*Csur)-1.0_r8)/
-     &           (1.0_r8-EXP(-theta_b))
+            Cbot=(EXP(theta_b*Csur)-1.0_r8)/ &
+                (1.0_r8-EXP(-theta_b))
             Cs_w(k)=Cbot
           ELSE
             Cs_w(k)=Csur
@@ -245,14 +245,14 @@ Cf2py intent(out) Cs_w
           sc__r=ds*(k-N-0.5_r8)
           sc_r(k)=sc__r
           IF (theta_s.gt.0.0_r8) THEN
-            Csur=(1.0_r8-COSH(theta_s*sc__r))/
-     &           (COSH(theta_s)-1.0_r8)
+            Csur=(1.0_r8-COSH(theta_s*sc__r))/ &
+                (COSH(theta_s)-1.0_r8)
           ELSE
             Csur=-sc__r**2
           END IF
           IF (theta_b.gt.0.0_r8) THEN
-            Cbot=(EXP(theta_b*Csur)-1.0_r8)/
-     &           (1.0_r8-EXP(-theta_b))
+            Cbot=(EXP(theta_b*Csur)-1.0_r8)/ &
+                (1.0_r8-EXP(-theta_b))
             Cs_r(k)=Cbot
           ELSE
             Cs_r(k)=Csur
@@ -264,21 +264,21 @@ Cf2py intent(out) Cs_w
 
 
 
-      subroutine s_levels(h,zeta,theta_s,theta_b,hc,N,Ny,Nx,z_r,z_w,
-     & Vtransform,Vstretching)
+      subroutine s_levels(h,zeta,theta_s,theta_b,hc,N,Ny,Nx,z_r,z_w, &
+      Vtransform,Vstretching)
       implicit none
       integer :: N,Ny,Nx, k,j,i, Vtransform,Vstretching
-c      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
+!      integer, parameter :: r8 = selected_real_kind(12,300)  ! 64-bit
       integer, parameter :: r8 = 8
       real (kind=r8) :: h(Ny,Nx),zeta(Ny,Nx),hc, theta_s, theta_b
       real (kind=r8) :: z_r(N,Ny,Nx), z_w(0:N,Ny,Nx)
 
-      real (kind=r8) :: cff_w,cff1_w,cff_r,cff1_r,cff2_w,
-     &     cff2_r, sc_w(0:N), Cs_w(0:N), sc_r(N),Cs_r(N),
-     &     hinv, hwater, z_w0, z_r0
+      real (kind=r8) :: cff_w,cff1_w,cff_r,cff1_r,cff2_w, &
+          cff2_r, sc_w(0:N), Cs_w(0:N), sc_r(N),Cs_r(N), &
+          hinv, hwater, z_w0, z_r0
 
-Cf2py intent(out) z_r
-Cf2py intent(out) z_w
+!f2py intent(out) z_r
+!f2py intent(out) z_w
 
       call scoord(theta_s,theta_b,N,sc_r,Cs_r,sc_w,Cs_w,Vstretching)
 
@@ -347,7 +347,7 @@ Cf2py intent(out) z_w
       real (kind=8) :: v(S,M,N),z(S,M,N),depth(M,N),val(M,N)
       real (kind=8) :: a,b
 
-Cf2py intent(out) depth
+!f2py intent(out) depth
 ! Cf2py integer optional, intent(in) :: S=shape(v,0)
 ! Cf2py integer optional, intent(in) :: M=shape(v,1)
 ! Cf2py integer optional, intent(in) :: N=shape(v,2)

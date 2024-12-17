@@ -169,82 +169,187 @@ class Grid(Common):
     self.load_atts()
 
     # about proj:
-    self.load_proj()
+    self.load_proj_info()
 
 
-  def load_proj(self):
-    # load and parse attrs needed for basemap projection
+  def load_proj_info(self):
+    # 1) load from grid and parse attrs needed for proj
 
     self.proj_info={}
-    for i in ['proj4string','basemap_opts']:
+    for i in ['proj4_string','wkt_string','proj_dict']:
       if i in netcdf.fatt(self.nc):
         self.proj_info[i]=netcdf.fatt(self.nc,i)
       else:
         self.proj_info[i]=''
 
+    # parse dict string:
     o={}
-    if self.proj_info['basemap_opts']: # parse it
-      for i in self.proj_info['basemap_opts'].split():
+    if self.proj_info['proj_dict']:
+      for i in self.proj_info['proj_dict'].split():
         name,val=i[1:].split('=')
         try:
           val=float(val)
         except: pass
         o[name]=val
 
-    self.proj_info['basemap_opts0']=o
+    self.proj_info['proj_dict']=o
 
-    # Now let ys make sure the projection is well centered (may not be
-    # at grid creation):
-    # - build a set of reasonable options;  user can always change them
-    # after. Let us consider only the lcc and merc projections, and use
-    # lcc by default if none is provided at grid atts
-    if o: prj=o['projection']
+    # 2) create a set of reasonable projection options from the data;
+    #  user can always change them after. Let us consider only the lcc
+    # and merc and tmerc projections, and use lcc by default if none
+    # is provided in proj_info. Also let's make sure the projection is
+    # well centred (may not be at grid creation)
+
+    if o: prj=o['proj']
     else: prj='lcc'
 
+    pnew={}
     if self.spherical:
       xlim=self.lon.min(),self.lon.max()
       ylim=self.lat.min(),self.lat.max()
       dlon=xlim[1]-xlim[0]
       dlat=ylim[1]-ylim[0]
+      lon_c=0.5*(xlim[0]+xlim[1])
+      lat_c=0.5*(ylim[0]+ylim[1])
 
       if prj=='lcc':
-        lon_0=0.5*(xlim[0]+xlim[1])
-        lat_0=0.5*(ylim[0]+ylim[1])
-        lat_1=lat_0-dlat/4.
-        lat_2=lat_0+dlat/4.
-
-        W=110*np.cos(lat_0*np.pi/180)*(xlim[1]-xlim[0])*1e3
-        H=110*(ylim[1]-ylim[0])*1e3
-        W*=1.2
-        H*=1.2
-
-        o=dict(resolution='i',projection=prj,
-               lat_1=lat_1,lat_2=lat_2,lat_0=lat_0,lon_0=lon_0,
-               width=W,height=H)
-
+        lat_1=lat_c-dlat/4.
+        lat_2=lat_c+dlat/4.
+        pnew=dict(proj=prj,lon_0=lon_c,lat_0=lat_c,lat_1=lat_1,lat_2=lat_2)
       elif prj=='merc':
-        dlon_=dlon_/10
-        dlat_=dlat_/10
-        o=dict(resolution='c',projection=prj,
-               llcrnrlon=xlim[0]-dlon_, llcrnrlat=ylim[0]-dlat_,
-               urcrnrlon=xlim[1]+dlon_, urcrnrlat=ylim[1]+dlat_,
-               lon_0=0.5*(xlim[0]+xlim[1]),
-               lat_0=0.5*(ylim[0]+ylim[1]))
+        pnew=dict(proj=prj,lon_0=lon_c,lat_ts=lat_c)
+      elif prj=='tmerc':
+        pnew=dict(proj=prj,lon_0=lon_c,lat_0=lat_c)
 
-      self.proj_info['basemap_opts']=o
+      self.proj_info['proj_dict_nice']=pnew
+
+      # 3) keep data extent, with some margin (needed for plots)
+      marginX=dlon/10
+      marginY=dlat/10
+      self.proj_info['extent']=xlim[0]-marginX,xlim[1]+marginX, ylim[0]-marginY,ylim[1]+marginY
+      self.proj_info['extent_no_margin']=xlim[0],xlim[1],ylim[0],ylim[1]
 
 
-  def get_projection(self,prjtype='nice'):
+  def get_projection(self,prjtype='nice',cartopy=False,**ckargs):
     '''
     prjtype, proj type, if 'nice', a set of reasonable options are used,
       else if 'original', the original basemap_opts0 is used
+    if cartopy, returns cartopy object instead of pyproj
+    ckargs=cartopy extra arguments (e.g. cutoff for lcc projection)
     '''
 
-    if prjtype=='nice': opts=self.proj_info['basemap_opts']
-    elif prjtype=='original': opts=self.proj_info['basemap_opts0']
+    if prjtype=='nice': opts=self.proj_info['proj_dict_nice']
+    elif prjtype=='original':
+      # use WKT if present, otherwise use proj_dict
+      if self.proj_info['wkt_string']: opts=self.proj_info['wkt_string']
+      else: opts=self.proj_info['proj_dict']
     else: return 'unknown prjtype'
 
-    if opts: return Basemap(**opts)
+    if cartopy:
+      import cartopy.crs as ccrs
+      if opts['proj']=='lcc':
+        #if opts['lat_0']<0: cutoff=30
+        #else: cutoff=-30
+        ylim=self.lat.min(),self.lat.max()
+        yc=(ylim[0]+ylim[1])/2
+        if yc>0: cutoff=ylim[0]-1
+        else: cutoff=ylim[1]+1
+
+        cutoff=ckargs.pop('cutoff',cutoff)
+        p=ccrs.LambertConformal(central_longitude=opts['lon_0'],
+                                central_latitude=opts['lat_0'],
+                                #secant_latitudes=(opts['lat_1'],opts['lat_2']),
+                                # secant latitudes deprecated, use standard paralels
+                                # (https://scitools.org.uk/cartopy/docs/v0.17/crs/projections.html)
+                                standard_parallels=(opts['lat_1'],opts['lat_2']),
+                                cutoff=cutoff,**ckargs)
+      elif opts['proj']=='merc':
+        p=ccrs.Mercator(central_longitude=opts['lon_0'],
+                        latitude_true_scale=opts['lat_ts'],**ckargs)
+      elif opts['proj']=='tmerc':
+        p=ccrs.TransverseMercator(central_longitude=opts['lon_0'],
+                                  central_latitude=opts['lat_0'],**ckargs)
+      else: return 'not implemented yet'
+      return p
+    else:
+      import pyproj
+      return pyproj.Proj(opts)
+
+
+#  def load_proj(self):
+#    # load and parse attrs needed for basemap projection
+#
+#    self.proj_info={}
+#    for i in ['proj4string','basemap_opts']:
+#      if i in netcdf.fatt(self.nc):
+#        self.proj_info[i]=netcdf.fatt(self.nc,i)
+#      else:
+#        self.proj_info[i]=''
+#
+#    o={}
+#    if self.proj_info['basemap_opts']: # parse it
+#      for i in self.proj_info['basemap_opts'].split():
+#        name,val=i[1:].split('=')
+#        try:
+#          val=float(val)
+#        except: pass
+#        o[name]=val
+#
+#    self.proj_info['basemap_opts0']=o
+#
+#    # Now let ys make sure the projection is well centered (may not be
+#    # at grid creation):
+#    # - build a set of reasonable options;  user can always change them
+#    # after. Let us consider only the lcc and merc projections, and use
+#    # lcc by default if none is provided at grid atts
+#    if o: prj=o['projection']
+#    else: prj='lcc'
+#
+#    if self.spherical:
+#      xlim=self.lon.min(),self.lon.max()
+#      ylim=self.lat.min(),self.lat.max()
+#      dlon=xlim[1]-xlim[0]
+#      dlat=ylim[1]-ylim[0]
+#
+#      if prj=='lcc':
+#        lon_0=0.5*(xlim[0]+xlim[1])
+#        lat_0=0.5*(ylim[0]+ylim[1])
+#        lat_1=lat_0-dlat/4.
+#        lat_2=lat_0+dlat/4.
+#
+#        W=110*np.cos(lat_0*np.pi/180)*(xlim[1]-xlim[0])*1e3
+#        H=110*(ylim[1]-ylim[0])*1e3
+#        W*=1.2
+#        H*=1.2
+#
+#        o=dict(resolution='i',projection=prj,
+#               lat_1=lat_1,lat_2=lat_2,lat_0=lat_0,lon_0=lon_0,
+#               width=W,height=H)
+#
+#      elif prj=='merc':
+#        dlon_=dlon/10
+#        dlat_=dlat/10
+#        o=dict(resolution='c',projection=prj,
+#               llcrnrlon=xlim[0]-dlon_, llcrnrlat=ylim[0]-dlat_,
+#               urcrnrlon=xlim[1]+dlon_, urcrnrlat=ylim[1]+dlat_,
+#               lon_0=0.5*(xlim[0]+xlim[1]),
+#               lat_0=0.5*(ylim[0]+ylim[1]))
+#
+#      self.proj_info['basemap_opts']=o
+#      self.proj_info['extent']=xlim[0]-dlon/10,xlim[1]+dlon/10, ylim[0]-dlat/10,ylim[1]+dlat/10
+#
+#
+#  def get_projection(self,prjtype='nice'):
+#    '''
+#    prjtype, proj type, if 'nice', a set of reasonable options are used,
+#      else if 'original', the original basemap_opts0 is used
+#    '''
+#
+#    if prjtype=='nice': opts=self.proj_info['basemap_opts']
+#    elif prjtype=='original': opts=self.proj_info['basemap_opts0']
+#    else: return 'unknown prjtype'
+#
+#    if opts: return Basemap(**opts)
 
 
   def load(self):
@@ -269,17 +374,31 @@ class Grid(Common):
     # let's also assume that empty or None sph means True!! (may not be a very smart idea)
     sph=self.spherical
     trueVals=[1,'T','',None]
-    try:
-      try:
-        sph=''.join(sph).strip()
-      except TypeError:
-        if sph.shape==(): # size is 1 though !
-          sph=sph[()].decode()
-        else:
-          sph=b''.join(sph).strip().decode() # bytes type needed for python3
 
-      if len(sph): sph=sph[0]
-    except: pass
+    # check if numeric:
+    if np.issubdtype(sph.dtype,np.number):
+      #if sph.size: sph=sph[0] # may have size and no shape !
+      if np.sum(sph.shape): sph=sph[0]
+    else:
+
+      if sph.shape==(): # another netcdf4 version, another issue!!
+        try:
+          sph=sph[()].decode()
+        except:
+          sph=sph[()]
+      else:
+        try:
+          try:
+            sph=''.join(sph).strip()
+          except TypeError:
+            if sph.shape==(): # size is 1 though !
+              sph=sph[()].decode()
+            else:
+              sph=b''.join(sph).strip().decode() # bytes type needed for python3
+
+          if len(sph): sph=sph[0]
+        except: pass
+
     self.spherical=sph in trueVals
 
   def load_grid(): self.load()
@@ -301,7 +420,7 @@ class Grid(Common):
 
   def border_multi_corner(self):
     mc=self.use('maskc')
-    if np.unique(m).size==1: return self.border() # it is not multi-corner!
+    if np.unique(mc).size==1: return self.border() # it is not multi-corner!
 
     l,n=mc.shape
 
@@ -400,7 +519,8 @@ class Grid(Common):
     if j is False: j=slice(None)
     if i is False: i=slice(None)
 
-    x,y,h,m=[i.data for i in [x,y,h,m] if np.ma.isMA(i)]
+    #x,y,h,m=[i.data for i in [x,y,h,m] if np.ma.isMA(i)]
+    x,y,h,m=[k.data if  np.ma.isMA(k) else k for k in [x,y,h,m]]
 
     return x[j,i],y[j,i],h[j,i],m[j,i]
 
@@ -513,14 +633,16 @@ class Grid(Common):
     # also show domain boundary:
     xb,yb=self.border()
     b=vis.Data(x=xb,v=yb)
-    b.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-'))
+    b.set_param(d1_line__options=dict(lw=0.5,color='k',ls='-',zorder=1e3))
     a.extra=[b]
 
-    # about projection:
-    if prjtype=='original' and self.proj_info['basemap_opts0']: d=self.proj_info['basemap_opts0']
-    elif prjtype=='nice': d=self.proj_info['basemap_opts']
+##    # about projection:
+##    if prjtype=='original' and self.proj_info['basemap_opts0']: d=self.proj_info['basemap_opts0']
+##    elif prjtype=='nice': d=self.proj_info['basemap_opts']
+##    a.set_projection(d,extent=self.proj_info['extent'])
 
-    a.set_projection(d)
+    p=self.get_projection(prjtype,cartopy=1)
+    a.set_projection(p,extent=self.proj_info['extent'])
 
     return a
 
@@ -633,10 +755,12 @@ class MGrid():
 
 
     # about projection:
-    if prjtype=='original' and self[0].proj_info['basemap_opts0']: d=self[0].proj_info['basemap_opts0']
-    elif prjtype=='nice': d=self[0].proj_info['basemap_opts']
+##    if prjtype=='original' and self[0].proj_info['basemap_opts0']: d=self[0].proj_info['basemap_opts0']
+##    elif prjtype=='nice': d=self[0].proj_info['basemap_opts']
+##    a.set_projection(d,extent=self[0].proj_info['extent'])
 
-    a.set_projection(d)
+    p=self[0].get_projection(prjtype,cartopy=1)
+    a.set_projection(p,extent=self[0].proj_info['extent'])
 
     return vis.MData([a])
 
@@ -652,7 +776,7 @@ class His(Common,Derived):
     self.name=his
     self.isremote=False
     if cb.isstr(his):
-      if his.startswith('http:'): self.isremote=True
+      if his.startswith('http'): self.isremote=True
       else: self.name=os.path.realpath(his)
 
     self.type='his'
@@ -683,14 +807,17 @@ class His(Common,Derived):
 
 
   def path_s_levels(self,time,x,y,rw='r',**kargs):
-    inds=kargs.get('inds',None)
+    inds=kargs.get('inds','find')
 
     xr,yr,h,m=self.grid.vars()
     zeta=self.use('zeta',SEARCHtime=time)
 
-    if inds:
-      i0,i1=inds['xi']
-      j0,j1=inds['eta']
+    if not inds is False:
+      if inds=='find':
+        i0,i1,j0,j1=calc.ij_limits(xr, yr, (x.min(),x.max()),(y.min(),y.max()), margin=1)
+      else: # inds is a dict
+        i0,i1=inds['xi']
+        j0,j1=inds['eta']
 
       xr=xr[j0:j1,i0:i1]
       yr=yr[j0:j1,i0:i1]
@@ -1014,7 +1141,9 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+##    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
+    p=self.grid.get_projection(cartopy=1)
+    out.set_projection(p,extent=self.grid.proj_info['extent'])
 
     return out
 
@@ -1036,7 +1165,7 @@ class His(Common,Derived):
 ###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
     x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     zeta=self.use('zeta',SEARCHtime=time)
-    zeta=rt.rho2uvp(zeta,varname)
+    zeta=rt.rho2uvp(zeta,self.vloc(varname)[0])
 
     out.v=rt.slicez(v,m,h,zeta,self.s_params,ind,surf_mask,spline)
 
@@ -1089,7 +1218,9 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+##    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
+    p=self.grid.get_projection(cartopy=1)
+    out.set_projection(p,extent=self.grid.proj_info['extent'])
 
     return out
 
@@ -1117,11 +1248,12 @@ class His(Common,Derived):
     x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
     if True: # extrat only portion of data needed:
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
-      xi='%d:%d'%(i0,i1)
-      eta='%d:%d'%(j0,j1)
+      xi=slice(i0,i1)
+      eta=slice(j0,j1)
 
       if data is False: V=self.use(varname,SEARCHtime=time,xi_SEARCH=xi,eta_SEARCH=eta)
-      else: v=data[...,j0:j1,i0:i1]
+      #else: v=data[...,j0:j1,i0:i1]
+      else: V=data[...,j0:j1,i0:i1]
 
       x=x[j0:j1,i0:i1]
       y=y[j0:j1,i0:i1]
@@ -1130,7 +1262,8 @@ class His(Common,Derived):
 
     else:
       if data is False: V=self.use(varname,SEARCHtime=time)
-      else: v=data
+      #else: v=data
+      else: V=data
 
     if V.ndim==3:
       v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
@@ -1327,7 +1460,9 @@ class His(Common,Derived):
     out.coordsReq=','.join(sorted(coords))
 
     # about projection:
-    out.set_projection(self.grid.proj_info['basemap_opts'])
+###    out.set_projection(self.grid.proj_info['basemap_opts'],extent=self.grid.proj_info['extent'])
+    p=self.grid.get_projection(cartopy=1)
+    out.set_projection(p,extent=self.grid.proj_info['extent'])
 
     return out
 

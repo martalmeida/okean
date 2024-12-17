@@ -25,7 +25,15 @@ def depthof(v,z,val):
   except: val=np.ones(v.shape[1:],v.dtype)*val
 
   from . import rtools
-  mask=(~v[0].mask).astype('i')
+
+  # roms-agrif or clm variables may not be masked, so instead of
+  #mask=(~v[0].mask).astype('i')
+  # use:
+  if np.ma.is_masked(v): # isMA make be True and mask not nD array, thus use is_masked.
+    mask=(~v[0].mask).astype('i')
+  else:
+    mask=np.ones(v[0].shape,'i')
+
   zz=rtools.depthof(v,z,mask,val)
   # 999 --> surface higher than val
   # 9999 --> all whater column lower than val
@@ -231,23 +239,90 @@ def psi2uvr(vp,pt):
   return vr
 
 
-def uvp_mask(rfield):
-  '''Compute the mask at u,v and psi points
-     Returns u,v,pmask
-     Based on Pierrick Penven uvp_mask
-     (http://www.brest.ird.fr/Roms_tools)
+#def uvp_mask(rfield):
+#  '''Compute the mask at u,v and psi points
+#     Returns u,v,pmask
+#     Based on Pierrick Penven uvp_mask
+#     (http://www.brest.ird.fr/Roms_tools)
+#
+#     mma 2007, La Coruña
+#  '''
+#  Mp,Lp=rfield.shape
+#  M=Mp-1
+#  L=Lp-1
+#
+#  ufield=rfield[:,:-1]*rfield[:,1:]
+#  vfield=rfield[:-1,:]*rfield[1:,:]
+#  pfield=ufield[:-1,:]*ufield[1:,:]
+#
+#  return ufield, vfield, pfield
 
-     mma 2007, La Coruña
-  '''
-  Mp,Lp=rfield.shape
-  M=Mp-1
-  L=Lp-1
 
-  ufield=rfield[:,:-1]*rfield[:,1:]
-  vfield=rfield[:-1,:]*rfield[1:,:]
-  pfield=ufield[:-1,:]*ufield[1:,:]
+def uvp_mask(rmask,old_psi=False):
+  umask=rmask[:,:-1]*rmask[:,1:]
+  vmask=rmask[:-1,:]*rmask[1:,:]
+  if old_psi:
+    pmask=umask[:-1,:]*umask[1:,:]
+  else:
 
-  return ufield, vfield, pfield
+    Lp,Mp=rmask.shape
+    L=Lp-1
+    M=Mp-1
+    pmask=np.zeros((L,M))
+
+    for jr in range(1,Mp):
+      jp=jr-1
+      for ir in range(1,Lp):
+        ip=ir-1
+        if (rmask[ir-1,jr  ]>0.5)&\
+           (rmask[ir  ,jr  ]>0.5)&\
+           (rmask[ir-1,jr-1]>0.5)&\
+           (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=1
+        elif (rmask[ir-1,jr  ]<0.5)&\
+             (rmask[ir  ,jr  ]>0.5)&\
+             (rmask[ir-1,jr-1]>0.5)&\
+             (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=1
+        elif (rmask[ir-1,jr  ]>0.5)&\
+             (rmask[ir  ,jr  ]<0.5)&\
+             (rmask[ir-1,jr-1]>0.5)&\
+             (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=1
+        elif (rmask[ir-1,jr  ]>0.5)&\
+             (rmask[ir  ,jr  ]>0.5)&\
+             (rmask[ir-1,jr-1]<0.5)&\
+             (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=1
+        elif (rmask[ir-1,jr  ]>0.5)&\
+             (rmask[ir  ,jr  ]>0.5)&\
+             (rmask[ir-1,jr-1]>0.5)&\
+             (rmask[ir  ,jr-1]<0.5):
+          pmask[ip,jp]=1
+        elif (rmask[ir-1,jr  ]>0.5)&\
+             (rmask[ir  ,jr  ]<0.5)&\
+             (rmask[ir-1,jr-1]>0.5)&\
+             (rmask[ir  ,jr-1]<0.5):
+          pmask[ip,jp]=2
+        elif (rmask[ir-1,jr  ]<0.5)&\
+             (rmask[ir  ,jr  ]>0.5)&\
+             (rmask[ir-1,jr-1]<0.5)&\
+             (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=2
+        elif (rmask[ir-1,jr  ]>0.5)&\
+             (rmask[ir  ,jr  ]>0.5)&\
+             (rmask[ir-1,jr-1]<0.5)&\
+             (rmask[ir  ,jr-1]<0.5):
+          pmask[ip,jp]=2
+        elif (rmask[ir-1,jr  ]<0.5)&\
+             (rmask[ir  ,jr  ]<0.5)&\
+             (rmask[ir-1,jr-1]>0.5)&\
+             (rmask[ir  ,jr-1]>0.5):
+          pmask[ip,jp]=2
+        else:
+          pmask[ip,jp]=0
+
+  return umask,vmask,pmask
 
 
 def s_params(nc,show=0):

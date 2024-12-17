@@ -64,7 +64,9 @@ class GFSDownload:
     # Ground Heat Flux             GFLUX:s
     # Sensible Heat Net Flux       SHTFL:s
     # Latent Heat Net Flux         LHTFL:s
-    self.egrep='| egrep "(PRATE|ALBDO|RH:2 m|TMP:2 m above|TMP:s|PRES:s|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s )" |'
+#    self.egrep='| egrep "(PRATE|ALBDO|RH:2 m|TMP:2 m above|TMP:s|PRES:s|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s )" |'
+
+    self.egrep='| egrep "(PRATE:surface.*ave|ALBDO|RH:2 m above ground|:TMP:2 m above|:TMP:surface|:PRES:surface|DSWRF:s|DLWRF:s|UGRD:10 m a|VGRD:10 m a|TCDC:e|USWRF:s|ULWRF:s|APCP:s|GFLUX:s|SHTFL:s|LHTFL:s)" |'
 
     # get info from tags info file:
     self.get_tags()
@@ -431,7 +433,9 @@ def get_date(fname):
   or
   etc/gfs_20110101_18_06.grib2
   '''
-  if isinstance(fname,basestring):
+  #if isinstance(fname,basestring):
+  from okean.cookbook import isstr
+  if isstr(fname):
     # expected date to be in filename or in path of file
     # expected hour_start and hour sim to be in filename!
     # hour_start must have 2 digist and hour_sim musta have at least 2 digits!
@@ -687,8 +691,9 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   # P rate [kg m-2 s-1 -> cm/d]
   if not quiet: print(' --> P rate')
-  #x,y,prate=gribu.getvar(fname,'precipitation rate',lons=xlim,lats=ylim)
-  x,y,prate=gribu.getvar(fname,'prate',lons=xlim,lats=ylim)
+  if gribu.findvar(fname,'prate','avg'):
+    x,y,prate=gribu.getvar(fname,'prate',tags='avg',lons=xlim,lats=ylim)
+  else: x,y,prate=gribu.getvar(fname,'prate',tags='instant',lons=xlim,lats=ylim)
   # Conversion kg m^-2 s^-1  to cm/day
   prate=prate*86400*100/1000.
   prate=np.where(abs(prate)<1.e-4,0,prate)
@@ -704,8 +709,7 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
     x,y,sw_down = gribu.getvar(fname,'downward short-wave',lons=xlim,lats=ylim)
 
   if not quiet: print('       SW up')
-  #x,y,sw_up   = gribu.getvar(fname,'',tags='Upward short-wave radiation flux',lons=xlim,lats=ylim)
-  x,y,sw_up   = gribu.getvar(fname,'uswrf',lons=xlim,lats=ylim)
+  x,y,sw_up   = gribu.getvar(fname,'uswrf',tags='surface',lons=xlim,lats=ylim)
   if sw_up is False:
     if not quiet: print('       SW up not found: using albedo')
     #x,y,albedo  = gribu.getvar(fname,'albedo',lons=xlim,lats=ylim)
@@ -728,13 +732,13 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
     x,y,lw_down = gribu.getvar(fname,'downward long-wave',lons=xlim,lats=ylim)
 
   if not quiet: print('       LW up')
-  #x,y,lw_up   = gribu.getvar(fname,'',tags='Upward long-wave radiation flux',lons=xlim,lats=ylim)
-  x,y,lw_up   = gribu.getvar(fname,'ulwrf',lons=xlim,lats=ylim)
+  x,y,lw_up   = gribu.getvar(fname,'ulwrf',tags='surface',lons=xlim,lats=ylim)
   if lw_up is False:
     if not quiet: print('       LW up not found: using sst')
     if isPygrib:
       #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-      x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+      #x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+      x,y,sst=gribu.getvar(fname,'t',tags='surface',lons=xlim,lats=ylim) # K
     else:
       x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
 
@@ -772,8 +776,15 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
 
   # Cloud cover [0--100 --> 0--1]:
   if not quiet: print(' --> Cloud cover')
-  #x,y,clouds  = gribu.getvar(fname,'cloud cover',lons=xlim,lats=ylim)
-  x,y,clouds  = gribu.getvar(fname,'tcc',lons=xlim,lats=ylim)
+  #x,y,clouds  = gribu.getvar(fname,'tcc',tags='atmosphere:level 0',lons=xlim,lats=ylim)
+  # new from mar-2021:
+  tags=['atmosphere:level 0','instant'] # new instantaneous clouds
+  if len(gribu.findvar(fname,'tcc',*tags)):
+    x,y,clouds  = gribu.getvar(fname,'tcc',tags=tags)
+  else:
+    tags=['atmosphere:level 0','avg'] # old avg clouds
+    x,y,clouds  = gribu.getvar(fname,'tcc',tags=tags)
+
   if clouds is False:
     if not quiet: print('CALC clouds from LW,TAIR,TSEA and RH')
     # first get sst (maybe already done to calc lw_up)
@@ -782,11 +793,12 @@ def gfs_file_data(fname,xlim=False,ylim=False,quiet=False):
       if not quiet: print('  get TSEA')
       if isPygrib:
         #x,y,sst=gribu.getvar(fname,'temperature',tags='surface',lons=xlim,lats=ylim) # K
-        x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+        #x,y,sst=gribu.getvar(fname,'t',lons=xlim,lats=ylim) # K
+        x,y,sst=gribu.getvar(fname,'t',tags='surface',lons=xlim,lats=ylim) # K
       else:
         x,y,sst=gribu.getvar(fname,'temperature',tags='water surface',lons=xlim,lats=ylim) # K
 
-    clouds=air_sea.cloud(lw_net,sst-273.15,tair,rhum,'net')
+    clouds=air_sea.cloud_fraction(lw_net,sst-273.15,tair,rhum,'net')
   else: clouds=clouds/100.
 
   out['cloud']=Data(x,y,clouds,'fraction (0--1)')

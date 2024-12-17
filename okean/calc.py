@@ -151,8 +151,8 @@ def griddata(x,y,v,xi,yi,**kargs):
       argument keepMaskVal (0 is the most strick case).
 
 
-  Based on delaunay triangulation provided by matplotlib.
-  Whenever triangulation is not possible numpy nans are returned
+  Supports both interpolation based delaunay triangulation provided by matplotlib
+  and scipy (use input argument method='mpl' or 'scipy'
 
   Example:
     import numpy as np
@@ -171,6 +171,9 @@ def griddata(x,y,v,xi,yi,**kargs):
 
   mma  2010
   '''
+
+  # 2023 07: added scipy method and other repairs...
+
 
   mask2d=kargs.pop('mask2d',False)
   # When v.ndim>2 and the same mask is used for all the dim 0 levels
@@ -202,16 +205,6 @@ def griddata(x,y,v,xi,yi,**kargs):
   # and set then as mask.
   # forceBoundary only makes sense when extrap is False
 
-  # finalextrap = extrap
-  #
-  # Even with extrap True, final data may have NaNs, depending on
-  # te number and distribution of the original data.
-  # In such case a second extrapolation is done to fill the NaN points
-  # This extrapolation is done with the target points, so if for
-  # instance they represent a line, the triangulation is not possible
-  # and thus extrapolation is not done
-  # finalextrap only makes sense when extrap is True
-
   norm_xy=kargs.pop('norm_xy',False)
   # matplotlib.delaunay may give VERY VERY BAD bad results when x and y data
   # range differ by orders of magnitude. In such case the solution is to
@@ -221,18 +214,16 @@ def griddata(x,y,v,xi,yi,**kargs):
   if extrap:
     keepMask      = False
     forceBoundary = False
-    finalextrap   = True
   else:
     keepMask      = True
     forceBoundary = True
-    finalextrap   = False
 
   keepMask      = kargs.pop('keepMask',      keepMask)
   forceBoundary = kargs.pop('forceBoundary', forceBoundary)
-  finalextrap   = kargs.pop('finalextrap',   finalextrap)
 
 
-  if norm_xy:
+  if norm_xy: # this could be done with scipy.interpolate tools
+              # ex, see scipy.interpolate.CloughTocher2DInterpolator option rescale
     dx=1.*(x.max()-x.min())
     dy=1.*(y.max()-y.min())
     x=100*(x-x.min())/dx
@@ -241,13 +232,22 @@ def griddata(x,y,v,xi,yi,**kargs):
 
   # interp/extrap:
   res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
-#  try:    res=_griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs)
-#  except: res=xi*np.nan
 
-  # final extrap:
-  if finalextrap:
-    try: mask_extrap(xi,yi,np.ma.masked_where(np.isnan(res),res),inplace=True,**kargs)
-    except: pass
+  # mpl returns masked arrays, scipy does not. So:
+  if np.ma.isMA(res): res=res.data
+  # mask will be applied later.
+
+  # if extrap, there should be no nans in the result!!
+  # - when using mpl method too many triangles may be eliminated with TriAnalyzer
+  #   a solution may be to decrease the option min_circle_ratio below 0.005
+  # - when using scipy need to check all the options of
+  #   scipy.spatial.Delaunay and scipy.interpolate.[CloughTocher2DInterpolator, etc]
+  #
+  # for now try to extrapolate again using only targer domain:
+  if extrap and np.any(np.isnan(res)):
+    #print('WARNING: NaNs found after extrap !!!!')
+    mask_extrap(xi,yi,res)
+    #print(np.any(np.isnan(res)))
 
   maskCond=np.isnan(res)
   # keep original mask:
@@ -286,35 +286,32 @@ def _griddataz(x,y,v,xi,yi,mask2d,extrap,**kargs):
   Use griddata instead
   '''
 
-  mpl_tri=kargs.get('mpl_tri',True)
-
-  if not mpl_tri:
-    # nn_extrapolator/nn_interpolator may have problems dealing with
-    # regular grids, nans may be obtained. One simple solution is to
-    # rotate the domains!
-    x,y=rot2d(np.squeeze(x),np.squeeze(y),np.pi/3.)
-    xi,yi=rot2d(xi,yi,np.pi/3.)
-
   if v.ndim==x.ndim+1:
-    tmp,tri=_griddata(x,y,v[0,...],xi,yi,extrap,tri=False,mask=mask2d,**kargs)
+    tmp,aux=_griddata(x,y,v[0,...],xi,yi,extrap=extrap,mask=mask2d,**kargs)
     res=np.zeros([v.shape[0]]+list(tmp.shape),dtype=v.dtype)
     res[0,...]=tmp
     for i in range(1,v.shape[0]):
-      res[i,...]=_griddata(x,y,v[i,...],xi,yi,extrap,tri,mask=mask2d,**kargs)[0]
+      res[i,...]=_griddata(x,y,v[i,...],xi,yi,extrap=extrap,mask=mask2d,**{**kargs,**aux})[0]
+
   else:
-    res=_griddata(x,y,v,xi,yi,extrap,mask=mask2d,**kargs)[0]
+    res=_griddata(x,y,v,xi,yi,extrap=extrap,mask=mask2d,**kargs)[0]
 
   return res
 
 
-def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
+def _griddata_old(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
   '''
   Use griddata instead
+
+  Deprecated, remove soon....
   '''
 
   mpl_tri=kargs.get('mpl_tri',True)
   tri_type=kargs.get('tri_type','cubic') # cubic or linear
   tri_kind=kargs.get('tri_kind','geom') # min_E or geom (for type cubic only)
+  min_area=kargs.get('min_area','auto1') # right value of first bin if only 1st and
+                                         # last bins have values; otherwise
+                                         # area.mean()/1e10 (auto2)
 
 
   # warning, if x.shape=n,1  x[~mask] will also have 2 dims!! Thus better just use ravel...
@@ -349,33 +346,60 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
 
   else:
     import  matplotlib.tri as mtri
-    if extrap:
 
-        # add corners:
-        if 0:
-          dx=(xi.max()-xi.min())/(1.*xi.size)
-          dy=(yi.max()-yi.min())/(1.*yi.size)
-        else: # higher distance from domain:
-          dx=(xi.max()-xi.min())
-          dy=(yi.max()-yi.min())
+    if tri:
+      tri,new_points_needed=tri
+    else:
+      if extrap:
+        # check if new points are needed in order to ensure extrap,
+        # ie, check if xi,yi are not inside x,y convex hull:
+        from shapely.geometry import MultiPoint
+        chull=MultiPoint(np.vstack((x[~mask],y[~mask])).T).convex_hull
+        # chull coords are given by xc,yc=chull.exterior.coords.xy
+        points=MultiPoint(np.vstack((xi.ravel(),yi.ravel())).T)
+        new_points_needed=not chull.contains(points)
+      else:
+        new_points_needed=False
 
-        xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
-        yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
-        vv=np.zeros(4,v.dtype)
-        mv=np.zeros(4,'bool')
+    if new_points_needed:
+      # add 4 corners to x,y:
+      dx=xi.max()-xi.min()
+      dy=yi.max()-yi.min()
 
-        for i in range(4):
-          d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
-          j=np.where(d==d.min())[0][0]
-          vv[i]=v[~mask][j]
+      xv=np.asarray([xi.min()-dx,xi.max()+dy,xi.max()+dx,xi.min()-dx])
+      yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
+      vv=np.zeros(4,v.dtype)
+      mv=np.zeros(4,'bool')
 
-        x=np.ma.hstack((x,xv))
-        y=np.ma.hstack((y,yv))
-        v=np.ma.hstack((v,vv))
-        mask=np.hstack((mask,mv))
+      for i in range(4):
+        d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
+        j=np.where(d==d.min())[0][0]
+        vv[i]=v[~mask][j]
+
+      x=np.ma.hstack((x,xv))
+      y=np.ma.hstack((y,yv))
+      v=np.ma.hstack((v,vv))
+      mask=np.hstack((mask,mv))
 
     if not tri:
       tri=mtri.Triangulation(x[~mask],y[~mask])
+
+      # remove very small triangles:
+      area=np.abs(np.asarray([poly_area(tri.x[i],tri.y[i]) for i in tri.triangles]))
+
+      if min_area=='auto1':
+        # check if all zeros except 1st and last, but 1st bin must
+        # be smaller than last as it should contain outliers. A couple
+        # of large triangles may appear in concave shapes and in such case
+        # there are no outliers
+        hist_y,hist_x=np.histogram(area)
+        if np.all(hist_y[1:-1]==0) and hist_y[-1]>hist_y[0]: min_area=hist_x[1]
+        else: min_area='auto2'
+
+      if min_area=='auto2':
+        tri.set_mask(area<area.mean()/1e10)
+      else:
+        tri.set_mask(area<min_area)
 
     if tri_type=='cubic':
       u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)
@@ -383,13 +407,200 @@ def _griddata(x,y,v,xi,yi,extrap=True,tri=False,mask=False,**kargs):
       u = mtri.LinearTriInterpolator(tri, v[~mask])(xi,yi)
 
 
-  return u, tri
+  return u, (tri,new_points_needed) # returning new_points_needed avoids recalculate
+                                    # convex hull when extrap
 
 
-def mask_extrap(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
+def _griddata(x,y,v,xi,yi,**kargs):
+  '''
+  Use griddata instead
+  '''
+
+  method=kargs.get('method','scipy') # or mpl
+
+  # options for scipy (griddata) only:
+  # none for now...
+
+  # options for mpl only:
+  min_circle_ratio=kargs.get('min_circle_ratio',0.005) # default is 0.01
+  tri_kind=kargs.get('tri_kind','geom') # min_E or geom (for type cubic only)
+
+  # options for both:
+  mask     = kargs.get('mask',False)
+  extrap   = kargs.get('extrap',True)
+  tri_type = kargs.get('tri_type','cubic') # for mpl: cubic or linear
+                                           # for scipy: cubic, linear or nearest
+
+  # options to speed the calculations. Used when v is 3d: calc for 1st level
+  # returns these options which are then used in other levels (everything assuming
+  # x,y,xi,yi do not change with level)
+  tri=kargs.get('tri',False)
+  new_points_needed=kargs.get('new_points_needed','unk')
+
+  # warning, if x.shape=n,1  x[~mask] will also have 2 dims!! Thus better just use ravel...
+  if x.shape!=x.size or y.shape!=y.size or v.shape!=v.size:
+    x=x.ravel()
+    y=y.ravel()
+    v=v.ravel()
+    if not mask is False: mask=mask.ravel()
+
+  if mask is False:
+    if np.ma.isMA(v) and np.ma.count_masked(v)>0: mask=v.mask
+    else: mask=np.zeros(v.shape,'bool')
+
+  if extrap:
+    if new_points_needed=='unk':
+      # check if new points are needed in order to ensure extrap,
+      # ie, check if xi,yi are not inside x,y convex hull:
+      from shapely.geometry import MultiPoint
+      chull=MultiPoint(np.vstack((x[~mask],y[~mask])).T).convex_hull
+      # chull coords are given by xc,yc=chull.exterior.coords.xy
+      points=MultiPoint(np.vstack((xi.ravel(),yi.ravel())).T)
+      new_points_needed=not chull.contains(points)
+  else:
+    new_points_needed=False
+
+  # this step is needed even when tri is provided (in order to increase v and mask)
+  if new_points_needed:
+    # add 4 corners to x,y:
+    dx=xi.max()-xi.min()
+    dy=yi.max()-yi.min()
+    dx=dx/xi.size**.5
+    dy=dy/yi.size**.5
+
+    xv=np.asarray([xi.min()-dx,xi.max()+dx,xi.max()+dx,xi.min()-dx])
+    yv=np.asarray([yi.min()-dy,yi.min()-dy,yi.max()+dy,yi.max()+dy])
+    vv=np.zeros(4,v.dtype)
+    mv=np.zeros(4,'bool')
+
+    for i in range(4):
+      d=(x[~mask]-xv[i])**2+(y[~mask]-yv[i])**2
+      j=np.where(d==d.min())[0][0]
+      vv[i]=v[~mask][j]
+
+    x=np.ma.hstack((x,xv))
+    y=np.ma.hstack((y,yv))
+    v=np.ma.hstack((v,vv))
+    mask=np.hstack((mask,mv))
+
+  if method=='mpl':
+    import  matplotlib.tri as mtri
+    if not tri:
+      tri=mtri.Triangulation(x[~mask],y[~mask])
+      # import pylab as pl
+      # pl.triplot(tri,alpha=.5)
+
+      triMask = mtri.TriAnalyzer(tri).get_flat_tri_mask(min_circle_ratio)
+      tri.set_mask(triMask)
+      #pl.triplot(tri,alpha=.5)
+
+    if tri_type=='cubic':
+      u = mtri.CubicTriInterpolator(tri, v[~mask],kind=tri_kind)(xi,yi)
+    elif tri_type=='linear':
+      u = mtri.LinearTriInterpolator(tri, v[~mask])(xi,yi)
+    else:
+      raise ValueError('Unknown mtri interpolation. Use cubic or linear')
+
+  elif method=='scipy':
+    if not tri:
+      from scipy.spatial import Delaunay
+      points=np.vstack((x[~mask],y[~mask])).T
+      if np.ma.isMA(points): points=points.data
+
+      tri=Delaunay(points)
+
+      #from scipy.spatial import delaunay_plot_2d
+      #delaunay_plot_2d(tri)
+
+      # maybe in the future will need to deal with flat triangles, using something like mtri.TriAnalyzer
+      # a possible way how to do it may be:
+      # https://stackoverflow.com/questions/71402899/filter-simplices-out-of-scipy-spatial-delaunay
+
+      '''
+      # teste----------------
+      def good_triangles(tri,points,amin):
+        edge_lengths = np.zeros(tri.vertices.shape)
+        areas = np.zeros(tri.vertices.shape[0])
+        seen = {}
+        # loop over triangles
+        for i, vertex in enumerate(tri.vertices):
+          #a=poly_area(points[vertex,0],points[vertex,1])
+          # faster:
+
+          #a=(1/2)|x1(y2 − y3) + x2(y3 − y1) + x3(y1 − y2)|
+          a=(points[vertex,0][0]*(points[vertex,1][1]-points[vertex,1][2])+
+             points[vertex,0][1]*(points[vertex,1][2]-points[vertex,1][0])+
+             points[vertex,0][2]*(points[vertex,1][0]-points[vertex,1][1]))/2
+
+          if a<0: a=-a
+          areas[i]=a
+
+        return areas>amin
+
+
+      amin=1e-9
+      good=good_triangles(tri,points,amin)
+#      subset_tri.nsimplex = large_triangle_ids.size
+#      subset_tri.simplices = tri.simplices[large_triangles]
+#      subset_tri.neighbors = tri.neighbors[large_triangles]
+
+      # teste----------------
+      '''
+
+    import scipy.interpolate
+    if tri_type=='cubic':
+      u=scipy.interpolate.CloughTocher2DInterpolator(tri,v[~mask])(xi.ravel(),yi.ravel())
+    elif tri_type=='linear':
+      u=scipy.interpolate.LinearNDInterpolator(tri,v[~mask])(xi.ravel(),yi.ravel())
+    elif tri_type=='nearest':
+      u=scipy.interpolate.NearestNDInterpolator(tri,v[~mask])(xi.ravel(),yi.ravel())
+    else:
+      raise ValueError('Unknown scipy interpolation. Use cubic, linear or nearest')
+
+    u.shape=xi.shape
+
+  return u, dict(tri=tri,new_points_needed=new_points_needed)
+
+
+def mask_extrap(x,y,v,**kargs):
+  '''
+  Extrapolate numpy array at masked points
+  kargs: inplace, default True
+  Check griddata for other kargs
+  '''
+  inplace=kargs.get('inplace',1)
+  if inplace: u=v
+  else: u=v.copy()
+
+  cnd=np.isnan(u)
+  if not np.any(cnd): return u
+
+  if v.ndim==x.ndim+1:
+    # check if nans are at the same location at every level (probably).
+    # if not loop the interpolation at every level if nans found for each level
+    if np.all(cnd.sum(0)/cnd.shape[0]==cnd[0]):
+      cnd=cnd.sum(0).astype('bool')
+      u[:,cnd]=_griddataz(x,y,u,x[cnd],y[cnd],mask2d=cnd,extrap=False,**kargs)
+    else:
+      for k in range(u.shape[0]):
+        if np.any(cnd[k]):
+          u[k,cnd[k]]=_griddataz(x,y,u,x[cnd[k]],y[cnd[k]],mask2d=cnd[k],extrap=False,**kargs)
+  else:
+    u[cnd]=_griddataz(x,y,u,x[cnd],y[cnd],mask2d=cnd,extrap=False,**kargs)
+
+  return u
+
+
+def mask_extrap_old_REMOVE(x,y,v,inplace=False,norm_xy=False,mpl_tri=True):
   '''
   Extrapolate numpy array at masked points.
   Based on delaunay triangulation provided by matplotlib.
+
+  min_area or TriAnalyzer not in use!!
+  TODO: fix this for TriAnalyzer and to support scipy qhull based triangulation
+  - thus, avoid this function for now...
+
+  - anyway, this is basically all deprecated, it can be done with griddata
   '''
 
   #if np.ma.isMA(v) and v.size!=v.count(): mask=v.mask
@@ -521,6 +732,14 @@ def cyclic_index(time,t,cycle):
 
   return Ind,d
 
+def lat_radius(lat):
+  '''earth radius at lat'''
+  lat=lat*np.pi/180
+  r1=6378137
+  r2=6356752.3
+
+  r=(((r1**2*np.cos(lat))**2+(r2**2*np.sin(lat))**2)/((r1*np.cos(lat))**2+(r2*np.sin(lat))**2))**.5
+  return r
 
 def distance(lon,lat):
   '''
@@ -814,7 +1033,7 @@ def mcross_points(xm,ym,xl,yl,addl=False,plt=False):
   return xx,yy
 
 
-def ij_limits(x,y,xlim,ylim,margin=0):
+def ij_limits_OLD_REMOVE(x,y,xlim,ylim,margin=0):
   '''
   ij limits of xy so that xlim and ylim box is inside xy[ij]
   Returns i0,i1,j0,j1, so for 1D x[i0:i1], y[j0:j1], and for 2D
@@ -891,6 +1110,79 @@ def ij_limits(x,y,xlim,ylim,margin=0):
   j2=min(L-1,j2+margin)
 
   return i1,i2+1,j1,j2+1
+
+
+def ij_limits(x,y,xlim,ylim,margin=1,check=0):
+
+  if x.ndim==1:
+    L=y.size
+    M=x.size
+    i1,=np.where(x<xlim[0])
+    if len(i1): i1=i1[-1]
+    else: i1=0
+
+    i2,=np.where(x>xlim[1])
+    if len(i2): i2=i2[0]
+    else: i2=M
+
+    j1,=np.where(y<ylim[0])
+    if len(j1): j1=j1[-1]
+    else: j1=0
+
+    j2,=np.where(y>ylim[1])
+    if len(j2): j2=j2[0]
+    else: j2=L
+
+    I0,I1,J0,J1=i1,i2,j1,j2
+    J0=J0-margin
+    J1=J1+1+margin
+    I0=I0-margin
+    I1=I1+1+margin
+  else:
+    # lower left and upper right:
+    d=((x-xlim[0])**2+(y-ylim[0])**2)**.5
+    j0,i0=np.where(d==d.min())
+    j0,i0=j0[0],i0[0]
+
+    d=((x-xlim[1])**2+(y-ylim[1])**2)**.5
+    j1,i1=np.where(d==d.min())
+    j1,i1=j1[0],i1[0]
+
+    # upper left and lower right:
+    d=((x-xlim[0])**2+(y-ylim[1])**2)**.5
+    j2,i2=np.where(d==d.min())
+    j2,i2=j2[0],i2[0]
+
+    d=((x-xlim[1])**2+(y-ylim[0])**2)**.5
+    j3,i3=np.where(d==d.min())
+    j3,i3=j3[0],i3[0]
+
+    add=1 # to ensure all xlim,ylim points are inside region
+    J0=min(j0,j1,j2,j3)-add-margin
+    J1=max(j0,j1,j2,j3)+1+add+margin
+    I0=min(i0,i1,i2,i3)-add-margin
+    I1=max(i0,i1,i2,i3)+1+add+margin
+
+    L,M=x.shape
+
+  J0=max(0,J0)
+  I0=max(0,I0)
+  J1=min(L,J1)
+  I1=min(M,I1)
+
+  if check:
+    import pylab as pl
+    pl.plot(xlim,ylim,'r')
+    if x.ndim==1:
+      [pl.plot([i,i],[y.min(),y.max()],'k') for i in x[I0:I1]]
+      [pl.plot([x.min(),x.max()],[i,i],'k') for i in y[J0:J1]]
+
+    else:
+      pl.plot(x[j0,i0],y[j0,i0],'g*')
+      pl.plot(x[j1,i1],y[j1,i1],'g*')
+      pl.plot(x[J0:J1,I0:I1],y[J0:J1,I0:I1],'k+')
+
+  return I0,I1,J0,J1
 
 
 def angle_point_line(x,y,xp,yp,n=1):

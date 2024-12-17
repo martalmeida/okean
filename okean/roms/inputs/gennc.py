@@ -6,9 +6,6 @@ from okean import netcdf
 from okean import cookbook as cb
 from okean import dateu as dts
 
-try: basestring
-except NameError: basestring=str
-
 class GenCommon:
   '''
   Base class for model input netcdf files generation
@@ -31,26 +28,12 @@ class GenCommon:
   '''
 
   def __init__(self,filename,grid,sparams=False,**kargs):
-    type   = 'ROMS file'
-    title  = 'ROMS file'
-    tunits = 'days since 1970-01-01'
-    cycle=False
-    ncversion= 3
-    attr={}
-
-    if 'type'   in kargs.keys(): type   = kargs['type']
-    if 'title'  in kargs.keys(): title  = kargs['title']
-    if 'tunits' in kargs.keys(): tunits = kargs['tunits']
-    if 'cycle'    in kargs.keys(): cycle=kargs['cycle']
-    if 'ncversion' in kargs.keys(): ncversion = kargs['ncversion']
-    if 'attr'   in kargs.keys(): attr = kargs['attr']
-
-    self.type   = type
-    self.title  = title
-    self.tunits = tunits
-    self.cycle = cycle
-    self.ncversion = ncversion
-    self.attr   = attr
+    self.type      = kargs.get('type',  'ROMS file')
+    self.title     = kargs.get('title', 'ROMS file')
+    self.tunits    = kargs.get('tunits','days since 1970-01-01')
+    self.cycle     = kargs.get('cycle',  False)
+    self.ncversion = kargs.get('ncversion',3)
+    self.attr      = kargs.get('attr',{})
 
     self.filename  = filename
     self.grid      = grid
@@ -62,10 +45,18 @@ class GenCommon:
     Adds horizontal dimensions to netcdf file
 
     '''
-    grd_dims=netcdf.fdim(self.grid)
-    gdims='xi_rho','xi_u','xi_v','eta_rho','eta_u','eta_v'
-    for name in gdims: nc.add_dim(name,grd_dims[name])
+    if self.grid:
+      grd_dims=netcdf.fdim(self.grid)
+      gdims='xi_rho','xi_u','xi_v','eta_rho','eta_u','eta_v'
+      for name in gdims: nc.add_dim(name,grd_dims[name])
+    else:
+      nc.add_dim(self.dnames['xi_rho'], self.dims['lon'])
+      #nc.add_dim(self.dnames['xi_u'],   self.dims['lon']-1)
+      #nc.add_dim(self.dnames['xi_v'],   self.dims['lon'])
 
+      nc.add_dim(self.dnames['eta_rho'], self.dims['lat'])
+      #nc.add_dim(self.dnames['eta_u'],   self.dims['lat'])
+      #nc.add_dim(self.dnames['eta_v'],   self.dims['lat']-1)
 
   def add_vert_dims(self,nc,addw=False):
     '''
@@ -128,14 +119,12 @@ class GenIni(GenCommon):
   '''
 
   def __init__(self,filename,grid,sparams,**kargs):
-    if not 'type'  in kargs.keys(): kargs['type']  = 'ROMS Initial file'
-    if not 'title' in kargs.keys(): kargs['title'] = 'ROMS Initial file'
+    if not 'type'  in kargs: kargs['type']  = 'ROMS Initial file'
+    if not 'title' in kargs: kargs['title'] = 'ROMS Initial file'
 
     GenCommon.__init__(self,filename,grid,sparams,**kargs)
 
-    date = 0
-    if 'date'   in kargs.keys(): date   = kargs['date']
-    self.date   = date
+    self.date=kargs.get('date',0)
 
     # about time:
     try:
@@ -316,14 +305,13 @@ class GenClm(GenCommon):
   '''
 
   def __init__(self,filename,grid,sparams,**kargs):
-    if not 'type'  in kargs.keys(): kargs['type']  = 'ROMS Climatology file'
-    if not 'title' in kargs.keys(): kargs['title'] = 'ROMS Climatology file'
+    if not 'type'  in kargs: kargs['type']  = 'ROMS Climatology file'
+    if not 'title' in kargs: kargs['title'] = 'ROMS Climatology file'
 
     GenCommon.__init__(self,filename,grid,sparams,**kargs)
 
-    one_time = True # dont create several time variables, like temp_time, etc
-    if 'one_time' in kargs.keys(): one_time=kargs['one_time']
-    self.one_time=one_time
+    # dont create several time variables, like temp_time, etc
+    self.one_time=kargs.get('one_time',True)
 
   def create(self):
     '''
@@ -573,17 +561,9 @@ class GenBry(GenCommon):
 
     GenCommon.__init__(self,filename,grid,sparams,**kargs)
 
-    cycle = False
-    obc   = 'nsew'
-    addxz = True
-    if 'cycle' in kargs.keys(): cycle = kargs['cycle']
-    if 'obc'   in kargs.keys(): obc   = kargs['obc']
-    if 'addxz' in kargs.keys(): addxz = kargs['addxz']
-
-    self.cycle = cycle
-    self.obc   = obc
-    self.addxz = addxz
-
+    self.cycle = kargs.get('cycle',False)
+    self.obc   = kargs.get('obc','nsew')
+    self.addxz = kargs.get('addxz',True)
 
   def create(self):
     '''
@@ -835,12 +815,16 @@ class GenBlk(GenCommon):
   ----------
   filename : netcdf file name
   grid : model netcdf grid file
+         If grid is False, the file will include lon, lat and dimensions
+         must be provided
+         will be the same as original data
 
   **kargs:
   type : global attribute ('ROMS Bulk forcing file')
   title : global attribute ('ROMS Bulk forcing file')
   cycle : time variables cycle_length (False, attribute not created)
-  tunits : time units ('seconds since 2000-01-01')
+  tunits : time units ('days since 1970-01-01')
+  coords : lon,lat coords to use if no grid provided ([lonR,latR])
 
   see GenCommon for additional kargs
 
@@ -860,17 +844,34 @@ class GenBlk(GenCommon):
   '''
 
   def __init__(self,filename,grid,**kargs):
-    if not 'type'  in kargs.keys(): kargs['type']  = 'ROMS Bulk forcing file'
-    if not 'title' in kargs.keys(): kargs['title'] = 'ROMS Bulk forcing file'
+    if not 'type'  in kargs: kargs['type']  = 'ROMS Bulk forcing file'
+    if not 'title' in kargs: kargs['title'] = 'ROMS Bulk forcing file'
 
     GenCommon.__init__(self,filename,grid,**kargs)
 
+    if grid is False:
+      self.coords=kargs['coords']
+      self.dims=dict(lon=self.coords[0].shape[1],lat=self.coords[0].shape[0])
+      self.dnames=dict(xi_rho='lon', xi_u='lonu', xi_v='lonv',
+                       eta_rho='lat',eta_u='latu',eta_v='latv')
+    else:
+      self.dnames=dict(xi_rho='xi_rho',  xi_u='xi_u',  xi_v='xi_v',
+                       eta_rho='eta_rho',eta_u='eta_u',eta_v='eta_v')
 
-  def create(self,model='roms',original=False):
+  def create(self,**kargs):
     '''
     Creates netcdf bulk forcing file
-    for model 'roms' or 'roms-agrif'
+    kargs:
+      model: 'roms' or 'roms-agrif'
+      wspeed: add wind speed (False)
+      wstress: add wind stress (False)
     '''
+
+    model       = kargs.get('model','roms')
+    original    = kargs.get('original',False)
+    add_wspeed  = kargs.get('wspeed',False)
+    add_wstress = kargs.get('wstress',False)
+
     nc=netcdf.Pync(self.filename,'t',version=self.ncversion)
 
     # Dimensions:
@@ -885,10 +886,21 @@ class GenBlk(GenCommon):
       nc.add_dim('x_original',original[1])
       nc.add_dim('y_original',original[0])
 
+    # coordinates:
+    if self.grid is False:
+      lon,lat=self.coords
+      v=nc.add_var('lon',np.dtype('d'),(self.dnames['eta_rho'], self.dnames['xi_rho']))
+      v.add_att('long_name','longitude')
+      v=nc.add_var('lat',np.dtype('d'),(self.dnames['eta_rho'], self.dnames['xi_rho']))
+      v.add_att('long_name','latitude')
+
+      nc.vars['lon'][:,:]=lon
+      nc.vars['lat'][:,:]=lat
+
     # Variables:
-    if model=='roms': vname='time'
-    elif model=='roms-agrif': vname='bulk_time'
-    v=nc.add_var(vname,np.dtype('d'),('time',))
+    if model=='roms': time_vname='time'
+    elif model=='roms-agrif': time_vname='bulk_time'
+    v=nc.add_var(time_vname,np.dtype('d'),('time',))
     v.add_att('long_name','bulk formulation atmospheric forcing time')
     v.add_att('units',self.tunits)
     if self.cycle: v.add_att('cycle_length',self.cycle)
@@ -899,10 +911,13 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname='Tair'
     elif model=='roms-agrif': vname='tair'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','surface air temperature')
     v.add_att('units','Celsius')
     v.add_att('time','time')
+    if self.grid is False:
+      coordinates='lon lat '+time_vname
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('tair_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -910,10 +925,12 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname,vunits='Pair','millibar'
     elif model=='roms-agrif': vname,vunits='pres','Pascal'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','surface pressure')
     v.add_att('units',vunits)
     v.add_att('time','time')
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('pres_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -921,10 +938,12 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname,vunits='Qair','percentage'
     elif model=='roms-agrif': vname,vunits='rhum','fraction'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','relative humidity')
     v.add_att('units',vunits)
     v.add_att('time','time')
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('rhum_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -932,10 +951,12 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname,vunits='rain','kg m-2 s-1'
     elif model=='roms-agrif': vname,vunits='prate','cm day-1'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','precipitation rate')
     v.add_att('units',vunits)
     v.add_att('time','time')
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('prate_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -943,7 +964,7 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname,vlname='lwrad','net longwave radiation flux'
     elif model=='roms-agrif': vname,vlname='radlw','outgoing longwave radiation'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name',vlname)
     v.add_att('units','Watts metre-2')
     v.add_att('time','time')
@@ -952,6 +973,9 @@ class GenBlk(GenCommon):
       v.add_att('negative_value','upward flux, cooling')
     elif model=='roms-agrif': # opposite to ROMS !!!
       v.add_att('positive','upward flux, cooling water')
+
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('radlw_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -963,7 +987,7 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname='lwrad_down'
     elif model=='roms-agrif': vname='dlwrf'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','downward longwave radiation')
     v.add_att('units','Watts metre-2')
     v.add_att('time','time')
@@ -972,6 +996,9 @@ class GenBlk(GenCommon):
       v.add_att('negative_value','upward flux, cooling')
     elif model=='roms-agrif': # opposite to ROMS !!!
       v.add_att('positive','upward flux, cooling water')
+
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('dlwrf_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -983,12 +1010,15 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname='swrad'
     elif model=='roms-agrif': vname='radsw'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','shortwave radiation')
     v.add_att('units','Watts metre-2')
     v.add_att('time','time')
     v.add_att('positive_value','downward flux, heating')
     v.add_att('negative_value','upward flux, cooling')
+
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('radsw_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -996,17 +1026,21 @@ class GenBlk(GenCommon):
 
     if model=='roms': vname='Uwind'
     elif model=='roms-agrif': vname='uwnd'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','u-wind')
     v.add_att('units','metre second-1')
     v.add_att('time','time')
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if model=='roms': vname='Vwind'
     elif model=='roms-agrif': vname='vwnd'
-    v=nc.add_var(vname,np.dtype('d'),('time','eta_rho', 'xi_rho'))
+    v=nc.add_var(vname,np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
     v.add_att('long_name','v-wind')
     v.add_att('units','metre second-1')
     v.add_att('time','time')
+    if self.grid is False:
+      v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('uwnd_original',np.dtype('d'),('time','y_original', 'x_original'))
@@ -1016,44 +1050,56 @@ class GenBlk(GenCommon):
 
     # cloud cover (for roms):
     if model=='roms' or 1: # add it anyway...
-      v=nc.add_var('cloud',np.dtype('d'),('time','eta_rho', 'xi_rho'))
+      v=nc.add_var('cloud',np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
       v.add_att('long_name','cloud fraction')
       v.add_att('units','nondimensional')
       v.add_att('time','time')
+      if self.grid is False:
+        v.add_att('coordinates',coordinates)
 
     if addOriginal:
       v=nc.add_var('cloud_original',np.dtype('d'),('time','y_original', 'x_original'))
       v.add_att('units','cloud fraction')
 
     #  next only required by roms-agrif (wspd,sustr,svstr)
-    v=nc.add_var('wspd',np.dtype('d'),('time','eta_rho', 'xi_rho'))
-    v.add_att('long_name','wind speed 10m')
-    v.add_att('units','metre second-1')
-    v.add_att('time','time')
-
-    v=nc.add_var('sustr',np.dtype('d'),('time','eta_u', 'xi_u'))
-    v.add_att('long_name','surface u-momentum stress')
-    v.add_att('units','Newton metre-2')
-    v.add_att('time','time')
-
-    v=nc.add_var('svstr',np.dtype('d'),('time','eta_v', 'xi_v'))
-    v.add_att('long_name','surface v-momentum stress')
-    v.add_att('units','Newton metre-2')
-    v.add_att('time','time')
-
-    if addOriginal:
-      v=nc.add_var('wspd_original',np.dtype('d'),('time','y_original', 'x_original'))
+    if add_wspeed:
+      v=nc.add_var('wspd',np.dtype('d'),('time',self.dnames['eta_rho'], self.dnames['xi_rho']))
+      v.add_att('long_name','wind speed 10m')
       v.add_att('units','metre second-1')
-      v=nc.add_var('sustr_original',np.dtype('d'),('time','y_original', 'x_original'))
+      v.add_att('time','time')
+      if self.grid is False:
+        v.add_att('coordinates',coordinates)
+
+      if addOriginal:
+        v=nc.add_var('wspd_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','metre second-1')
+
+    if add_wstress:
+      v=nc.add_var('sustr',np.dtype('d'),('time',self.dnames['eta_u'], self.dnames['xi_u']))
+      v.add_att('long_name','surface u-momentum stress')
       v.add_att('units','Newton metre-2')
-      v=nc.add_var('svstr_original',np.dtype('d'),('time','y_original', 'x_original'))
+      v.add_att('time','time')
+      if self.grid is False:
+        v.add_att('coordinates',coordinates)
+
+      v=nc.add_var('svstr',np.dtype('d'),('time',self.dnames['eta_v'], self.dnames['xi_v']))
+      v.add_att('long_name','surface v-momentum stress')
       v.add_att('units','Newton metre-2')
+      v.add_att('time','time')
+      if self.grid is False:
+        v.add_att('coordinates',coordinates)
+
+      if addOriginal:
+        v=nc.add_var('sustr_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','Newton metre-2')
+        v=nc.add_var('svstr_original',np.dtype('d'),('time','y_original', 'x_original'))
+        v.add_att('units','Newton metre-2')
 
 
     # Global Attributes:
     nc.add_att('type',self.type)
     nc.add_att('title',self.title)
-    nc.add_att('grd_file',realpath(self.grid))
+    if self.grid: nc.add_att('grd_file',realpath(self.grid))
     nc.add_att('history','ROMS blk file, '+ctime())
     nc.add_att('author',cb.username()[1]+', '+cb.machinename())
 
@@ -1099,8 +1145,12 @@ class GenBlk(GenCommon):
             'vwnd','wspd','sustr','svstr',\
             'cloud' # not used, but add it anyway
 
+    names=list(names)
+    for name in ('wspd','sustr','svstr'):
+      if not name in nc.varnames: names.remove(name)
+
     for i in names:
-      if isinstance(i,basestring): filev,datav=i,i
+      if cb.isstr(i): filev,datav=i,i
       else:  filev,datav=i
 
       if datav not in data.keys():
@@ -1167,7 +1217,7 @@ class GenBlk(GenCommon):
 
 
       for i in names:
-        if isinstance(i,basestring): filev,datav=i,i
+        if cb.isstr(i): filev,datav=i,i
         else:  filev,datav=i
 
         newName = filev+'_old'
@@ -1196,7 +1246,7 @@ class GenBlk(GenCommon):
 
     # store new wind data:
     for i in names:
-      if isinstance(i,basestring): filev,datav=i,i 
+      if cb.isstr(i): filev,datav=i,i
       else:  filev,datav=i
 
       if not quiet: print('  %s (%s) min=%8.3f max=%8.3f' % (filev.ljust(7),datav.ljust(7),

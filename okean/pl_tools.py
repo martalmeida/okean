@@ -290,6 +290,10 @@ class InteractiveRect:
     self.line=False
     self.lineOpts=lineOpts
 
+    if not 'marker' in lineOpts: self.lineOpts['marker']='s'
+    self.lineOpts['ms']=0
+    self.lineOpts['picker']=True
+
     self.cmd=cmd
     self.axis=axis
 
@@ -415,6 +419,275 @@ class InteractiveRect:
     if callable(self.cmd): return self.cmd()
 
 
+class InteractiveEllipse:
+  @staticmethod
+  def ellipse(major,minor,inc,phase=0,pos=(0,0)):
+    def cart2pol(x,y): return np.angle(x+1j*y),np.abs(x+1j*y)
+    def pol2cart(a,r): return r*np.cos(a),r*np.sin(a)
+
+    #t=np.linspace(0,2*np.pi,360)
+    t=np.arange(0,361,1)*np.pi/180
+    x=major*np.cos(t-phase*np.pi/180)
+    y=minor*np.sin(t-phase*np.pi/180)
+    th,r=cart2pol(x,y)
+    x,y=pol2cart(th+inc*np.pi/180,r)
+    return x+pos[0],y+pos[1]
+
+  @staticmethod
+  def point_to_param(x,y,inc,t=45,phase=0):
+    inc=inc*np.pi/180
+    X =  x*np.cos(inc)+y*np.sin(inc)
+    Y = -x*np.sin(inc)+y*np.cos(inc)
+
+    major=X/np.cos(t*np.pi/180-phase*np.pi/180)
+    minor=Y/np.sin(t*np.pi/180-phase*np.pi/180)
+    return major,minor
+
+  def __init__(self,ax=False,cmd=False,axis=False,**lineOpts):
+    if not ax: ax=plt.gca()
+    self.x=[]
+    self.y=[]
+    self.line=False
+    self.line_aux=False # scale
+    self.line_aux2=False # rot
+    self.line_aux3=False # axis
+    self.line_aux4=False # scale both
+    self.lineOpts=lineOpts
+
+    self.auxOpts={}
+    self.auxOpts['picker']=True
+    self.auxOpts3={}
+    self.auxOpts3['picker']=True
+
+    self.etask=''
+
+    self.cmd=cmd
+    self.axis=axis
+
+    self.ax=ax
+    self.figure=ax.figure
+    self.events={}
+
+    self.pind=0 # any...
+    self.start()
+
+  def start(self):
+    # start line creation
+    self.events['mousedown'] = self.figure.canvas.mpl_connect('button_press_event', self.mouseclick)
+    self.events['mouseup']   = self.figure.canvas.mpl_connect('button_release_event', self.stop)
+
+    # enable/disable edition witj key "e"
+    self.events['key']=self.figure.canvas.mpl_connect('key_press_event', self.onkey)
+
+  def edit(self):
+
+    def onpick(event):
+      thisline = event.artist
+      if event.mouseevent.button==1:
+
+        if thisline in [self.line_aux2,self.line_aux3,self.line_aux4]:
+          # ver linha aux3 so com pick (sem mouse move):
+          self.line_aux3.set(lw=0.5)
+          #self._xi=event.mouseevent.xdata
+          #self._yi=event.mouseevent.ydata
+          self._xi=self.x0+self.major*1.5*np.cos(self.inc*np.pi/180)
+          self._yi=self.y0+self.major*1.5*np.sin(self.inc*np.pi/180)
+          self.update_line()
+
+        if thisline is self.line_aux:
+          self.pind=event.ind
+          self.etask='scale'
+          self.events['mousemove'] = self.figure.canvas.mpl_connect('motion_notify_event', self.mousemove)
+        elif thisline is self.line_aux2:
+          self.pind=event.ind
+          self.etask='rotate'
+
+          ## ver linha aux3 so com pick (sem mouse move):
+          #self.line_aux3.set(lw=0.5)
+          #self._xi=event.mouseevent.xdata
+          #self._yi=event.mouseevent.ydata
+          #self.update_line()
+
+          self.events['mousemove'] = self.figure.canvas.mpl_connect('motion_notify_event', self.mousemove)
+
+        elif thisline is self.line_aux4:
+          self.pind=event.ind
+          self.etask='scale_both'
+
+          self.events['mousemove'] = self.figure.canvas.mpl_connect('motion_notify_event', self.mousemove)
+
+      else:
+        self.remove_line()
+
+    if self.line:
+      self.line_aux.set(mfc='#cccccc',mec='b',ms=5)
+      self.line_aux2.set(mfc='#cccccc',mec='y',ms=5,lw=0.5)
+      self.line_aux3.set(lw=0.5)
+      self.line_aux4.set(mfc='#cccccc',mec='y',ms=5,lw=0.5)
+      self.events['pick']=self.figure.canvas.mpl_connect('pick_event', onpick)
+      self.figure.canvas.draw()
+
+
+  def edit_stop(self):
+    if self.line:
+      self.line_aux.set(mfc='w',mec='r',ms=0)
+      self.line_aux2.set(mfc='w',mec='r',ms=0,lw=0)
+      self.line_aux3.set(lw=0)
+      self.line_aux4.set(mfc='w',mec='y',ms=0,lw=0)
+      self.figure.canvas.mpl_disconnect(self.events['pick'])
+      self.figure.canvas.draw()
+
+  def onkey(self,event):
+    if event.key=='e':
+      if self.line_aux.get_markersize()==0: self.edit()
+      else: self.edit_stop()
+
+  def update_line(self):
+    self.major=np.abs(self.major)
+    self.minor=np.abs(self.minor)
+
+    self.x,self.y=self.ellipse(self.major,self.minor,self.inc,self.phase,pos=(self.x0,self.y0))
+    if not self.line:
+      if not 'alpha'in self.lineOpts: self.lineOpts['alpha']=0.7
+      if not 'color'in self.lineOpts: self.lineOpts['color']='r'
+      self.line,=self.ax.plot(self.x,self.y,**self.lineOpts)
+      xx=self.x[0],self.x[90],self.x[180],self.x[270],self.x0
+      yy=self.y[0],self.y[90],self.y[180],self.y[270],self.y0
+      self.line_aux,=self.ax.plot(xx,yy,'s',ms=0,**self.auxOpts)
+
+      p0=np.asarray([self.x0,self.y0])
+      p1=np.asarray([self.x[0],self.y[0]])
+      p2=p0+(p1-p0)*1.2
+      p3=p0+(p1-p0)*1.5
+      xx=p2[0],p3[0]
+      yy=p2[1],p3[1]
+      xx,yy=xx[-1],yy[-1] # ver so ultimo ponto!!
+      self.line_aux2,=self.ax.plot(xx,yy,'s-',ms=0,lw=0,**self.auxOpts)
+
+      xx=self.x0,self._xi
+      yy=self.y0,self._yi
+      self.line_aux3,=self.ax.plot(xx,yy,'b:',ms=0,lw=0.5,**self.auxOpts3)
+
+      xx=self.x[45]
+      yy=self.y[45]
+      self.line_aux4,=self.ax.plot(xx,yy,'D',ms=0,lw=0.5,**self.auxOpts3)
+
+    else:
+      self.line.set_data(self.x,self.y)
+      xx=self.x[0],self.x[90],self.x[180],self.x[270],self.x0
+      yy=self.y[0],self.y[90],self.y[180],self.y[270],self.y0
+      self.line_aux.set_data(xx,yy)
+      p0=np.asarray([self.x0,self.y0])
+      p1=np.asarray([self.x[0],self.y[0]])
+      p2=p0+(p1-p0)*1.2
+      p3=p0+(p1-p0)*1.5
+      xx=p2[0],p3[0]
+      yy=p2[1],p3[1]
+      xx,yy=xx[-1],yy[-1] # ver so ultimo ponto!!
+      self.line_aux2.set_data(xx,yy)
+
+      if 0:
+        xx=self.x0,self._xi
+        yy=self.y0,self._yi
+      else:
+        m0=p0
+        m1=np.asarray([self.x[180],self.y[180]])
+        m2=p0-(p1-p0)*1.5
+        xx=m2[0],self._xi
+        yy=m2[1],self._yi
+
+        q1=np.asarray([self.x[90],self.y[90]])
+        q2=p0+(q1-p0)*1.5
+        q3=np.asarray([self.x[270],self.y[270]])
+        q4=p0+(q3-p0)*1.5
+        xx=xx+(np.nan,q2[0],q4[0])
+        yy=yy+(np.nan,q2[1],q4[1])
+
+      self.line_aux3.set_data(xx,yy)
+
+      xx=self.x[45]
+      yy=self.y[45]
+      self.line_aux4.set_data(xx,yy)
+
+    if self.axis: self.ax.axis(self.axis)
+    self.figure.canvas.draw()
+
+  def remove_line(self):
+    if self.line in self.ax.lines:
+      self.ax.lines.remove(self.line)
+      self.ax.lines.remove(self.line_aux)
+      self.ax.lines.remove(self.line_aux2)
+      self.ax.lines.remove(self.line_aux3)
+      self.ax.lines.remove(self.line_aux4)
+      self.figure.canvas.draw()
+      self.line=False
+      self.x=[]
+      self.y=[]
+
+
+  def mouseclick(self,event):
+    self.button=event.button
+
+    self.x=np.asarray((event.xdata))
+    self.y=np.asarray((event.ydata))
+    self.x0=event.xdata
+    self.y0=event.ydata
+
+    self.events['mousemove'] = self.figure.canvas.mpl_connect('motion_notify_event', self.mousemove)
+
+  def mousemove(self,event):
+    if event.inaxes:## self.x and not event.xdata is None and not event.ydata is None:
+
+      self._xi=self.x0
+      self._yi=self.y0
+      if self.etask=='rotate':
+        self.inc=np.arctan2(event.ydata-self.y0,event.xdata-self.x0)*180/np.pi
+        self._xi=event.xdata
+        self._yi=event.ydata
+      elif self.etask=='scale':
+        if 0 in self.pind or 2 in self.pind:
+          self.major=((event.xdata-self.x0)**2+(event.ydata-self.y0)**2)**.5
+        elif 1 in self.pind or 3 in self.pind:
+          self.minor=((event.xdata-self.x0)**2+(event.ydata-self.y0)**2)**.5
+        elif 4 in self.pind: # move the whole ellipse
+          self.x0=event.xdata
+          self.y0=event.ydata
+
+        # para visualizar correctamente aux3:
+        self._xi=self.x0+self.major*1.5*np.cos(self.inc*np.pi/180)
+        self._yi=self.y0+self.major*1.5*np.sin(self.inc*np.pi/180)
+
+      elif self.etask=='scale_both':
+        self.major,self.minor=self.point_to_param(event.xdata-self.x0,event.ydata-self.y0,self.inc,t=45,phase=0)
+
+        # para visualizar correctamente aux3:
+        self._xi=self.x0+self.major*1.5*np.cos(self.inc*np.pi/180)
+        self._yi=self.y0+self.major*1.5*np.sin(self.inc*np.pi/180)
+
+      else: # 1st gen
+        self.major=event.xdata-self.x0
+        self.minor=event.ydata-self.y0
+        self.inc=0
+        self.phase=0
+
+        self._xi=self.x0+self.major*1.5
+        self._yi=self.y0
+
+      self.update_line()
+
+  def stop(self,e):
+    events='mousedown','mousemove'
+    for n in events:
+      if n in self.events: self.figure.canvas.mpl_disconnect(self.events[n])
+
+    if self.line_aux3:
+      self.line_aux3.set(lw=0)
+      self.figure.canvas.draw()
+
+    # do something after line is created:
+    if callable(self.cmd): return self.cmd()
+
+
 def _trend_cmap(cmap,x):
   def original_colors(ncolors):
     mm=plt.cm.ScalarMappable(cmap=cmap)
@@ -513,7 +786,7 @@ class cmap_aux:
 
   def _invert(self,c):
     if isinstance(c,plt.matplotlib.colors.LinearSegmentedColormap):
-      return invert_lsc(c) 
+      return invert_lsc(c)
     elif isinstance(c,plt.matplotlib.colors.ListedColormap):
       return invert_lc(c)
 
@@ -714,7 +987,7 @@ class ucmaps(cmap_aux):
                          (0.3,  0.61,  0.61),
                          (0.9,  0.0,   0.0),
                          (1.0,  0.85,  0.0))}
-      cdict=plt.cm.revcmap(cdict)
+      #cdict=plt.cm.revcmap(cdict)
 
     else:
       i=((28,23,3),(28,28,3),(28,3,23),(28,3,28),
@@ -729,20 +1002,26 @@ class ucmaps(cmap_aux):
         'green': _cm.gfunc[g],
         'blue': _cm.gfunc[b]}
 
-    cdict=plt.cm.revcmap(cdict)
+    #cdict=plt.cm.revcmap(cdict)
     return plt.matplotlib.colors.LinearSegmentedColormap('oceano_%02d'%ind,cdict,256)
 
 
 def invert_lsc(C):
   '''Invert linearSegmentedColormap'''
-  r=plt.cm.revcmap(C._segmentdata)
-  return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
+  #r=plt.cm.revcmap(C._segmentdata)
+  #return plt.matplotlib.colors.LinearSegmentedColormap(C.name+'_r',r,C.N)
+  C1=C.reversed()
+  C1.name=C.name+'_r'
+  return C1
 
 
 def invert_lc(C):
   '''Invert ListedColormap'''
-  r=np.flipud(C.colors)
-  return plt.matplotlib.colors.ListedColormap(r, name=C.name+'_r', N=C.N)
+  #r=np.flipud(C.colors)
+  #return plt.matplotlib.colors.ListedColormap(r, name=C.name+'_r', N=C.N)
+  C1=C.reversed()
+  C1.name=C.name+'_r'
+  return C1
 
 
 class ncview_cmaps(cmap_aux):
@@ -810,7 +1089,9 @@ cm=ucmaps()
 
 # other colormaps,
 # basemap:
-from mpl_toolkits. basemap import cm as cm_basemap
+try:
+  from mpl_toolkits.basemap import cm as cm_basemap
+except:pass
 
 # ncview:
 cm_ncview=ncview_cmaps()

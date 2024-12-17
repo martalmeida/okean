@@ -100,6 +100,8 @@ def cross_lon0(x,y,v):
   #i=np.where(x[0]==180.)[0]
   i=np.where(x[0]>180.)[0]
   L=len(i)
+  if L==0: return x,y,v
+
 #  print x[0].min(),x[0].max()
   i=i[0]
   X=x.copy()

@@ -180,7 +180,7 @@ def load_data(f,quiet=0,**kargs):
     res['NZ']=1
 
   # about horizontal inds:
-  if sett.xdim in inds and len(inds[sett.xdim])==2 and not isinstance(inds[sett.xdim],basestring):
+  if sett.xdim in inds and len(inds[sett.xdim])==2 and not cb.isstr(inds[sett.xdim]):
     if not quiet: print('  calc horizontal inds...')
     xlim=inds[sett.xdim]
     ylim=inds[sett.ydim]
@@ -256,7 +256,8 @@ def load_data(f,quiet=0,**kargs):
     res['depth'] = -netcdf.use(ncZ,sett.z_name,**inds)
   else: res['depth']=False
 
-  if res['lon'].size!=res['lat'].size:
+  #if res['lon'].size!=res['lat'].size: --> may have same size and be 1d !!
+  if res['lon'].ndim==1:
     res['lon'],res['lat']=np.meshgrid(res['lon'],res['lat'])
     # needed for griddata, later
 

@@ -64,7 +64,7 @@ def rgui_tools(master):
   b.w.grid(row=0, column=1)
   out['nozoom']=b
 
-  b = bButton(h, state=0,image='path',toggle=0)#, command=callback)
+  b = bButton(h, state=0,image='path',toggle=1)#, command=callback)
   b.w.grid(row=1, column=0)
   out['path']=b
 
@@ -86,7 +86,8 @@ def rgui_tools(master):
 
   return out
 
-#master = tk.Tk()
-#o=rgui_tools(master)
-#o['base'].pack()
-#tk.mainloop()
+if 0:
+  master = tk.Tk()
+  o=rgui_tools(master)
+  o['base'].pack()
+  tk.mainloop()

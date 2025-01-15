@@ -181,10 +181,10 @@ def load_blkdata_cordex(cordexClim,date0=False,date1=False,quiet=True,grd=False)
   return out
 
 
-def load_blkdata_era5(datapath,date0=False,date1=False,quiet=True):
+def load_blkdata_era5(datapath,date0=False,date1=False,quiet=True,uvstress=False):
   from okean.datasets import era5
   a=era5.ERA5Data(datapath)
-  data=a.data(date0,date1,quiet)
+  data=a.data(date0,date1,quiet,uvstress=uvstress)
 
   out=OrderedDict()
   time=data['time']
@@ -680,8 +680,12 @@ def make_blk_era5(datapath,grd,bulk,date0=False,date1=False,**kargs):
   create = kargs.get('create',1)
   model  = kargs.get('model','roms') # or roms-agrif
   proj   = kargs.get('proj','auto')
+  dt     = kargs.get('dt','auto')
 
-  data=load_blkdata_era5(datapath,date0,date1,quiet)
+  #uvstress=model=='roms-agrif'
+  uvstress=kargs.get('uvstress',False)
+
+  data=load_blkdata_era5(datapath,date0,date1,quiet,uvstress)
 
   if not grd is False:
     g=roms.Grid(grd)
@@ -711,7 +715,14 @@ def make_blk_era5(datapath,grd,bulk,date0=False,date1=False,**kargs):
   q=gennc.GenBlk(bulk,grd,**kargs)
   if create: q.create(model=model,original=original,wspeed=wspeed,wstress=wstress)
 
+  if dt=='auto': hours=range(24)
+  else: hours=range(0,24,dt)
+
   for d in data:
+    if not d.hour in hours:
+      print('-> not including %s'%d.isoformat())
+      continue
+
     if model=='roms':
        if not quiet: print('  converting units:'),
        conv_units(data[d],model,quiet)

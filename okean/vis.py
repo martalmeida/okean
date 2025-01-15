@@ -686,7 +686,7 @@ class Vis(visCfg):
 
     C=self.config['vfield.C']
     if C:
-      if C is 'speed':
+      if C == 'speed':
         C=np.sqrt(u[m]**2+v[m]**2)
       else: C=C[m]
       args=x[m],y[m],u[m],v[m],C

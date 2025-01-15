@@ -107,6 +107,8 @@ def wind_rose(D,F,**kargs):
   if Ag is False:
     from okean import ticks
     Ag,sAg=ticks.loose_label_n(F.min(),F.max(),ntick=7,labels=True)
+  else:
+    sAg=['%g'%i for i in Ag]
 
   E=np.zeros([len(Ay)-1,len(Ag)-1])
   for i in range(len(Ay)-1):

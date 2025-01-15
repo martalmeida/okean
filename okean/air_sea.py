@@ -294,8 +294,8 @@ def cloud_fraction(lw,Tsea,Tair,Rh,Wtype='net'):
   TairK=Tair+C2K
   TseaK=Tsea+C2K
 
-  if Wtype is 'down':  LW=lwhf(TseaK,lw)
-  elif Wtype is 'net': LW=lw
+  if Wtype=='down':  LW=lwhf(TseaK,lw)
+  elif Wtype=='net': LW=lw
 
   cff  = (0.7859+0.03477*Tair)/(1.0+0.00412*Tair)
   sat  = 10.0**cff   # saturation vapor pressure (hPa or mbar)

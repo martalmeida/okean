@@ -35,13 +35,13 @@ class ERA5Data:
     self.files=glob.glob(os.path.join(self.basefolder,'*.nc'))
 
 
-  def data(self,date0=False,date1=False,quiet=True):
+  def data(self,date0=False,date1=False,quiet=True,uvstress=False):
     '''
     Returns atm data form all times in basefolder files or between
     date0 (>=) and date1 (<=)
     '''
     # get data for all times in file:
-    res=era5_file_data(self.files,quiet=quiet)
+    res=era5_file_data(self.files,quiet=quiet,uvstress=uvstress)
     time=res['time']
     if date0:
       date0=dateu.parse_date(date0)
@@ -134,7 +134,7 @@ def fill_tend(v,fill='prev'):
   return vv
 
 
-def era5_file_data(files,quiet=False):
+def era5_file_data(files,quiet=False,uvstress=False):
   '''
   ECMWF ERA5 data for ROMS
 
@@ -433,7 +433,7 @@ def era5_file_data(files,quiet=False):
   out['uwnd']=Data(x,y,uwnd,'m s-1')
   out['vwnd']=Data(x,y,vwnd,'m s-1')
   # speed and stress:
-  if 0:
+  if uvstress:
     if not quiet: print(' --> calc wind speed and stress')
     speed = np.sqrt(uwnd**2+vwnd**2)
     taux,tauy=air_sea.wind_stress(uwnd,vwnd)

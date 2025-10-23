@@ -1622,6 +1622,8 @@ class MHis():
       f=os.path.splitext(grd)[0][:-1]+'*'+os.path.splitext(grd)[1]
       gfiles=glob.glob(f)
       gfiles.sort()
+    else:
+      gfiles=grd
 
     if grd:
       self._his=[]

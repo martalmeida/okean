@@ -232,7 +232,8 @@ def use(filename,varname,interface='auto',**kargs):
 
   # mask nan
   maskNaN=kargs.get('maskNaN',True)
-  if maskNaN and not res.dtype.type==np.string_ and not np.ma.isMA(res) and np.any(np.isnan(res)):
+  #if maskNaN and not res.dtype.type==np.string_ and not np.ma.isMA(res) and np.any(np.isnan(res)):
+  if maskNaN and not res.dtype.type==np.bytes_ and not np.ma.isMA(res) and np.any(np.isnan(res)):
     res=np.ma.masked_where(np.isnan(res),res)
 
   return res

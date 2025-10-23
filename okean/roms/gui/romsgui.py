@@ -1441,6 +1441,8 @@ class rgui:
          atype.find('average')>=0 or atype.find('restart')>=0 or\
          atype.find('climatology')>=0:
 
+      if f.startswith('http'): multiple=False
+
       if not multiple:
         self.files['his']=[f] # do not look for other files, like nesting ones inside roms.MHis
       else:
@@ -1462,7 +1464,8 @@ class rgui:
         #        print f, grd
         #        self.files['His']=roms.Grid(f,grd)
       else:
-        self.files['grid']=f
+        if f.startswith('http'): self.files['grid']=[f]
+        else: self.files['grid']=f
         self.reset_file('grid')
 
       #######self.files['His']=roms.His(f)

@@ -37,10 +37,10 @@ def load_blkdata_gfs(gfspath,date0,date1=False,nforec=0,quiet=True):
   return out, miss
 
 
-def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,quiet=True):
+def load_blkdata_wrf(wrfpath,wrffiles='wrfout*',date0=False,date1=False,exclude_initial=True,quiet=True):
   from okean.datasets import wrf
   a=wrf.WRFData(wrfpath,wrffiles)
-  data=a.data(date0,date1,quiet)
+  data=a.data(date0,date1,exclude_initial=exclude_initial,quiet=quiet)
 
   out=OrderedDict()
   if not data:
@@ -572,8 +572,9 @@ def make_blk_wrf(wrfpath,grd,bulk,date0=False,date1=False,**kargs):
   wrffiles=kargs.get('wrffiles','wrfout*')
   dt     = kargs.get('dt',6)
   proj   = kargs.get('proj','auto')
+  exc_ini= kargs.get('exclude_initial',True)
 
-  data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,quiet)
+  data=load_blkdata_wrf(wrfpath,wrffiles,date0,date1,exclude_initial=exc_ini,quiet=quiet)
 
   if not len(data): return
 

@@ -32,7 +32,7 @@ class GenCommon:
     self.title     = kargs.get('title', 'ROMS file')
     self.tunits    = kargs.get('tunits','days since 1970-01-01')
     self.cycle     = kargs.get('cycle',  False)
-    self.ncversion = kargs.get('ncversion',3)
+    self.ncversion = kargs.get('ncversion','NETCDF4_CLASSIC')
     self.attr      = kargs.get('attr',{})
 
     self.filename  = filename
@@ -846,6 +846,7 @@ class GenBlk(GenCommon):
   def __init__(self,filename,grid,**kargs):
     if not 'type'  in kargs: kargs['type']  = 'ROMS Bulk forcing file'
     if not 'title' in kargs: kargs['title'] = 'ROMS Bulk forcing file'
+    if not 'tunits' in kargs: kargs['tunits'] = 'seconds since 1970-01-01'
 
     GenCommon.__init__(self,filename,grid,**kargs)
 
@@ -900,7 +901,9 @@ class GenBlk(GenCommon):
     # Variables:
     if model=='roms': time_vname='time'
     elif model=='roms-agrif': time_vname='bulk_time'
-    v=nc.add_var(time_vname,np.dtype('d'),('time',))
+##    v=nc.add_var(time_vname,np.dtype('d'),('time',))
+##    v=nc.add_var(time_vname,np.int64,('time',)) # so funciona com NETCDF4
+    v=nc.add_var(time_vname,np.int32,('time',))   # int32 funciona com ambos e é mais q suficiente!
     v.add_att('long_name','bulk formulation atmospheric forcing time')
     v.add_att('units',self.tunits)
     if self.cycle: v.add_att('cycle_length',self.cycle)

@@ -227,6 +227,13 @@ def type_2dtype(type,**kargs):
   if 'isstr'  in kargs.keys(): isstr  = kargs['isstr']
   if 'isbool' in kargs.keys(): isbool = kargs['isbool']
 
+  def is_dtype(d):
+    for k in np.sctypes:
+      if d in np.sctypes[k]: return True
+
+    return False
+
+
   if cb.isstr(type):
     if len(type)==1: # is a numeric typecode
       return type_numeric2numpy(type,strlen=strlen)
@@ -235,7 +242,8 @@ def type_2dtype(type,**kargs):
     else: # is netcdf type name:
       return type_nc2numpy(type,strlen=strlen,isstr=isstr,isbool=isbool)
 
-  elif isinstance(type,np.dtype): return type
+  #elif isinstance(type,np.dtype): return type # nao funciona mais !!
+  elif is_dtype(type): return type
   else: return False
 
 

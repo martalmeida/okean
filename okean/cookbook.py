@@ -191,7 +191,7 @@ def username(name=False):
 
 
 def machinename():
-  if os.name is 'posix':
+  if os.name=='posix':
     res=run0('hostname --fqdn 2>/dev/null')
     if len(res): return res[0]
     else: return run0('hostname')[0]

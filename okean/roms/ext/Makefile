@@ -15,14 +15,14 @@ check:
 	f2py -c --help-fcompiler
 
 defaul:
-	f2py -c alga.f -m alga
-	f2py -c rtools.f -m rtools
+	f2py -c alga.f90 -m alga
+	f2py -c rtools.f90 -m rtools
 
 alga:
 	f2py -c alga_.f -m alga_ --fcompiler=$(FCname)
 
 rtools:
-	f2py -c rtools.f -m rtools --fcompiler=$(FCname)
+	f2py -c rtools.f90 -m rtools --fcompiler=$(FCname)
 
 rtools_test:
 	f2py -c rtools_test.f -m rtools_test --fcompiler=$(FCname)

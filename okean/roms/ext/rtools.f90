@@ -12,20 +12,30 @@
       return
       end
 
+
       function interp_lin(z,v,lev,N)
+      ! Nos extremos extrapola linearmente usado o primeiro ou ultimo declives
       integer :: k, N
       real ( kind = 8 ) :: z(N), v(N), lev, interp_lin
       real (kind=8) :: a,b
-      k=2
-      do while (z(k).lt.lev)
-        k=k+1
-      enddo
+
+      if (lev.le.z(1)) then
+        k=2
+      else if (lev.gt.z(N)) then
+        k=N
+      else
+        do k=2,N
+          if (lev.le.z(k)) then
+            exit
+          endif
+        enddo
+      endif
+
       a=z(k)-lev
       b=lev-z(k-1)
       interp_lin=(v(k)*b+v(k-1)*a)/(a+b)
       return
       end
-
 
       subroutine roms_slicez(s,v,h,zeta,tts,ttb,hc,Nr, &
       Vtransform,Vstretching,lev,SN,SPL, &
@@ -101,6 +111,94 @@
       endif
 
       end
+
+
+      subroutine generic_slicez(u,v,z,mask,lev,SPL,S,M,N)
+
+      integer :: S,M,N,i,j,k
+      real ( kind=8 ) :: z(S,M,N),v(S,M,N), mask(S,M,N), &
+                         u(M,N),lev(M,N), interp_lin,interp_spl, &
+                         kini(M,N),kend(M,N)
+      logical :: SPL ! use spline instead of linear interpolation
+
+!f2py intent(out) u
+
+
+      ! 999 --> k0 (initial level not masked) higher than val
+      ! 9999 --> all water column lower than val
+      ! -999 --> all masked
+
+
+      ! assume q z aumenta de 1 para S
+
+      nDec=0
+      do i=1,M
+        do j=1,N
+          ! assumir q existe mascara so num (ou ambos) os extremos
+          ! achar 1o ultimos elementos nao mascarado
+          k0=0
+          k1=0
+          do k=1,S
+            if ((k0.eq.0).and.(mask(k,i,j).eq.1)) then
+              k0=k
+            else if ((k0.gt.0).and.(k1.eq.0).and.(mask(k,i,j).eq.0)) then
+              k1=k-1
+            endif
+          enddo
+          if ((k0.gt.0).and.(k1.eq.0)) then
+            k1=S
+          endif
+
+          kini(i,j)=k0
+          kend(i,j)=k1
+        enddo
+      enddo
+
+
+      do i=1,M
+        do j=1,N
+          k0=kini(i,j)
+          k1=kend(i,j)
+
+          if ((k0.gt.0).and.(k1.gt.0)) then
+            if (k0.eq.k1) then ! se so tem um avalor nao mascarado
+              if (z(k0,i,j).eq.lev(i,j)) then
+                u(i,j)=z(k0,i,j)
+              else
+                u(i,j)=999. ! como se primeiro valor ja fora do rango
+              endif
+            else
+              if (z(k0,i,j).le.lev(i,j)) then
+                if (z(k1,i,j).ge.lev(i,j)) then
+
+                  if ((i.eq.101).and.(j.eq.101)) then
+                    print*,k0,k1,z(k0:k1,i,j),lev(i,j)
+                    print*,k0,k1,v(k0:k1,i,j),lev(i,j)
+                  endif
+
+                  if (SPL) then
+                    u(i,j)=interp_spl(z(k0:k1,i,j),v(k0:k1,i,j),lev(i,j),k1-k0+1)
+                  else
+                    u(i,j)=interp_lin(z(k0:k1,i,j),v(k0:k1,i,j),lev(i,j),k1-k0+1)
+                  endif
+
+                else
+                   ! primeiro valor ok, mas lev nao encontado no rango
+                   u(i,j)=9999.
+                endif
+              else
+                u(i,j)=999. ! primeiro valor ja esta fora do rango
+              endif
+
+            endif ! k0 eq k1
+          else
+             u(i,j)=-999. ! tudo mascarado
+          endif
+        enddo
+      enddo
+
+      end
+
 
 
       subroutine scoord(theta_s,theta_b,N,sc_r,Cs_r,sc_w,Cs_w, &
@@ -381,7 +479,7 @@
         do j=1,N
           if (mask(i,j).eq.1) then
             if (v(1,i,j).gt.v(S,i,j)) then
-              nInc=nInc+1
+              nInc=nInc+1 ! aumenta da superfiie para o fundo
             else
               nDec=nDec+1
             endif
@@ -393,18 +491,18 @@
       else
         dir=0
       endif
-!      print*, 'DIR=',dir, nInc, nDec
+      !print*, 'DIR=',dir, nInc, nDec
 
-      if (dir.eq.1) then ! increases:
+      if (dir.eq.1) then ! increases with depth (from k=S to k=1)
          do i=1,M
            do j=1,N
              depth(i,j)=999.
              if ((mask(i,j).eq.1).and.(v(S,i,j).le.val(i,j))) then
-               do k=S,2,-1
+               do k=S-1,1,-1
                  if (v(k,i,j).gt.val(i,j)) then
-                   a=v(k,i,j)-val(i,j)
-                   b=val(i,j)-v(k+1,i,j)
-                   depth(i,j)=(z(k,i,j)*b+z(k+1,i,j)*a)/(a+b)
+                   a=v(k+1,i,j)-val(i,j)
+                   b=val(i,j)-v(k,i,j)
+                   depth(i,j)=(z(k,i,j)*a+z(k+1,i,j)*b)/(a+b)
                    exit
                  endif
                enddo
@@ -415,16 +513,16 @@
            enddo
          enddo
 
-      else !  decrease
+      else !  decrease with depth (from k=S to k=1)
          do i=1,M
            do j=1,N
              depth(i,j)=999.
              if ((mask(i,j).eq.1).and.(v(S,i,j).ge.val(i,j))) then
-               do k=S,2,-1
+               do k=S-1,1,-1
                  if (v(k,i,j).lt.val(i,j)) then
-                   a=v(k,i,j)-val(i,j)
-                   b=val(i,j)-v(k+1,i,j)
-                   depth(i,j)=(z(k,i,j)*b+z(k+1,i,j)*a)/(a+b)
+                   a=v(k+1,i,j)-val(i,j)
+                   b=val(i,j)-v(k,i,j)
+                   depth(i,j)=(z(k,i,j)*a+z(k+1,i,j)*b)/(a+b)
                    exit
                  endif
                enddo
@@ -432,6 +530,148 @@
                  depth(i,j)=9999.
                endif
              endif
+           enddo
+         enddo
+
+
+      endif
+
+      end
+
+      subroutine  depthof_mask3d(v,z,mask,val,S,M,N,depth)
+      ! a busca comeca em k0=1 (ou proximo indice nao mascarado)
+      ! ou seja, em geral, para oceano admite-se q k=1 seja a superficie
+
+      integer :: S, mask(S,M,N),dir, nInc, nDec
+      integer :: k0,k1,kini(M,N),kend(M,N)
+      real (kind=8) :: v(S,M,N),z(S,M,N),depth(M,N),val(M,N)
+      real (kind=8) :: a,b
+      real (kind=8) :: interp_lin
+
+!f2py intent(out) depth
+
+      ! 999 --> surface higher than val
+      ! 9999 --> all water column lower than val
+      ! -999 --> all masked
+
+
+      ! find if v increases or decreases with depth:
+
+      dir=0
+      nInc=0
+      nDec=0
+      do i=1,M
+        do j=1,N
+          ! assumir q existe mascara so num (ou ambos) os extremos
+          ! achar 1o ultimos elementos nao mascarado
+          k0=0
+          k1=0
+          do k=1,S
+            if ((k0.eq.0).and.(mask(k,i,j).eq.1)) then
+              k0=k
+            else if ((k0.gt.0).and.(k1.eq.0).and.(mask(k,i,j).eq.0)) then
+              k1=k-1
+            endif
+          enddo
+          if ((k0.gt.0).and.(k1.eq.0)) then
+            k1=S
+          endif
+
+          kini(i,j)=k0
+          kend(i,j)=k1
+
+          if ((k0.gt.0).and.(k1.gt.0).and.v(k0,i,j).gt.v(k1,i,j)) then
+            nDec=nDec+1 ! diminiu de k0 para k1
+          else
+            nInc=nInc+1 ! aumenta de k0 para k1
+          endif
+        enddo
+      enddo
+
+      if (nInc.gt.nDec) then
+        dir=1
+      else
+        dir=0
+      endif
+      !print*, 'DIR=',dir, nInc, nDec
+
+      if (dir.eq.1) then ! increases de k0 para k1
+         do i=1,M
+           do j=1,N
+             k0=kini(i,j)
+             k1=kend(i,j)
+             if ((k0.gt.0).and.(k1.gt.0)) then
+               if (k0.eq.k1) then ! se so tem um avalor nao mascarado
+                 if (v(k0,i,j).eq.val(i,j)) then
+                   depth(i,j)=z(k0,i,j)
+                 else
+                   depth(i,j)=999. ! como se primeiro valor ja fora do rango
+                 endif
+               else
+                 if (v(k0,i,j).le.val(i,j)) then
+                   if (v(k1,i,j).ge.val(i,j)) then
+                     !depth(i,j)=interp_lin(v(k0:k1,i,j),z(k0:k1,i,j),val(i,j),k1-k0+1)
+                     ! interp_lin e interp_spl pode dar maus resultados
+                     ! (incluindo extrapolacoes) pois v[k0:j1,i,j] nao cresce
+                     ! monotonicamente. Ou seja, vou procurar nivel a nivel:
+                     do k=k0+1,k1
+                       if (v(k,i,j).gt.val(i,j)) then
+                         a=v(k-1,i,j)-val(i,j)
+                         b=val(i,j)-v(k,i,j)
+                         depth(i,j)=(z(k,i,j)*a+z(k-1,i,j)*b)/(a+b)
+                         exit
+                       endif
+                     enddo
+                   else
+                     ! primeiro valor ok, mas val nao encontado no rango
+                     depth(i,j)=9999.
+                   endif
+                 else
+                   depth(i,j)=999. ! primeiro valor ja esta fora do rango
+                 endif
+               endif ! k0 eq k1
+             else
+               depth(i,j)=-999. ! tudo mascarado
+             endif
+
+           enddo
+         enddo
+
+      else !  decrease de k0 para k1
+         do i=1,M
+           do j=1,N
+             k0=kini(i,j)
+             k1=kend(i,j)
+             if ((k0.gt.0).and.(k1.gt.0)) then
+               if (k0.eq.k1) then ! se so tem um avalor nao mascarado
+                 if (v(k0,i,j).eq.val(i,j)) then
+                   depth(i,j)=z(k0,i,j)
+                 else
+                   depth(i,j)=999. ! como se primeiro valor ja fora do rango
+                 endif
+               else
+                 if (v(k0,i,j).ge.val(i,j)) then
+                   if (v(k1,i,j).le.val(i,j)) then
+                     do k=k0+1,k1
+                       if (v(k,i,j).lt.val(i,j)) then
+                         a=v(k-1,i,j)-val(i,j)
+                         b=val(i,j)-v(k,i,j)
+                         depth(i,j)=(z(k,i,j)*a+z(k-1,i,j)*b)/(a+b)
+                         exit
+                       endif
+                     enddo
+                   else
+                     ! primeiro valor ok, mas val nao encontrado no rango
+                     depth(i,j)=9999.
+                   endif
+                 else
+                   depth(i,j)=999. ! primeiro valor ja esta fora do rango
+                 endif
+               endif ! k0 eq k1
+             else
+               depth(i,j)=-999. ! tudo mascarado
+             endif ! k0>0 e k1>0
+
            enddo
          enddo
 

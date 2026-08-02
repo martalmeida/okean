@@ -65,7 +65,11 @@ class Derived:
 
         # coords at rho needed for okubo','hdiv','rvort, so:
         if any([i in coords for i in 'xy']):
-          x,y,h,m=self.grid.vars(ruvp='r')
+          # rvort at is at psi
+          if var=='rvort':
+            x,y,h,m=self.grid.vars(ruvp='p')
+          else:
+            x,y,h,m=self.grid.vars(ruvp='r')
 
         if 'x' in coords:
           if self.grid.spherical:
@@ -119,7 +123,9 @@ class Derived:
 
         out.coordsReq=','.join(sorted(coords))
 
-        out.set_projection(self.grid.proj_info['basemap_opts'])
+        p=self.grid.get_projection(cartopy=1)
+        out.set_projection(p,extent=self.grid.proj_info['extent'])
+
 
         return out
 

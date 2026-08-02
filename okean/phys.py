@@ -49,44 +49,79 @@ def vorticity(u,v,pm,pn):
   Compute the relative vorticity
   '''
 
-  Mp,Lp=pm.shape
-  L=Lp-1
-  M=Mp-1
-  Lm=L-1
-  Mm=M-1
+  dx=1/pm
+  dy=1/pn
 
-  uom = 2.*u/(pm[:,:L]+pm[:,1:Lp])
-  uon = 2.*u/(pn[:,:L]+pn[:,1:Lp])
-  von = 2.*v/(pn[0:M,:]+pn[1:Mp,:])
-  vom = 2.*v/(pm[0:M,:]+pm[1:Mp,:])
+  dx=(dx[:,1:]+dx[:,:-1])/2 # at u
+  dx=(dx[1:]+dx[:-1])/2 # at psi
 
-  mn=pm*pn
-  mn_p=(mn[:M,:L]+mn[:M,1:Lp]+mn[1:Mp,1:Lp]+mn[1:Mp,:L])/4.
+  dy=(dy[:,1:]+dy[:,:-1])/2 # at u
+  dy=(dy[1:]+dy[:-1])/2 # at psi
 
-  # relative vorticity:
-  xi=mn*rt.psi2rho(von[:,1:Lp]-von[:,:L]-uom[1:Mp,:]+uom[:M,:])
+  dvdx=(v[:,1:]-v[:,:-1])/dx
+  dudy=(u[1:]-u[:-1])/dy
 
-  return xi
+  return dvdx-dudy
+
+  ## or, using roms_tools:
+
+  #Mp,Lp=pm.shape
+  #L=Lp-1
+  #M=Mp-1
+  #Lm=L-1
+  #Mm=M-1
+  #
+  #uom = 2.*u/(pm[:,:L]+pm[:,1:Lp])
+  #uon = 2.*u/(pn[:,:L]+pn[:,1:Lp])
+  #von = 2.*v/(pn[0:M,:]+pn[1:Mp,:])
+  #vom = 2.*v/(pm[0:M,:]+pm[1:Mp,:])
+  #
+  #mn=pm*pn
+  #mn_p=(mn[:M,:L]+mn[:M,1:Lp]+mn[1:Mp,1:Lp]+mn[1:Mp,:L])/4.
+  #
+  #xi=mn_p*(von[:,1:Lp]-von[:,:L]-uom[1:Mp,:]+uom[:M,:])
+  ## at rho:
+  #xi=rt.psi2rho(xi)
+  #
+  #return xi
 
 
 def hor_div(u,v,pm,pn):
   '''
   Compute the horizontal divergence
   '''
-  Mp,Lp=pm.shape
-  L  = Lp-1
-  M  = Mp-1
-  Lm = L-1
-  Mm = M-1
-  Dtype=u.dtype
+  dx=1/pm
+  dy=1/pn
 
-  uom = 2.*u/(pm[:,:L]+pm[:,1:Lp])
-  uon = 2.*u/(pn[:,:L]+pn[:,1:Lp])
-  von = 2.*v/(pn[0:M,:]+pn[1:Mp,:])
-  vom = 2.*v/(pm[0:M,:]+pm[1:Mp,:])
+  dudx=(u[:,1:]-u[:,:-1])/dx[:,1:-1] # at rho, excluding 1st and last cols
+  dvdy=(v[1:]-v[:-1])/dy[1:-1] # at rho, excluding 1st and last rows
 
-  mn  = pm*pn
-  # Horizontal divergence:
-  hdiv = mn[1:-1,1:-1]* ((vom[1:,1:L]-vom[:-1,1:L])+(uon[1:M,1:]-uon[1:M,:-1]))
+  dx=(dx[:,1:]+dx[:,:-1])/2 # at u
+  dx=(dx[1:]+dx[:-1])/2 # at psi
 
+  dy=(dy[:,1:]+dy[:,:-1])/2 # at u
+  dy=(dy[1:]+dy[:-1])/2 # at psi
+
+  dvdx=(v[:,1:]-v[:,:-1])/dx
+  dudy=(u[1:]-u[:-1])/dy
+
+  hdiv=dudx[1:-1]+dvdy[:,1:-1]
   return hdiv
+
+  ## or, using roms_tools:
+
+  #Mp,Lp=pm.shape
+  #L  = Lp-1
+  #M  = Mp-1
+  #Lm = L-1
+  #Mm = M-1
+  #
+  #uom = 2.*u/(pm[:,:L]+pm[:,1:Lp])
+  #uon = 2.*u/(pn[:,:L]+pn[:,1:Lp])
+  #von = 2.*v/(pn[0:M,:]+pn[1:Mp,:])
+  #vom = 2.*v/(pm[0:M,:]+pm[1:Mp,:])
+  #
+  #mn  = pm*pn
+  ## Horizontal divergence:
+  #hdiv = mn[1:-1,1:-1]* ((vom[1:,1:L]-vom[:-1,1:L])+(uon[1:M,1:]-uon[1:M,:-1]))
+  #return hdiv

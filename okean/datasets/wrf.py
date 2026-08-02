@@ -21,16 +21,21 @@ class WRFData:
   '''GFS data extraction'''
 
   def __init__(self,basefolder,files='wrfout*'):
-    self.basefolder=basefolder
 
-    import glob
-    import os
-    self.files=glob.glob(os.path.join(self.basefolder,files))
-    self.files.sort()
+    if isinstance(files,list):
+      self.files=files
+    else:
+      self.basefolder=basefolder
+      import glob
+      import os
+      self.files=glob.glob(os.path.join(self.basefolder,files))
+      self.files.sort()
 
 
-  def data(self,date0=False,date1=False,quiet=True):
+  def data_deprecated(self,date0=False,date1=False,quiet=True):
     '''
+    Use data instead.
+
     Returns atm data form all times in basefolder files or between
     date0 (>=) and date1 (<=)
    '''
@@ -69,6 +74,60 @@ class WRFData:
             out[k]=np.hstack((out[k],res[k][i0:]))
           else:
             out[k].data=np.concatenate((out[k].data,res[k].data[i0:]))
+
+    return out
+
+  def data(self,date0=False,date1=False,exclude_initial=True,quiet=True):
+    # can deal with repeated times, replacing with "best", most recent data among several file
+
+    if date0 is False: date0=datetime.datetime(1,1,1)
+    else: date0=dateu.parse_date(date0)
+
+    if date1 is False: date1=datetime.datetime(9999,1,1)
+    else: date1=dateu.parse_date(date1)
+
+    out=None
+    for f in self.files:
+      time=read_time(f)
+      #print(time[0],time[-1])
+      if not np.any((time>=date0)&(time<=date1)): continue
+
+      if not quiet: print('-> extracting file %s'%f)
+      res=wrf_file_data(f,quiet=quiet)
+      time=res['time']
+      i,=np.where(time>=date0)
+      j,=np.where(time<=date1)
+      i=i[0]
+      j=j[-1]
+
+      if exclude_initial:
+        if not quiet: print(' --> excluding initial time')
+        i=max(i,1)
+
+      for k in res.keys():
+        if k =='time':
+          res[k]=res[k][i:j+1]
+        else:
+          res[k].data=res[k].data[i:j+1]
+
+
+      if not out:
+        out=res
+      else:
+        for i1,t1 in enumerate(res['time']):
+          if t1 in out['time']: # replace
+            i0=np.where(out['time']==t1)[0][0]
+            for k in out:
+              if k=='time': continue
+              out[k].data[i0]=res[k].data[i1]
+          else: # append:
+            if t1>out['time'][-1]:
+              for k in out:
+                if k=='time': out[k]=np.hstack((out[k],t1))
+                else: out[k].data=np.vstack((out[k].data,res[k].data[i1][np.newaxis]))
+            else:
+              print('ERROR!!!')
+              return
 
     return out
 
@@ -116,9 +175,12 @@ def accum2avg(v,dt): # accum from initial reccord!
 #    day0=Day0+datetime.datetime(
 
 
-def read_time(file):
-  return parse_time(netcdf.use(file,'Times'))
- 
+def read_time(f):
+  if 'XTIME' in netcdf.varnames(f):
+    return netcdf.nctime(f,'XTIME')
+  else:
+    return parse_time(netcdf.use(f,'Times'))
+
 
 def wrf_file_data(file,quiet=False):
   '''
@@ -199,6 +261,19 @@ def wrf_file_data(file,quiet=False):
   if not quiet: print(' --> U and V wind')
   uwnd=netcdf.use(file,'U10')
   vwnd=netcdf.use(file,'V10')
+
+  if not quiet: print(' --> rotating to earth relative')
+  # https://forum.mmm.ucar.edu/threads/are-u-v-wind-components-grid-relative.947/
+  # https://forum.mmm.ucar.edu/threads/converting-model-grid-relative-wind-to-earth-relative-wind.179/
+  if 'SINALPHA' in netcdf.varnames(file):
+    sina=netcdf.use(file,'SINALPHA')
+    cosa=netcdf.use(file,'COSALPHA')
+    u_earth = uwnd*cosa - vwnd*sina
+    v_earth = vwnd*cosa + uwnd*sina
+    uwnd,vwnd=u_earth,v_earth
+  else:
+    if not quiet: print(' --> WARNING : cannot rotate, SINALPHA not found')
+
   if not quiet: print(' --> calc wind speed and stress')
   speed = np.sqrt(uwnd**2+vwnd**2)
   taux,tauy=air_sea.wind_stress(uwnd,vwnd)
@@ -220,7 +295,7 @@ def wrf_file_data(file,quiet=False):
 #    clouds=netcdf.use(file,'CLDFRA').sum(-3)
 #    clouds=np.where(clouds>1,1,clouds)
   else:
-    if not quiet: print('CLDFRA not found!! Using SST and air_sea.cloud_fraction')
+    if not quiet: print(' --> CLDFRA not found!! Using SST and air_sea.cloud_fraction')
     sst=netcdf.use(file,'SST')-273.15
     clouds=air_sea.cloud_fraction(lw_net,sst,tair,rhum,Wtype='net')
     clouds[clouds<0]=0

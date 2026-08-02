@@ -125,11 +125,19 @@ def nctime_old(filename,varname,interface='auto',**kargs):
 
 
 def nctime(filename,varname,**kargs):
-  time=use(filename,varname,**kargs)
-  if time is None: return
-  units=vatt(filename,varname,'units')
-  try: cal=vatt(filename,varname,'calendar')
-  except: cal='standard'
+  nc,close=__open(filename,interface='auto')
+
+  time=use(nc,varname,**kargs)
+  if time is None:
+    nc.close()
+    return
+
+  atts=nc.vars[varname].atts
+  units=atts['units'].value
+  if 'calendar' in atts: cal=atts['calendar'].value
+  else: cal='standard'
+
+  if close: nc.close()
 
   # older  ROMS output files the calendar attribute must be fixed!
   if cal=='gregorian_proleptic': cal='proleptic_gregorian'

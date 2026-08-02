@@ -819,11 +819,14 @@ class His(Common,Derived):
         i0,i1=inds['xi']
         j0,j1=inds['eta']
 
-      xr=xr[j0:j1,i0:i1]
-      yr=yr[j0:j1,i0:i1]
-      h=h[j0:j1,i0:i1]
-      m=m[j0:j1,i0:i1]
-      zeta= zeta[j0:j1,i0:i1]
+      xi=slice(i0,i1)
+      eta=slice(j0,j1)
+
+      xr=xr[eta,xi]
+      yr=yr[eta,xi]
+      h=h[eta,xi]
+      m=m[eta,xi]
+      zeta= zeta[eta,xi]
 
     if np.ma.is_masked(zeta):
       # h=np.ma.masked_where(zeta.mask,h)
@@ -834,7 +837,7 @@ class His(Common,Derived):
     else:# probably a clm/ini file. Mask maskc point (pygridgen complex grid):
       if 'maskc' in netcdf.varnames(self.grid.nc):
         mc=self.grid.use('maskc')
-        if inds: mc=mc[j0:j1,i0:i1]
+        if inds: mc=mc[eta,xi]
         h=np.ma.masked_where(mc==0,h)
         zeta=np.ma.masked_where(mc==0,zeta)
 
@@ -844,14 +847,39 @@ class His(Common,Derived):
     # better interpolate the gaps, otherwise s_levels will use default
     # values for zeta and h:
     X=np.arange(h.size)
-    if np.ma.is_masked(h): h=np.interp(X,X[~h.mask],h[~h.mask])
-    if np.ma.is_masked(zeta): zeta=np.interp(X,X[~zeta.mask],zeta[~zeta.mask])
-    
+    # for slice without points on water, h and zeta are fully masked:
+    cnd0=np.ma.is_masked(h) and h.count()==0
+    cnd1=np.ma.is_masked(zeta) and zeta.count()==0
+    if cnd0 or cnd1: # conditions shoud be the same...
+      N=self.S_RHO
+      zw=np.zeros((N+1,x.size))*np.nan
+      zr=np.zeros((N,x.size))*np.nan
+      zr=np.ma.masked_where(np.isnan(zr),zr)
+      zw=np.ma.masked_where(np.isnan(zw),zw)
+      if rw==False: return zr,zw
+      elif rw=='w': return zw
+      else: return zr
 
-###    return h,zeta,self.s_params,rw
-    return rt.s_levels(h,zeta,self.s_params,rw=rw)
-###    z=np.squeeze(z)
-###    return np.ma.masked_where(np.isnan(z),z)
+      # same as:
+      #h=np.zeros(h.size)+1000
+      #zeta=np.zeros(zeta.size)
+      #if rw==False:
+      #  zr,zr=rt.s_levels(h,zeta,self.s_params,rw=rw)
+      #  zr*=np.nan
+      #  zw*=np.nan
+      #  zr=np.ma.masked_where(np.isnan(zr),zr)
+      #  zw=np.ma.masked_where(np.isnan(zw),zw)
+      #  return zr,zw
+      #else:
+      #  zz=rt.s_levels(h,zeta,self.s_params,rw=rw)
+      #  zz*=np.nan
+      #  zz=np.ma.masked_where(np.isnan(zz),zz)
+      #  return zz
+
+    else:
+      if np.ma.is_masked(h): h=np.interp(X,X[~h.mask],h[~h.mask])
+      if np.ma.is_masked(zeta): zeta=np.interp(X,X[~zeta.mask],zeta[~zeta.mask])
+      return rt.s_levels(h,zeta,self.s_params,rw=rw)
 
 
   def s_levels(self,time,loc='rr',i=False,j=False,k=False,extrapZeta=False):
@@ -1237,38 +1265,41 @@ class His(Common,Derived):
     out=vis.Data()
     out.label='slicell'
     out.msg=self.check_slice(varname,t=time)
-    if out.msg: return out#None,aux
+    if out.msg: return out
 
     X=np.asarray(X)
     Y=np.asarray(Y)
     if X.ndim>1: X=np.squeeze(X)
     if Y.ndim>1: Y=np.squeeze(X)
 
-###    x,y,h,m=self.grid.vars(ruvp=self.var_at(varname)[0])
     x,y,h,m=self.grid.vars(ruvp=self.vloc(varname)[0])
-    if True: # extrat only portion of data needed:
+    if True: # extract only a portion of data needed:
       i0,i1,j0,j1=calc.ij_limits(x, y, (X.min(),X.max()),(Y.min(),Y.max()), margin=1)
       xi=slice(i0,i1)
       eta=slice(j0,j1)
 
       if data is False: V=self.use(varname,SEARCHtime=time,xi_SEARCH=xi,eta_SEARCH=eta)
-      #else: v=data[...,j0:j1,i0:i1]
-      else: V=data[...,j0:j1,i0:i1]
+      else: V=data[...,eta,xi]
 
-      x=x[j0:j1,i0:i1]
-      y=y[j0:j1,i0:i1]
-      h=h[j0:j1,i0:i1]
-      m=m[j0:j1,i0:i1]
+      x=x[eta,xi]
+      y=y[eta,xi]
+      h=h[eta,xi]
+      m=m[eta,xi]
 
     else:
       if data is False: V=self.use(varname,SEARCHtime=time)
-      #else: v=data
       else: V=data
 
     if V.ndim==3:
-      v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
+      if np.all(m==0):
+        v=np.zeros((V.shape[0],X.size))*np.nan
+        v=np.ma.masked_where(np.isnan(v),v)
+      else: v=calc.griddata(x,y,V,X,Y,extrap=extrap,mask2d=m==0, keepMaskVal=maskLimit)
     elif V.ndim==2:
-      v=calc.griddata(x,y,np.ma.masked_where(m==0,V),X,Y,extrap=extrap, keepMaskVal=maskLimit)
+      if np.all(m==0):
+        v=np.zeros(X.size)*np.nan
+        v=np.ma.masked_where(np.isnan(v),v)
+      else: v=calc.griddata(x,y,np.ma.masked_where(m==0,V),X,Y,extrap=extrap, keepMaskVal=maskLimit)
 
     out.v=v
     out.info['v']['name']=varname
@@ -1276,16 +1307,13 @@ class His(Common,Derived):
     try: out.info['v']['units']=netcdf.vatt(self.nc,varname,'units')
     except: pass
 
-
     # coords:
     if 'z' in coords and V.ndim==3:
       inds=dict(xi=(i0,i1),eta=(j0,j1))
-#########      out.z=self.path_s_levels(time,X,Y,rw=varname[0],inds=inds)
-###      out.z=self.path_s_levels(time,X,Y,rw=self.var_at(varname)[1],inds=inds)
-###
-#######      out.z,zw=self.path_s_levels(time,X,Y,rw=False,inds=inds)
-#######      if self.vloc(varname)[1]=='w': out.z=zw
-      out.z=self.path_s_levels(time,X,Y,rw=self.vloc(varname)[1],inds=inds)
+
+      if np.all(m==0): out.z=out.v.copy()
+      else: out.z=self.path_s_levels(time,X,Y,rw=self.vloc(varname)[1],inds=inds)
+
       out.info['z']=dict(name='Depth',units='m')
 
     if 'd' in coords:
@@ -1309,31 +1337,33 @@ class His(Common,Derived):
       out.y=Y
       out.info['y']=dict(name='Latitude',units=r'$\^o$N')
 
-#######    if 't' in coords and self.hast(varname): out.t=self.time[time]
     if 't' in coords and 't' in self.vaxes(varname): out.t=self.time[time]
 
-    if v.ndim==2: ################3 and not out.z is None: # zeta and bottom already calculated
+    if v.ndim==2:
       out.extra=[vis.Data()]
       if 'd' in coords: out.extra[0].x=out.d[0]
       if 'x' in coords: out.extra[0].y=out.x[0]
       if 'y' in coords: out.extra[0].x=out.y[0]
-####      #h=-zw[0]
+
       h    = calc.griddata(x,y,h,X,Y,extrap=False)
       out.extra[0].v=-h # bottom
       out.extra[0].config['d1.plot']='fill_between'
       out.extra[0].config['d1.y0']=-h.max()-(h.max()-h.min())/20.
       out.extra[0].label='bottom'
 
-
-
     out.coordsReq=','.join(sorted(coords))
     return out
 
 
-  def sliceuv(self,ind,time=0,**opts):#plot=False,**opts):
+  def sliceuv(self,ind,time=0,**opts):
     coords=opts.get('coords',self._default_coords('sliceuv')).split(',')
 
-    if ind=='bar':
+    if isinstance(ind,np.ndarray):
+       # assumir ind nos pontos rho!
+       indu=(ind[:,1:]+ind[:,:-1])/2
+       indv=(ind[1:]+ind[:-1])/2
+       slc,uname,vname,ind = self.slicez,  'u','v', [indu,indv]
+    elif ind=='bar':
       slc,uname,vname,ind = self.slicek, 'ubar','vbar', 9999
     elif ind in ('s','surf','surface'):
       slc,uname,vname,ind = self.slicek,  'u','v', -1
@@ -1342,8 +1372,11 @@ class His(Common,Derived):
     elif ind <0:
       slc,uname,vname,ind = self.slicez, 'u','v', ind
 
-    outu=slc(uname,ind,time,**opts)
-    outv=slc(vname,ind,time,**opts)
+    try: indu,indv=ind
+    except: indu=indv=ind
+
+    outu=slc(uname,indu,time,**opts)
+    outv=slc(vname,indv,time,**opts)
 
     if   outu.msg: return outu
     elif outv.msg: return outv
@@ -1487,10 +1520,16 @@ class His(Common,Derived):
     else:
       out.msg=self.check_slice(varname,t=np.max(times)) 
 
+
+    # check if x,y inside domain:
+    xb,yb=self.grid.border(margin=-1) # larger 1 cell
+    inp=calc.inpolygon(x,y,xb,yb)
+    if not inp:
+      out.msg='site not inside domain'
+
     if out.msg: return out
 
     # find nearest point:
-###    lon,lat,hr,mr=self.grid.vars(ruvp=self.var_at(varname))
     lon,lat,hr,mr=self.grid.vars(ruvp=self.vloc(varname))
     dist=(lon-x)**2+(lat-y)**2
     i,j=np.where(dist==dist.min())
